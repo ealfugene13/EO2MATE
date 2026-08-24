@@ -100,6 +100,11 @@ export default function PortalPage({ session }) {
   const [deliverySearch, setDeliverySearch] = useState("");
   const [deliveryStatusFilter, setDeliveryStatusFilter] = useState("ALL");
   const [deliveryDetail, setDeliveryDetail] = useState(null);
+  const [bookingReference, setBookingReference] = useState("");
+  const [trackingNumber, setTrackingNumber] = useState("");
+  const [trackingUrl, setTrackingUrl] = useState("");
+  const [deliveryActionLoading, setDeliveryActionLoading] = useState(false);
+  const [deliveryActionMessage, setDeliveryActionMessage] = useState("");
 
   useEffect(() => {
     loadPortal();
@@ -259,26 +264,99 @@ export default function PortalPage({ session }) {
     }
   }
 
+  async function loadDeliveryDetail(deliveryId) {
+    const { data, error } = await supabase
+      .from("client_delivery_detail")
+      .select("*")
+      .eq("delivery_id", deliveryId)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    setDeliveryDetail(data);
+    setBookingReference(data?.booking_reference || "");
+    setTrackingNumber(data?.tracking_number || "");
+    setTrackingUrl(data?.tracking_url || "");
+
+    return data;
+  }
+
   async function openDelivery(deliveryId) {
     setPage("delivery-detail");
     setDetailLoading(true);
     setDeliveryDetail(null);
+    setDeliveryActionMessage("");
     setErrorMessage("");
 
     try {
-      const { data, error } = await supabase
-        .from("client_delivery_detail")
-        .select("*")
-        .eq("delivery_id", deliveryId)
-        .maybeSingle();
-
-      if (error) throw error;
-
-      setDeliveryDetail(data);
+      await loadDeliveryDetail(deliveryId);
     } catch (error) {
       setErrorMessage(error.message || "Unable to load delivery detail.");
     } finally {
       setDetailLoading(false);
+    }
+  }
+
+  async function confirmManualBooking(event) {
+    event.preventDefault();
+    if (!deliveryDetail?.delivery_id) return;
+
+    setDeliveryActionLoading(true);
+    setDeliveryActionMessage("");
+    setErrorMessage("");
+
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        "confirm-manual-delivery-booking",
+        {
+          body: {
+            delivery_id: deliveryDetail.delivery_id,
+            booking_reference: bookingReference.trim() || null,
+            tracking_number: trackingNumber.trim(),
+            tracking_url: trackingUrl.trim() || null,
+          },
+        },
+      );
+
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.message || "Unable to confirm booking.");
+
+      await loadDeliveryDetail(deliveryDetail.delivery_id);
+      setDeliveryActionMessage("Booking confirmed successfully.");
+    } catch (error) {
+      setErrorMessage(error.message || "Unable to confirm booking.");
+    } finally {
+      setDeliveryActionLoading(false);
+    }
+  }
+
+  async function updateDeliveryStatus(nextStatus) {
+    if (!deliveryDetail?.delivery_id) return;
+
+    setDeliveryActionLoading(true);
+    setDeliveryActionMessage("");
+    setErrorMessage("");
+
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        "update-delivery-status",
+        {
+          body: {
+            delivery_id: deliveryDetail.delivery_id,
+            delivery_status: nextStatus,
+          },
+        },
+      );
+
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.message || "Unable to update delivery status.");
+
+      await loadDeliveryDetail(deliveryDetail.delivery_id);
+      setDeliveryActionMessage(`Delivery moved to ${statusLabel(nextStatus)}.`);
+    } catch (error) {
+      setErrorMessage(error.message || "Unable to update delivery status.");
+    } finally {
+      setDeliveryActionLoading(false);
     }
   }
 
@@ -953,8 +1031,8 @@ export default function PortalPage({ session }) {
                 <header className="dashboard-header">
                   <div>
                     <p className="eyebrow">DELIVERY DETAIL</p>
-                    <h1>{deliveryDetail.order_number}</h1>
-                    <p>{deliveryDetail.item_label}</p>
+                    <h1>{deliveryDetail.group_number || deliveryDetail.order_number || deliveryDetail.delivery_id}</h1>
+                    <p>{deliveryDetail.item_label || (deliveryDetail.order_group_id ? "Consolidated shipment" : "Shipment")}</p>
                   </div>
                   <StatusBadge status={deliveryDetail.delivery_status} />
                 </header>
@@ -964,8 +1042,10 @@ export default function PortalPage({ session }) {
                     <div className="detail-card-header"><h2>Courier</h2></div>
                     <DetailRow label="Courier code" value={deliveryDetail.courier_code || "-"} />
                     <DetailRow label="Courier name" value={deliveryDetail.courier_name || "-"} />
+                    <DetailRow label="Courier status" value={deliveryDetail.courier_status || "-"} />
                     <DetailRow label="Booking reference" value={deliveryDetail.booking_reference || "-"} />
                     <DetailRow label="Tracking number" value={deliveryDetail.tracking_number || "-"} />
+                    <DetailRow label="Tracking URL" value={deliveryDetail.tracking_url || "-"} />
                     <DetailRow label="Shipping fee" value={formatCurrency(deliveryDetail.shipping_fee)} />
                   </div>
 
@@ -985,22 +1065,74 @@ export default function PortalPage({ session }) {
                     <div className="detail-card-header"><h2>Timeline</h2></div>
                     <DetailRow label="Booked at" value={formatDateTime(deliveryDetail.booked_at)} />
                     <DetailRow label="Picked up at" value={formatDateTime(deliveryDetail.picked_up_at)} />
-                    <DetailRow label="Shipped / Transit" value={formatDateTime(deliveryDetail.shipped_at)} />
+                    <DetailRow label="In transit at" value={formatDateTime(deliveryDetail.shipped_at)} />
                     <DetailRow label="Delivered at" value={formatDateTime(deliveryDetail.delivered_at)} />
                     <DetailRow label="Failed at" value={formatDateTime(deliveryDetail.failed_at)} />
                     <DetailRow label="Cancelled at" value={formatDateTime(deliveryDetail.cancelled_at)} />
                   </div>
                 </section>
 
-                <section className="detail-card">
-                  <div className="detail-card-header"><h2>Related order & payment</h2></div>
-                  <DetailRow label="Order status" value={deliveryDetail.order_status || "-"} />
-                  <DetailRow label="Payment status" value={deliveryDetail.latest_payment_status || deliveryDetail.payment_status || "-"} />
-                  <DetailRow label="Order total" value={formatCurrency(deliveryDetail.total_amount)} />
-                  <DetailRow label="Payment amount" value={formatCurrency(deliveryDetail.payment_amount)} />
-                  <DetailRow label="Payment provider" value={deliveryDetail.provider || "-"} />
-                  <DetailRow label="Paid at" value={formatDateTime(deliveryDetail.payment_paid_at)} />
-                </section>
+                {deliveryDetail.delivery_status === "READY_FOR_BOOKING" && (
+                  <section className="form-card">
+                    <div className="form-card-header">
+                      <div>
+                        <h2>Confirm Manual Courier Booking</h2>
+                        <p>After booking in J&T, enter the actual booking and tracking details.</p>
+                      </div>
+                    </div>
+
+                    <form className="inline-form-grid" onSubmit={confirmManualBooking}>
+                      <label>
+                        Booking Reference
+                        <input type="text" value={bookingReference} onChange={(e) => setBookingReference(e.target.value)} placeholder="Optional" />
+                      </label>
+
+                      <label>
+                        Tracking Number
+                        <input type="text" value={trackingNumber} onChange={(e) => setTrackingNumber(e.target.value)} placeholder="Required" required />
+                      </label>
+
+                      <label className="wide-field">
+                        Tracking URL
+                        <input type="url" value={trackingUrl} onChange={(e) => setTrackingUrl(e.target.value)} placeholder="Optional" />
+                      </label>
+
+                      <div className="wide-field form-actions">
+                        <button className="primary-button" type="submit" disabled={deliveryActionLoading}>
+                          {deliveryActionLoading ? "Saving..." : "Confirm Booking"}
+                        </button>
+                      </div>
+                    </form>
+                  </section>
+                )}
+
+                {deliveryDetail.delivery_status === "BOOKED" && (
+                  <section className="action-card">
+                    <div><h2>Parcel Pickup</h2><p>Use this when the courier has physically received the parcel.</p></div>
+                    <button className="primary-button" disabled={deliveryActionLoading} onClick={() => updateDeliveryStatus("PICKED_UP")}>Mark Picked Up</button>
+                  </section>
+                )}
+
+                {deliveryDetail.delivery_status === "PICKED_UP" && (
+                  <section className="action-card">
+                    <div><h2>Shipment In Transit</h2><p>Use this when the parcel is moving through the courier network.</p></div>
+                    <button className="primary-button" disabled={deliveryActionLoading} onClick={() => updateDeliveryStatus("IN_TRANSIT")}>Mark In Transit</button>
+                  </section>
+                )}
+
+                {deliveryDetail.delivery_status === "IN_TRANSIT" && (
+                  <section className="action-card">
+                    <div><h2>Delivery Completion</h2><p>Use this only after the parcel reaches the recipient.</p></div>
+                    <button className="primary-button" disabled={deliveryActionLoading} onClick={() => updateDeliveryStatus("DELIVERED")}>Mark Delivered</button>
+                  </section>
+                )}
+
+                {deliveryDetail.delivery_status === "DELIVERED" && (
+                  <section className="completion-card">
+                    <strong>Delivery completed</strong>
+                    <span>{formatDateTime(deliveryDetail.delivered_at)}</span>
+                  </section>
+                )}
               </>
             ) : null}
           </>
