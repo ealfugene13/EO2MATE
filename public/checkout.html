@@ -28,7 +28,9 @@
       color: #1f2937;
     }
 
-    button {
+    button,
+    input,
+    select {
       font: inherit;
     }
 
@@ -46,8 +48,8 @@
       margin: 0 auto;
       padding: 18px 0;
       display: flex;
-      justify-content: space-between;
       align-items: center;
+      justify-content: space-between;
       gap: 16px;
     }
 
@@ -196,8 +198,8 @@
     }
 
     .button:disabled {
-      cursor: not-allowed;
       opacity: 0.5;
+      cursor: not-allowed;
     }
 
     .payment-disabled {
@@ -228,12 +230,41 @@
       text-align: center;
     }
 
-    .address {
-      line-height: 1.7;
-    }
-
     .hidden {
       display: none !important;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns:
+        repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .form-field {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .form-field.full {
+      grid-column: 1 / -1;
+    }
+
+    .form-field label {
+      color: #4b5563;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .form-field input,
+    .form-field select {
+      width: 100%;
+      padding: 12px 13px;
+      background: #ffffff;
+      color: #111827;
+      border: 1px solid #d1d5db;
+      border-radius: 9px;
     }
 
     @media (max-width: 600px) {
@@ -257,6 +288,14 @@
       .summary-value {
         text-align: left;
       }
+
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .form-field.full {
+        grid-column: auto;
+      }
     }
   </style>
 </head>
@@ -266,7 +305,6 @@
 <div class="page">
 
   <header class="header">
-
     <div class="header-inner">
 
       <div class="brand">
@@ -278,15 +316,12 @@
       </div>
 
     </div>
-
   </header>
 
 
   <main class="container">
 
-    <!-- =====================================================
-         LOADING
-         ===================================================== -->
+    <!-- LOADING -->
 
     <div
       id="loading"
@@ -304,9 +339,7 @@
     </div>
 
 
-    <!-- =====================================================
-         ERROR
-         ===================================================== -->
+    <!-- ERROR -->
 
     <div
       id="errorPage"
@@ -321,20 +354,18 @@
         id="errorMessage"
         class="muted"
       >
-        This checkout link could not be loaded.
       </p>
 
     </div>
 
 
-    <!-- =====================================================
-         CHECKOUT
-         ===================================================== -->
+    <!-- CHECKOUT -->
 
     <div
       id="checkoutPage"
       class="hidden"
     >
+
 
       <!-- SELLER -->
 
@@ -380,7 +411,7 @@
       </section>
 
 
-      <!-- ORDER SUMMARY -->
+      <!-- SUMMARY -->
 
       <section class="card">
 
@@ -389,7 +420,6 @@
         </h2>
 
         <div class="summary-row">
-
           <span class="summary-label">
             Reference
           </span>
@@ -399,12 +429,10 @@
             class="summary-value"
           >
           </span>
-
         </div>
 
 
         <div class="summary-row">
-
           <span class="summary-label">
             Subtotal
           </span>
@@ -414,12 +442,10 @@
             class="summary-value"
           >
           </span>
-
         </div>
 
 
         <div class="summary-row">
-
           <span class="summary-label">
             Shipping
           </span>
@@ -429,19 +455,16 @@
             class="summary-value"
           >
           </span>
-
         </div>
 
 
         <div class="total-row">
-
           <span>
             Total
           </span>
 
           <span id="totalAmount">
           </span>
-
         </div>
 
       </section>
@@ -459,9 +482,10 @@
         </h2>
 
         <div class="muted">
-          Choose whether you want to checkout these items now or keep the
-          order open for possible additional auction wins.
+          Choose whether to checkout now or wait for possible
+          additional auction wins.
         </div>
+
 
         <button
           id="payNowButton"
@@ -471,6 +495,7 @@
           Pay Now
         </button>
 
+
         <button
           id="waitButton"
           class="button button-secondary"
@@ -478,6 +503,7 @@
         >
           Wait for More Items
         </button>
+
 
         <div
           id="choiceMessage"
@@ -489,7 +515,202 @@
       </section>
 
 
-      <!-- SHIPPING -->
+      <!-- SHIPPING FORM -->
+
+      <section
+        id="shippingFormSection"
+        class="card hidden"
+      >
+
+        <h2 class="card-title">
+          Shipping details
+        </h2>
+
+        <div
+          class="muted"
+          style="margin-bottom: 18px;"
+        >
+          Complete your delivery information before proceeding to payment.
+        </div>
+
+
+        <form id="shippingForm">
+
+          <div class="form-grid">
+
+
+            <div class="form-field">
+
+              <label for="shippingNameInput">
+                Recipient name
+              </label>
+
+              <input
+                id="shippingNameInput"
+                type="text"
+                required
+              />
+
+            </div>
+
+
+            <div class="form-field">
+
+              <label for="shippingPhoneInput">
+                Phone
+              </label>
+
+              <input
+                id="shippingPhoneInput"
+                type="tel"
+                required
+              />
+
+            </div>
+
+
+            <div class="form-field full">
+
+              <label for="shippingAddress1Input">
+                Address line 1
+              </label>
+
+              <input
+                id="shippingAddress1Input"
+                type="text"
+                required
+              />
+
+            </div>
+
+
+            <div class="form-field full">
+
+              <label for="shippingAddress2Input">
+                Address line 2
+              </label>
+
+              <input
+                id="shippingAddress2Input"
+                type="text"
+              />
+
+            </div>
+
+
+            <div class="form-field">
+
+              <label for="shippingCityInput">
+                City
+              </label>
+
+              <input
+                id="shippingCityInput"
+                type="text"
+                required
+              />
+
+            </div>
+
+
+            <div class="form-field">
+
+              <label for="shippingProvinceInput">
+                Province
+              </label>
+
+              <input
+                id="shippingProvinceInput"
+                type="text"
+                required
+              />
+
+            </div>
+
+
+            <div class="form-field">
+
+              <label for="shippingPostalInput">
+                Postal code
+              </label>
+
+              <input
+                id="shippingPostalInput"
+                type="text"
+                required
+              />
+
+            </div>
+
+
+            <div class="form-field">
+
+              <label for="shippingCountryInput">
+                Country
+              </label>
+
+              <input
+                id="shippingCountryInput"
+                type="text"
+                value="PH"
+                required
+              />
+
+            </div>
+
+
+            <div class="form-field full">
+
+              <label for="courierInput">
+                Courier
+              </label>
+
+              <select
+                id="courierInput"
+                required
+              >
+
+                <option value="">
+                  Select courier
+                </option>
+
+                <option value="JNT">
+                  J&T Express
+                </option>
+
+                <option value="LALAMOVE">
+                  Lalamove
+                </option>
+
+              </select>
+
+            </div>
+
+          </div>
+
+
+          <button
+            id="saveShippingButton"
+            class="button button-primary"
+            type="submit"
+          >
+            Save Shipping Details
+          </button>
+
+
+          <div
+            id="shippingMessage"
+            class="notice hidden"
+            style="margin-top: 14px;"
+          >
+          </div>
+
+        </form>
+
+      </section>
+
+
+      <!-- DELIVERY SUMMARY -->
 
       <section class="card">
 
@@ -535,7 +756,7 @@
 
           <span
             id="shippingAddress"
-            class="summary-value address"
+            class="summary-value"
           >
           </span>
 
@@ -568,7 +789,13 @@
         </h2>
 
 
-        <!-- PAYMONGO AVAILABLE -->
+        <div
+          id="paymentWaiting"
+          class="notice hidden"
+        >
+          Complete shipping details before payment.
+        </div>
+
 
         <div
           id="onlinePayment"
@@ -576,7 +803,7 @@
         >
 
           <div class="notice notice-success">
-            Online payment is available for this order.
+            Online payment is available.
           </div>
 
           <button
@@ -590,8 +817,6 @@
         </div>
 
 
-        <!-- PAYMONGO NOT AVAILABLE -->
-
         <div
           id="manualPayment"
           class="payment-disabled hidden"
@@ -602,7 +827,7 @@
           </div>
 
           <div class="muted">
-            This seller has not enabled online payment for this checkout.
+            This seller has not enabled PayMongo.
             Please coordinate payment directly with the seller.
           </div>
 
@@ -623,16 +848,8 @@
      CONFIG
      ========================================================= */
 
-  const SUPABASE_FUNCTION_BASE =
+  const FUNCTION_BASE =
     "https://ithmrccqlmuodylilfsx.supabase.co/functions/v1";
-
-
-  /* =========================================================
-     STATE
-     ========================================================= */
-
-  let checkoutData =
-    null;
 
 
   /* =========================================================
@@ -719,21 +936,6 @@
       "courier"
     );
 
-  const onlinePayment =
-    document.getElementById(
-      "onlinePayment"
-    );
-
-  const manualPayment =
-    document.getElementById(
-      "manualPayment"
-    );
-
-  const payButton =
-    document.getElementById(
-      "payButton"
-    );
-
   const payNowButton =
     document.getElementById(
       "payNowButton"
@@ -749,21 +951,110 @@
       "choiceMessage"
     );
 
+  const shippingFormSection =
+    document.getElementById(
+      "shippingFormSection"
+    );
+
+  const shippingForm =
+    document.getElementById(
+      "shippingForm"
+    );
+
+  const shippingMessage =
+    document.getElementById(
+      "shippingMessage"
+    );
+
+  const saveShippingButton =
+    document.getElementById(
+      "saveShippingButton"
+    );
+
+  const shippingNameInput =
+    document.getElementById(
+      "shippingNameInput"
+    );
+
+  const shippingPhoneInput =
+    document.getElementById(
+      "shippingPhoneInput"
+    );
+
+  const shippingAddress1Input =
+    document.getElementById(
+      "shippingAddress1Input"
+    );
+
+  const shippingAddress2Input =
+    document.getElementById(
+      "shippingAddress2Input"
+    );
+
+  const shippingCityInput =
+    document.getElementById(
+      "shippingCityInput"
+    );
+
+  const shippingProvinceInput =
+    document.getElementById(
+      "shippingProvinceInput"
+    );
+
+  const shippingPostalInput =
+    document.getElementById(
+      "shippingPostalInput"
+    );
+
+  const shippingCountryInput =
+    document.getElementById(
+      "shippingCountryInput"
+    );
+
+  const courierInput =
+    document.getElementById(
+      "courierInput"
+    );
+
+  const paymentWaiting =
+    document.getElementById(
+      "paymentWaiting"
+    );
+
+  const onlinePayment =
+    document.getElementById(
+      "onlinePayment"
+    );
+
+  const manualPayment =
+    document.getElementById(
+      "manualPayment"
+    );
+
+  const payButton =
+    document.getElementById(
+      "payButton"
+    );
+
 
   /* =========================================================
-     FORMAT MONEY
+     HELPERS
      ========================================================= */
 
-  function formatMoney(
+  function getToken() {
+
+    return new URLSearchParams(
+      window.location.search
+    ).get(
+      "token"
+    );
+
+  }
+
+
+  function money(
     value
   ) {
-
-    const amount =
-      Number(
-        value ||
-        0
-      );
-
 
     return new Intl.NumberFormat(
       "en-PH",
@@ -775,53 +1066,49 @@
           "PHP"
       }
     ).format(
-      amount
+      Number(
+        value ||
+        0
+      )
     );
+
   }
 
 
-  /* =========================================================
-     SAFE TEXT
-     ========================================================= */
-
-  function setText(
+  function text(
     element,
-    value,
-    fallback = "-"
+    value
   ) {
 
     element.textContent =
-      value === null ||
-      value === undefined ||
-      value === ""
-        ? fallback
-        : String(
-            value
-          );
+      value ||
+      "-";
+
   }
 
 
-  /* =========================================================
-     TOKEN
-     ========================================================= */
+  function address(
+    group
+  ) {
 
-  function getCheckoutToken() {
+    return [
+      group.shipping_address_line1,
+      group.shipping_address_line2,
+      group.shipping_city,
+      group.shipping_province,
+      group.shipping_postal_code,
+      group.shipping_country
+    ]
+      .filter(
+        Boolean
+      )
+      .join(
+        ", "
+      ) ||
+      "-";
 
-    const params =
-      new URLSearchParams(
-        window.location.search
-      );
-
-
-    return params.get(
-      "token"
-    );
   }
 
-
-  /* =========================================================
-     ERROR
-     ========================================================= */
 
   function showError(
     message
@@ -839,46 +1126,14 @@
       "hidden"
     );
 
+    errorMessage.textContent =
+      message;
 
-    setText(
-      errorMessage,
-      message,
-      "Checkout could not be loaded."
-    );
   }
 
 
   /* =========================================================
-     ADDRESS
-     ========================================================= */
-
-  function buildAddress(
-    data
-  ) {
-
-    const parts = [
-      data.shipping_address_line1,
-      data.shipping_address_line2,
-      data.shipping_city,
-      data.shipping_province,
-      data.shipping_postal_code,
-      data.shipping_country
-    ]
-      .filter(
-        Boolean
-      );
-
-
-    return parts.length
-      ? parts.join(
-          ", "
-        )
-      : "-";
-  }
-
-
-  /* =========================================================
-     RENDER ITEMS
+     ITEMS
      ========================================================= */
 
   function renderItems(
@@ -899,15 +1154,10 @@
     ) {
 
       items =
-        Array.isArray(
-          data.items
-        )
-          ? data.items
-          : [];
+        data.items ||
+        [];
 
     } else if (
-      data.checkout_type ===
-        "AUCTION_WINNER" &&
       data.item
     ) {
 
@@ -917,13 +1167,7 @@
             data.item.item_label,
 
           subtotal:
-            data.item.amount,
-
-          order_number:
-            data
-              ?.order
-              ?.order_number ||
-            null
+            data.item.amount
         }
       ];
 
@@ -931,8 +1175,7 @@
 
 
     if (
-      items.length ===
-      0
+      !items.length
     ) {
 
       noItems.classList.remove(
@@ -940,6 +1183,7 @@
       );
 
       return;
+
     }
 
 
@@ -948,122 +1192,71 @@
     );
 
 
-    items.forEach(
-      item => {
+    for (
+      const item
+      of items
+    ) {
 
-        const wrapper =
-          document.createElement(
-            "div"
-          );
-
-
-        wrapper.className =
-          "item";
-
-
-        const name =
-          document.createElement(
-            "div"
-          );
-
-
-        name.className =
-          "item-name";
-
-
-        name.textContent =
-          item.item_label ||
-          "Auction Item";
-
-
-        const meta =
-          document.createElement(
-            "div"
-          );
-
-
-        meta.className =
-          "item-meta";
-
-
-        meta.textContent =
-          item.order_number
-            ? `Order ${item.order_number}`
-            : "";
-
-
-        const amount =
-          document.createElement(
-            "div"
-          );
-
-
-        amount.className =
-          "item-amount";
-
-
-        amount.textContent =
-          formatMoney(
-            item.subtotal ??
-            item.total_amount ??
-            0
-          );
-
-
-        wrapper.appendChild(
-          name
+      const row =
+        document.createElement(
+          "div"
         );
 
 
-        if (
-          meta.textContent
-        ) {
-
-          wrapper.appendChild(
-            meta
-          );
-
-        }
+      row.className =
+        "item";
 
 
-        wrapper.appendChild(
-          amount
+      row.innerHTML = `
+        <div class="item-name"></div>
+        <div class="item-meta"></div>
+        <div class="item-amount"></div>
+      `;
+
+
+      row.querySelector(
+        ".item-name"
+      ).textContent =
+        item.item_label ||
+        "Auction Item";
+
+
+      row.querySelector(
+        ".item-meta"
+      ).textContent =
+        item.order_number
+          ? `Order ${item.order_number}`
+          : "";
+
+
+      row.querySelector(
+        ".item-amount"
+      ).textContent =
+        money(
+          item.subtotal ??
+          item.total_amount
         );
 
 
-        itemsContainer.appendChild(
-          wrapper
-        );
+      itemsContainer.appendChild(
+        row
+      );
 
-      }
-    );
+    }
+
   }
 
 
   /* =========================================================
-     CHECKOUT CHOICE STATE
+     GROUP UI
      ========================================================= */
 
-  function renderCheckoutChoice(
+  function renderGroup(
     data
   ) {
 
     const group =
       data.order_group;
-
-
-    if (
-      !group
-    ) {
-
-      payNowButton.disabled =
-        true;
-
-      waitButton.disabled =
-        true;
-
-      return;
-    }
 
 
     const status =
@@ -1074,17 +1267,71 @@
 
 
     const choice =
-      group.buyer_checkout_choice
-        ? String(
-            group.buyer_checkout_choice
-          ).toUpperCase()
-        : null;
+      String(
+        group.buyer_checkout_choice ||
+        ""
+      ).toUpperCase();
 
 
-    /*
-     * OPEN + no final choice:
-     * both actions available.
-     */
+    text(
+      referenceNumber,
+      group.group_number
+    );
+
+
+    text(
+      checkoutStatus,
+      status
+    );
+
+
+    subtotal.textContent =
+      money(
+        group.subtotal
+      );
+
+
+    shippingFee.textContent =
+      money(
+        group.shipping_fee
+      );
+
+
+    totalAmount.textContent =
+      money(
+        group.total_amount
+      );
+
+
+    text(
+      shippingName,
+      group.shipping_name
+    );
+
+
+    text(
+      shippingPhone,
+      group.shipping_phone
+    );
+
+
+    text(
+      shippingAddress,
+      address(
+        group
+      )
+    );
+
+
+    text(
+      courier,
+      group.preferred_courier_code
+    );
+
+
+    /* ---------------------------------------------
+       OPEN
+       --------------------------------------------- */
 
     if (
       status ===
@@ -1098,48 +1345,20 @@
         false;
 
 
-      if (
-        choice ===
-        "WAIT_FOR_MORE"
-      ) {
+      shippingFormSection.classList.add(
+        "hidden"
+      );
 
-        waitButton.textContent =
-          "Waiting for More Items";
-
-        choiceMessage.classList.remove(
-          "hidden"
-        );
-
-        choiceMessage.classList.remove(
-          "notice-error"
-        );
-
-        choiceMessage.classList.add(
-          "notice-success"
-        );
-
-        choiceMessage.textContent =
-          "This order is still open for possible additional auction wins.";
-
-      } else {
-
-        waitButton.textContent =
-          "Wait for More Items";
-
-      }
-
-
-      return;
     }
 
 
-    /*
-     * PAY_NOW already selected.
-     */
+    /* ---------------------------------------------
+       AWAITING SHIPPING
+       --------------------------------------------- */
 
-    if (
-      choice ===
-      "PAY_NOW"
+    else if (
+      status ===
+      "AWAITING_SHIPPING_DETAILS"
     ) {
 
       payNowButton.disabled =
@@ -1151,12 +1370,9 @@
       payNowButton.textContent =
         "Checkout Locked";
 
-      choiceMessage.classList.remove(
-        "hidden"
-      );
 
       choiceMessage.classList.remove(
-        "notice-error"
+        "hidden"
       );
 
       choiceMessage.classList.add(
@@ -1164,319 +1380,210 @@
       );
 
       choiceMessage.textContent =
-        "Your items are locked for checkout. Complete shipping and payment next.";
+        "Your items are locked. Complete your shipping details below.";
 
-      return;
+
+      shippingFormSection.classList.remove(
+        "hidden"
+      );
+
+
+      shippingNameInput.value =
+        group.shipping_name ||
+        group.buyer_name ||
+        "";
+
+
+      shippingPhoneInput.value =
+        group.shipping_phone ||
+        "";
+
+
+      shippingAddress1Input.value =
+        group.shipping_address_line1 ||
+        "";
+
+
+      shippingAddress2Input.value =
+        group.shipping_address_line2 ||
+        "";
+
+
+      shippingCityInput.value =
+        group.shipping_city ||
+        "";
+
+
+      shippingProvinceInput.value =
+        group.shipping_province ||
+        "";
+
+
+      shippingPostalInput.value =
+        group.shipping_postal_code ||
+        "";
+
+
+      shippingCountryInput.value =
+        group.shipping_country ||
+        "PH";
+
+
+      courierInput.value =
+        group.preferred_courier_code ||
+        "";
+
     }
 
 
-    /*
-     * Other non-OPEN statuses.
-     */
+    /* ---------------------------------------------
+       READY FOR PAYMENT
+       --------------------------------------------- */
 
-    payNowButton.disabled =
-      true;
+    else if (
+      status ===
+      "READY_FOR_PAYMENT"
+    ) {
 
-    waitButton.disabled =
-      true;
+      payNowButton.disabled =
+        true;
+
+      waitButton.disabled =
+        true;
+
+      payNowButton.textContent =
+        "Checkout Locked";
+
+
+      shippingFormSection.classList.add(
+        "hidden"
+      );
+
+
+      choiceMessage.classList.remove(
+        "hidden"
+      );
+
+      choiceMessage.classList.add(
+        "notice-success"
+      );
+
+      choiceMessage.textContent =
+        "Shipping details are complete. Your order is ready for payment.";
+
+    }
+
+
+    /* ---------------------------------------------
+       OTHER STATUS
+       --------------------------------------------- */
+
+    else {
+
+      payNowButton.disabled =
+        true;
+
+      waitButton.disabled =
+        true;
+
+      shippingFormSection.classList.add(
+        "hidden"
+      );
+
+    }
 
   }
 
 
   /* =========================================================
-     RENDER GROUP
-     ========================================================= */
-
-  function renderGroup(
-    data
-  ) {
-
-    const group =
-      data.order_group;
-
-
-    setText(
-      referenceNumber,
-      group.group_number
-    );
-
-
-    setText(
-      checkoutStatus,
-      group.group_status
-    );
-
-
-    subtotal.textContent =
-      formatMoney(
-        group.subtotal
-      );
-
-
-    shippingFee.textContent =
-      formatMoney(
-        group.shipping_fee
-      );
-
-
-    totalAmount.textContent =
-      formatMoney(
-        group.total_amount
-      );
-
-
-    setText(
-      shippingName,
-      group.shipping_name
-    );
-
-
-    setText(
-      shippingPhone,
-      group.shipping_phone
-    );
-
-
-    setText(
-      shippingAddress,
-      buildAddress(
-        group
-      )
-    );
-
-
-    setText(
-      courier,
-      group.preferred_courier_code
-    );
-
-
-    renderCheckoutChoice(
-      data
-    );
-  }
-
-
-  /* =========================================================
-     RENDER SINGLE WINNER
-     ========================================================= */
-
-  function renderWinner(
-    data
-  ) {
-
-    const order =
-      data.order;
-
-
-    setText(
-      referenceNumber,
-      order?.order_number ||
-      data.bid_winner_id
-    );
-
-
-    setText(
-      checkoutStatus,
-      order?.order_status ||
-      data.winner_status
-    );
-
-
-    const itemAmount =
-      Number(
-        data
-          ?.item
-          ?.amount ||
-        0
-      );
-
-
-    subtotal.textContent =
-      formatMoney(
-        order?.subtotal ??
-        itemAmount
-      );
-
-
-    shippingFee.textContent =
-      formatMoney(
-        order?.shipping_fee ??
-        0
-      );
-
-
-    totalAmount.textContent =
-      formatMoney(
-        order?.total_amount ??
-        itemAmount
-      );
-
-
-    setText(
-      shippingName,
-      order?.shipping_name
-    );
-
-
-    setText(
-      shippingPhone,
-      order?.shipping_phone
-    );
-
-
-    setText(
-      shippingAddress,
-      order
-        ? buildAddress(
-            order
-          )
-        : "-"
-    );
-
-
-    setText(
-      courier,
-      order?.preferred_courier_code
-    );
-
-
-    payNowButton.disabled =
-      true;
-
-    waitButton.disabled =
-      true;
-  }
-
-
-  /* =========================================================
-     PAYMENT
+     PAYMENT UI
      ========================================================= */
 
   function renderPayment(
     data
   ) {
 
-    const enabled =
-      data
-        ?.payment
-        ?.payment_enabled ===
-      true;
+    paymentWaiting.classList.add(
+      "hidden"
+    );
+
+    onlinePayment.classList.add(
+      "hidden"
+    );
+
+    manualPayment.classList.add(
+      "hidden"
+    );
 
 
     if (
-      enabled
+      data.checkout_type !==
+      "ORDER_GROUP"
+    ) {
+      return;
+    }
+
+
+    const status =
+      String(
+        data.order_group.group_status ||
+        ""
+      ).toUpperCase();
+
+
+    if (
+      status !==
+      "READY_FOR_PAYMENT"
+    ) {
+
+      paymentWaiting.classList.remove(
+        "hidden"
+      );
+
+      return;
+
+    }
+
+
+    if (
+      data.payment
+        ?.payment_enabled ===
+      true
     ) {
 
       onlinePayment.classList.remove(
         "hidden"
       );
 
-      manualPayment.classList.add(
-        "hidden"
-      );
-
     } else {
-
-      onlinePayment.classList.add(
-        "hidden"
-      );
 
       manualPayment.classList.remove(
         "hidden"
       );
 
     }
+
   }
 
 
   /* =========================================================
-     RENDER
-     ========================================================= */
-
-  function renderCheckout(
-    data
-  ) {
-
-    checkoutData =
-      data;
-
-
-    choiceMessage.classList.add(
-      "hidden"
-    );
-
-
-    setText(
-      sellerName,
-      data
-        ?.seller
-        ?.name,
-      "Seller"
-    );
-
-
-    renderItems(
-      data
-    );
-
-
-    if (
-      data.checkout_type ===
-      "ORDER_GROUP"
-    ) {
-
-      renderGroup(
-        data
-      );
-
-    } else {
-
-      renderWinner(
-        data
-      );
-
-    }
-
-
-    renderPayment(
-      data
-    );
-
-
-    loading.classList.add(
-      "hidden"
-    );
-
-    errorPage.classList.add(
-      "hidden"
-    );
-
-    checkoutPage.classList.remove(
-      "hidden"
-    );
-  }
-
-
-  /* =========================================================
-     LOAD CHECKOUT
+     LOAD
      ========================================================= */
 
   async function loadCheckout() {
 
     const token =
-      getCheckoutToken();
+      getToken();
 
 
-    if (
-      !token
-    ) {
+    if (!token) {
 
       showError(
-        "The checkout link is missing its secure token."
+        "Missing checkout token."
       );
 
       return;
+
     }
 
 
@@ -1484,7 +1591,7 @@
 
       const response =
         await fetch(
-          `${SUPABASE_FUNCTION_BASE}/buyer-checkout`,
+          `${FUNCTION_BASE}/buyer-checkout`,
           {
             method:
               "POST",
@@ -1505,54 +1612,66 @@
         );
 
 
-      const result =
+      const data =
         await response.json();
 
 
       if (
         !response.ok ||
-        result.success !==
-        true
+        !data.success
       ) {
 
-        if (
-          result.error ===
-          "CHECKOUT_EXPIRED"
-        ) {
-
-          showError(
-            "This checkout link has expired. Please contact the seller for a new link."
-          );
-
-          return;
-        }
-
-
-        if (
-          result.error ===
-          "CHECKOUT_NOT_ACTIVE"
-        ) {
-
-          showError(
-            "This checkout link is no longer active."
-          );
-
-          return;
-        }
-
-
         showError(
-          result.message ||
-          result.error ||
-          "Checkout could not be loaded."
+          data.message ||
+          data.error ||
+          "Unable to load checkout."
         );
 
         return;
+
       }
 
 
-      renderCheckout(
-        result
+      text(
+        sellerName,
+        data.seller?.name
+      );
+
+
+      renderItems(
+        data
+      );
+
+
+      if (
+        data.checkout_type ===
+        "ORDER_GROUP"
+      ) {
+
+        renderGroup(
+          data
+        );
+
+      }
+
+
+      renderPayment(
+        data
+      );
+
+
+      loading.classList.add(
+        "hidden"
+      );
+
+
+      errorPage.classList.add(
+        "hidden"
+      );
+
+
+      checkoutPage.classList.remove(
+        "hidden"
       );
 
     } catch (
@@ -1565,30 +1684,24 @@
 
 
       showError(
-        "Unable to connect to the checkout service. Please try again."
+        "Unable to connect to checkout service."
       );
 
     }
+
   }
 
 
   /* =========================================================
-     CHECKOUT ACTION
+     PAY NOW / WAIT
      ========================================================= */
 
-  async function submitCheckoutAction(
+  async function submitChoice(
     action
   ) {
 
     const token =
-      getCheckoutToken();
-
-
-    if (
-      !token
-    ) {
-      return;
-    }
+      getToken();
 
 
     payNowButton.disabled =
@@ -1598,27 +1711,11 @@
       true;
 
 
-    choiceMessage.classList.remove(
-      "hidden"
-    );
-
-    choiceMessage.classList.remove(
-      "notice-error"
-    );
-
-    choiceMessage.classList.remove(
-      "notice-success"
-    );
-
-    choiceMessage.textContent =
-      "Updating checkout...";
-
-
     try {
 
       const response =
         await fetch(
-          `${SUPABASE_FUNCTION_BASE}/buyer-checkout-action`,
+          `${FUNCTION_BASE}/buyer-checkout-action`,
           {
             method:
               "POST",
@@ -1634,8 +1731,7 @@
                   checkout_token:
                     token,
 
-                  action:
-                    action
+                  action
                 }
               )
           }
@@ -1648,19 +1744,20 @@
 
       if (
         !response.ok ||
-        result.success !==
-        true
+        !result.success
       ) {
+
+        choiceMessage.classList.remove(
+          "hidden"
+        );
 
         choiceMessage.classList.add(
           "notice-error"
         );
 
-
         choiceMessage.textContent =
           result.message ||
-          result.error ||
-          "Unable to update checkout.";
+          result.error;
 
 
         payNowButton.disabled =
@@ -1671,26 +1768,6 @@
 
 
         return;
-      }
-
-
-      choiceMessage.classList.add(
-        "notice-success"
-      );
-
-
-      if (
-        action ===
-        "WAIT_FOR_MORE"
-      ) {
-
-        choiceMessage.textContent =
-          "Your current items will remain open for consolidation with future wins.";
-
-      } else {
-
-        choiceMessage.textContent =
-          "Your items are now locked for checkout. Next, complete your shipping details.";
 
       }
 
@@ -1705,35 +1782,16 @@
         error
       );
 
-
-      choiceMessage.classList.add(
-        "notice-error"
-      );
-
-
-      choiceMessage.textContent =
-        "Unable to connect to the checkout service.";
-
-
-      payNowButton.disabled =
-        false;
-
-      waitButton.disabled =
-        false;
-
     }
+
   }
 
-
-  /* =========================================================
-     PAY NOW
-     ========================================================= */
 
   payNowButton.addEventListener(
     "click",
     () => {
 
-      submitCheckoutAction(
+      submitChoice(
         "PAY_NOW"
       );
 
@@ -1741,17 +1799,168 @@
   );
 
 
-  /* =========================================================
-     WAIT FOR MORE
-     ========================================================= */
-
   waitButton.addEventListener(
     "click",
     () => {
 
-      submitCheckoutAction(
+      submitChoice(
         "WAIT_FOR_MORE"
       );
+
+    }
+  );
+
+
+  /* =========================================================
+     SAVE SHIPPING
+     ========================================================= */
+
+  shippingForm.addEventListener(
+    "submit",
+    async (
+      event
+    ) => {
+
+      event.preventDefault();
+
+
+      const token =
+        getToken();
+
+
+      saveShippingButton.disabled =
+        true;
+
+
+      shippingMessage.classList.remove(
+        "hidden"
+      );
+
+
+      shippingMessage.classList.remove(
+        "notice-error",
+        "notice-success"
+      );
+
+
+      shippingMessage.textContent =
+        "Saving shipping details...";
+
+
+      try {
+
+        const response =
+          await fetch(
+            `${FUNCTION_BASE}/buyer-shipping-details`,
+            {
+              method:
+                "POST",
+
+              headers: {
+                "Content-Type":
+                  "application/json"
+              },
+
+              body:
+                JSON.stringify(
+                  {
+                    checkout_token:
+                      token,
+
+                    shipping_name:
+                      shippingNameInput.value,
+
+                    shipping_phone:
+                      shippingPhoneInput.value,
+
+                    shipping_address_line1:
+                      shippingAddress1Input.value,
+
+                    shipping_address_line2:
+                      shippingAddress2Input.value,
+
+                    shipping_city:
+                      shippingCityInput.value,
+
+                    shipping_province:
+                      shippingProvinceInput.value,
+
+                    shipping_postal_code:
+                      shippingPostalInput.value,
+
+                    shipping_country:
+                      shippingCountryInput.value,
+
+                    preferred_courier_code:
+                      courierInput.value
+                  }
+                )
+            }
+          );
+
+
+        const result =
+          await response.json();
+
+
+        if (
+          !response.ok ||
+          !result.success
+        ) {
+
+          shippingMessage.classList.add(
+            "notice-error"
+          );
+
+
+          shippingMessage.textContent =
+            result.message ||
+            result.error ||
+            "Unable to save shipping details.";
+
+
+          saveShippingButton.disabled =
+            false;
+
+
+          return;
+
+        }
+
+
+        shippingMessage.classList.add(
+          "notice-success"
+        );
+
+
+        shippingMessage.textContent =
+          "Shipping details saved.";
+
+
+        await loadCheckout();
+
+      } catch (
+        error
+      ) {
+
+        console.error(
+          error
+        );
+
+
+        shippingMessage.classList.add(
+          "notice-error"
+        );
+
+
+        shippingMessage.textContent =
+          "Unable to connect to shipping service.";
+
+
+        saveShippingButton.disabled =
+          false;
+
+      }
 
     }
   );
@@ -1765,13 +1974,8 @@
     "click",
     () => {
 
-      /*
-       * Buyer PayMongo payment needs a separate
-       * token-secured payment endpoint.
-       */
-
       alert(
-        "Online payment will be connected in the next step."
+        "Buyer PayMongo checkout will be connected next."
       );
 
     }
