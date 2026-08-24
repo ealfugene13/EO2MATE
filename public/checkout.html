@@ -1970,16 +1970,161 @@
      PAY ONLINE
      ========================================================= */
 
-  payButton.addEventListener(
-    "click",
-    () => {
+payButton.addEventListener(
+  "click",
+  async () => {
 
-      alert(
-        "Buyer PayMongo checkout will be connected next."
+    const token =
+      getToken();
+
+
+    if (
+      !token
+    ) {
+      return;
+    }
+
+
+    payButton.disabled =
+      true;
+
+    payButton.textContent =
+      "Preparing payment...";
+
+
+    try {
+
+      const response =
+        await fetch(
+          `${FUNCTION_BASE}/buyer-create-payment`,
+          {
+            method:
+              "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json"
+            },
+
+            body:
+              JSON.stringify(
+                {
+                  checkout_token:
+                    token
+                }
+              )
+          }
+        );
+
+
+      const result =
+        await response.json();
+
+
+      if (
+        !response.ok ||
+        result.success !==
+        true
+      ) {
+
+        alert(
+          result.message ||
+          result.error ||
+          "Unable to create payment."
+        );
+
+
+        payButton.disabled =
+          false;
+
+        payButton.textContent =
+          "Pay Online";
+
+
+        return;
+      }
+
+
+      /*
+       * Already paid.
+       */
+
+      if (
+        result.already_paid ===
+        true
+      ) {
+
+        alert(
+          "This order has already been paid."
+        );
+
+
+        await loadCheckout();
+
+
+        return;
+      }
+
+
+      /*
+       * Existing or newly-created pending checkout.
+       */
+
+      const checkoutUrl =
+        result.checkout_url;
+
+
+      if (
+        !checkoutUrl
+      ) {
+
+        alert(
+          "Payment checkout URL was not returned."
+        );
+
+
+        payButton.disabled =
+          false;
+
+        payButton.textContent =
+          "Pay Online";
+
+
+        return;
+      }
+
+
+      /*
+       * Redirect buyer to PayMongo.
+       */
+
+      window.location.href =
+        checkoutUrl;
+
+    } catch (
+      error
+    ) {
+
+      console.error(
+        error
       );
 
+
+      alert(
+        "Unable to connect to the payment service."
+      );
+
+
+      payButton.disabled =
+        false;
+
+      payButton.textContent =
+        "Pay Online";
+
     }
-  );
+
+  }
+);
 
 
   /* =========================================================
