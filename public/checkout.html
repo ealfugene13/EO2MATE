@@ -28,9 +28,7 @@
       color: #1f2937;
     }
 
-    button,
-    input,
-    select {
+    button {
       font: inherit;
     }
 
@@ -59,8 +57,8 @@
     }
 
     .secure {
-      font-size: 13px;
       color: #6b7280;
+      font-size: 13px;
     }
 
     .container {
@@ -69,11 +67,11 @@
     }
 
     .card {
+      margin-bottom: 18px;
+      padding: 24px;
       background: #ffffff;
       border: 1px solid #e5e7eb;
       border-radius: 14px;
-      padding: 24px;
-      margin-bottom: 18px;
     }
 
     .card-title {
@@ -82,24 +80,26 @@
     }
 
     .seller-name {
+      margin-top: 3px;
+      margin-bottom: 5px;
       font-size: 24px;
       font-weight: 700;
-      margin-bottom: 5px;
     }
 
     .muted {
       color: #6b7280;
       font-size: 14px;
+      line-height: 1.5;
     }
 
     .status {
       display: inline-block;
+      margin-top: 12px;
       padding: 6px 10px;
+      background: #f3f4f6;
       border-radius: 999px;
       font-size: 12px;
       font-weight: 600;
-      background: #f3f4f6;
-      margin-top: 12px;
     }
 
     .summary-row {
@@ -124,11 +124,11 @@
     }
 
     .total-row {
+      display: flex;
+      justify-content: space-between;
       margin-top: 10px;
       padding-top: 16px;
       border-top: 2px solid #e5e7eb;
-      display: flex;
-      justify-content: space-between;
       font-size: 20px;
       font-weight: 700;
     }
@@ -159,10 +159,10 @@
 
     .notice {
       padding: 14px 16px;
-      border-radius: 10px;
       background: #f3f4f6;
-      line-height: 1.5;
+      border-radius: 10px;
       font-size: 14px;
+      line-height: 1.5;
     }
 
     .notice-error {
@@ -177,17 +177,17 @@
 
     .button {
       width: 100%;
+      margin-top: 12px;
+      padding: 14px 18px;
       border: 0;
       border-radius: 10px;
-      padding: 14px 18px;
       cursor: pointer;
       font-weight: 600;
-      margin-top: 12px;
     }
 
     .button-primary {
       background: #111827;
-      color: white;
+      color: #ffffff;
     }
 
     .button-secondary {
@@ -196,18 +196,30 @@
     }
 
     .button:disabled {
-      opacity: 0.5;
       cursor: not-allowed;
+      opacity: 0.5;
+    }
+
+    .payment-disabled {
+      padding: 18px;
+      background: #fafafa;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+    }
+
+    .payment-disabled-title {
+      margin-bottom: 6px;
+      font-weight: 600;
     }
 
     .loading {
-      text-align: center;
       padding: 70px 20px;
+      text-align: center;
     }
 
     .loading-title {
-      font-weight: 600;
       margin-bottom: 8px;
+      font-weight: 600;
     }
 
     .error-page {
@@ -216,24 +228,12 @@
       text-align: center;
     }
 
-    .hidden {
-      display: none !important;
-    }
-
-    .payment-disabled {
-      padding: 18px;
-      border: 1px solid #e5e7eb;
-      border-radius: 10px;
-      background: #fafafa;
-    }
-
-    .payment-disabled-title {
-      font-weight: 600;
-      margin-bottom: 6px;
-    }
-
     .address {
       line-height: 1.7;
+    }
+
+    .hidden {
+      display: none !important;
     }
 
     @media (max-width: 600px) {
@@ -266,6 +266,7 @@
 <div class="page">
 
   <header class="header">
+
     <div class="header-inner">
 
       <div class="brand">
@@ -277,6 +278,7 @@
       </div>
 
     </div>
+
   </header>
 
 
@@ -445,6 +447,48 @@
       </section>
 
 
+      <!-- CHECKOUT CHOICE -->
+
+      <section
+        id="checkoutChoiceSection"
+        class="card"
+      >
+
+        <h2 class="card-title">
+          Checkout option
+        </h2>
+
+        <div class="muted">
+          Choose whether you want to checkout these items now or keep the
+          order open for possible additional auction wins.
+        </div>
+
+        <button
+          id="payNowButton"
+          class="button button-primary"
+          type="button"
+        >
+          Pay Now
+        </button>
+
+        <button
+          id="waitButton"
+          class="button button-secondary"
+          type="button"
+        >
+          Wait for More Items
+        </button>
+
+        <div
+          id="choiceMessage"
+          class="notice hidden"
+          style="margin-top: 14px;"
+        >
+        </div>
+
+      </section>
+
+
       <!-- SHIPPING -->
 
       <section class="card">
@@ -532,11 +576,8 @@
         >
 
           <div class="notice notice-success">
-
             Online payment is available for this order.
-
           </div>
-
 
           <button
             id="payButton"
@@ -566,33 +607,6 @@
           </div>
 
         </div>
-
-      </section>
-
-
-      <!-- WAIT FOR MORE -->
-
-      <section
-        id="checkoutChoiceSection"
-        class="card"
-      >
-
-        <h2 class="card-title">
-          Checkout option
-        </h2>
-
-        <div class="muted">
-          If you expect to win more items, you may wait before completing
-          your consolidated checkout.
-        </div>
-
-        <button
-          id="waitButton"
-          class="button button-secondary"
-          type="button"
-        >
-          Wait for More Items
-        </button>
 
       </section>
 
@@ -720,9 +734,19 @@
       "payButton"
     );
 
+  const payNowButton =
+    document.getElementById(
+      "payNowButton"
+    );
+
   const waitButton =
     document.getElementById(
       "waitButton"
+    );
+
+  const choiceMessage =
+    document.getElementById(
+      "choiceMessage"
     );
 
 
@@ -736,8 +760,10 @@
 
     const amount =
       Number(
-        value || 0
+        value ||
+        0
       );
+
 
     return new Intl.NumberFormat(
       "en-PH",
@@ -786,6 +812,7 @@
         window.location.search
       );
 
+
     return params.get(
       "token"
     );
@@ -811,6 +838,7 @@
     errorPage.classList.remove(
       "hidden"
     );
+
 
     setText(
       errorMessage,
@@ -839,6 +867,7 @@
       .filter(
         Boolean
       );
+
 
     return parts.length
       ? parts.join(
@@ -878,7 +907,7 @@
 
     } else if (
       data.checkout_type ===
-      "AUCTION_WINNER" &&
+        "AUCTION_WINNER" &&
       data.item
     ) {
 
@@ -927,6 +956,7 @@
             "div"
           );
 
+
         wrapper.className =
           "item";
 
@@ -936,8 +966,10 @@
             "div"
           );
 
+
         name.className =
           "item-name";
+
 
         name.textContent =
           item.item_label ||
@@ -949,8 +981,10 @@
             "div"
           );
 
+
         meta.className =
           "item-meta";
+
 
         meta.textContent =
           item.order_number
@@ -963,8 +997,10 @@
             "div"
           );
 
+
         amount.className =
           "item-amount";
+
 
         amount.textContent =
           formatMoney(
@@ -978,6 +1014,7 @@
           name
         );
 
+
         if (
           meta.textContent
         ) {
@@ -987,6 +1024,7 @@
           );
 
         }
+
 
         wrapper.appendChild(
           amount
@@ -999,6 +1037,149 @@
 
       }
     );
+  }
+
+
+  /* =========================================================
+     CHECKOUT CHOICE STATE
+     ========================================================= */
+
+  function renderCheckoutChoice(
+    data
+  ) {
+
+    const group =
+      data.order_group;
+
+
+    if (
+      !group
+    ) {
+
+      payNowButton.disabled =
+        true;
+
+      waitButton.disabled =
+        true;
+
+      return;
+    }
+
+
+    const status =
+      String(
+        group.group_status ||
+        ""
+      ).toUpperCase();
+
+
+    const choice =
+      group.buyer_checkout_choice
+        ? String(
+            group.buyer_checkout_choice
+          ).toUpperCase()
+        : null;
+
+
+    /*
+     * OPEN + no final choice:
+     * both actions available.
+     */
+
+    if (
+      status ===
+      "OPEN"
+    ) {
+
+      payNowButton.disabled =
+        false;
+
+      waitButton.disabled =
+        false;
+
+
+      if (
+        choice ===
+        "WAIT_FOR_MORE"
+      ) {
+
+        waitButton.textContent =
+          "Waiting for More Items";
+
+        choiceMessage.classList.remove(
+          "hidden"
+        );
+
+        choiceMessage.classList.remove(
+          "notice-error"
+        );
+
+        choiceMessage.classList.add(
+          "notice-success"
+        );
+
+        choiceMessage.textContent =
+          "This order is still open for possible additional auction wins.";
+
+      } else {
+
+        waitButton.textContent =
+          "Wait for More Items";
+
+      }
+
+
+      return;
+    }
+
+
+    /*
+     * PAY_NOW already selected.
+     */
+
+    if (
+      choice ===
+      "PAY_NOW"
+    ) {
+
+      payNowButton.disabled =
+        true;
+
+      waitButton.disabled =
+        true;
+
+      payNowButton.textContent =
+        "Checkout Locked";
+
+      choiceMessage.classList.remove(
+        "hidden"
+      );
+
+      choiceMessage.classList.remove(
+        "notice-error"
+      );
+
+      choiceMessage.classList.add(
+        "notice-success"
+      );
+
+      choiceMessage.textContent =
+        "Your items are locked for checkout. Complete shipping and payment next.";
+
+      return;
+    }
+
+
+    /*
+     * Other non-OPEN statuses.
+     */
+
+    payNowButton.disabled =
+      true;
+
+    waitButton.disabled =
+      true;
+
   }
 
 
@@ -1070,20 +1251,9 @@
     );
 
 
-    if (
-      group.buyer_checkout_choice
-    ) {
-
-      waitButton.disabled =
-        true;
-
-      waitButton.textContent =
-        group.buyer_checkout_choice ===
-        "WAIT_FOR_MORE"
-          ? "Waiting for More Items"
-          : "Checkout Choice Already Submitted";
-
-    }
+    renderCheckoutChoice(
+      data
+    );
   }
 
 
@@ -1170,6 +1340,12 @@
       order?.preferred_courier_code
     );
 
+
+    payNowButton.disabled =
+      true;
+
+    waitButton.disabled =
+      true;
   }
 
 
@@ -1226,6 +1402,11 @@
       data;
 
 
+    choiceMessage.classList.add(
+      "hidden"
+    );
+
+
     setText(
       sellerName,
       data
@@ -1274,7 +1455,6 @@
     checkoutPage.classList.remove(
       "hidden"
     );
-
   }
 
 
@@ -1393,24 +1573,168 @@
 
 
   /* =========================================================
-     PAY BUTTON
+     CHECKOUT ACTION
      ========================================================= */
 
-  payButton.addEventListener(
+  async function submitCheckoutAction(
+    action
+  ) {
+
+    const token =
+      getCheckoutToken();
+
+
+    if (
+      !token
+    ) {
+      return;
+    }
+
+
+    payNowButton.disabled =
+      true;
+
+    waitButton.disabled =
+      true;
+
+
+    choiceMessage.classList.remove(
+      "hidden"
+    );
+
+    choiceMessage.classList.remove(
+      "notice-error"
+    );
+
+    choiceMessage.classList.remove(
+      "notice-success"
+    );
+
+    choiceMessage.textContent =
+      "Updating checkout...";
+
+
+    try {
+
+      const response =
+        await fetch(
+          `${SUPABASE_FUNCTION_BASE}/buyer-checkout-action`,
+          {
+            method:
+              "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json"
+            },
+
+            body:
+              JSON.stringify(
+                {
+                  checkout_token:
+                    token,
+
+                  action:
+                    action
+                }
+              )
+          }
+        );
+
+
+      const result =
+        await response.json();
+
+
+      if (
+        !response.ok ||
+        result.success !==
+        true
+      ) {
+
+        choiceMessage.classList.add(
+          "notice-error"
+        );
+
+
+        choiceMessage.textContent =
+          result.message ||
+          result.error ||
+          "Unable to update checkout.";
+
+
+        payNowButton.disabled =
+          false;
+
+        waitButton.disabled =
+          false;
+
+
+        return;
+      }
+
+
+      choiceMessage.classList.add(
+        "notice-success"
+      );
+
+
+      if (
+        action ===
+        "WAIT_FOR_MORE"
+      ) {
+
+        choiceMessage.textContent =
+          "Your current items will remain open for consolidation with future wins.";
+
+      } else {
+
+        choiceMessage.textContent =
+          "Your items are now locked for checkout. Next, complete your shipping details.";
+
+      }
+
+
+      await loadCheckout();
+
+    } catch (
+      error
+    ) {
+
+      console.error(
+        error
+      );
+
+
+      choiceMessage.classList.add(
+        "notice-error"
+      );
+
+
+      choiceMessage.textContent =
+        "Unable to connect to the checkout service.";
+
+
+      payNowButton.disabled =
+        false;
+
+      waitButton.disabled =
+        false;
+
+    }
+  }
+
+
+  /* =========================================================
+     PAY NOW
+     ========================================================= */
+
+  payNowButton.addEventListener(
     "click",
     () => {
 
-      /*
-       * We intentionally do NOT call create-payment yet.
-       *
-       * The existing create-payment endpoint is authenticated
-       * for CLIENT PORTAL users.
-       *
-       * Buyer payment needs its own token-secured endpoint.
-       */
-
-      alert(
-        "Online payment action will be connected in the next step."
+      submitCheckoutAction(
+        "PAY_NOW"
       );
 
     }
@@ -1418,22 +1742,36 @@
 
 
   /* =========================================================
-     WAIT BUTTON
+     WAIT FOR MORE
      ========================================================= */
 
   waitButton.addEventListener(
     "click",
     () => {
 
+      submitCheckoutAction(
+        "WAIT_FOR_MORE"
+      );
+
+    }
+  );
+
+
+  /* =========================================================
+     PAY ONLINE
+     ========================================================= */
+
+  payButton.addEventListener(
+    "click",
+    () => {
+
       /*
-       * Same principle:
-       *
-       * Buyer actions must go through a buyer-token-secured
-       * Edge Function instead of directly updating Supabase.
+       * Buyer PayMongo payment needs a separate
+       * token-secured payment endpoint.
        */
 
       alert(
-        "Wait for More Items will be connected in the next step."
+        "Online payment will be connected in the next step."
       );
 
     }
