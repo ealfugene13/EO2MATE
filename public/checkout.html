@@ -1,1 +1,1452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
 
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  />
+
+  <title>Buyer Checkout</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family:
+        Inter,
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
+      background: #f5f6f8;
+      color: #1f2937;
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    .page {
+      min-height: 100vh;
+    }
+
+    .header {
+      background: #ffffff;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    .header-inner {
+      width: min(960px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 18px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .brand {
+      font-size: 20px;
+      font-weight: 700;
+    }
+
+    .secure {
+      font-size: 13px;
+      color: #6b7280;
+    }
+
+    .container {
+      width: min(960px, calc(100% - 32px));
+      margin: 32px auto 64px;
+    }
+
+    .card {
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      padding: 24px;
+      margin-bottom: 18px;
+    }
+
+    .card-title {
+      margin: 0 0 18px;
+      font-size: 18px;
+    }
+
+    .seller-name {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 5px;
+    }
+
+    .muted {
+      color: #6b7280;
+      font-size: 14px;
+    }
+
+    .status {
+      display: inline-block;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      background: #f3f4f6;
+      margin-top: 12px;
+    }
+
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 10px 0;
+      border-bottom: 1px solid #f0f0f0;
+    }
+
+    .summary-row:last-child {
+      border-bottom: 0;
+    }
+
+    .summary-label {
+      color: #6b7280;
+    }
+
+    .summary-value {
+      text-align: right;
+      font-weight: 500;
+    }
+
+    .total-row {
+      margin-top: 10px;
+      padding-top: 16px;
+      border-top: 2px solid #e5e7eb;
+      display: flex;
+      justify-content: space-between;
+      font-size: 20px;
+      font-weight: 700;
+    }
+
+    .item {
+      padding: 14px 0;
+      border-bottom: 1px solid #eeeeee;
+    }
+
+    .item:last-child {
+      border-bottom: 0;
+    }
+
+    .item-name {
+      font-weight: 600;
+    }
+
+    .item-meta {
+      margin-top: 5px;
+      color: #6b7280;
+      font-size: 13px;
+    }
+
+    .item-amount {
+      margin-top: 7px;
+      font-weight: 600;
+    }
+
+    .notice {
+      padding: 14px 16px;
+      border-radius: 10px;
+      background: #f3f4f6;
+      line-height: 1.5;
+      font-size: 14px;
+    }
+
+    .notice-error {
+      background: #fef2f2;
+      color: #991b1b;
+    }
+
+    .notice-success {
+      background: #ecfdf5;
+      color: #065f46;
+    }
+
+    .button {
+      width: 100%;
+      border: 0;
+      border-radius: 10px;
+      padding: 14px 18px;
+      cursor: pointer;
+      font-weight: 600;
+      margin-top: 12px;
+    }
+
+    .button-primary {
+      background: #111827;
+      color: white;
+    }
+
+    .button-secondary {
+      background: #f3f4f6;
+      color: #111827;
+    }
+
+    .button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 70px 20px;
+    }
+
+    .loading-title {
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .error-page {
+      max-width: 600px;
+      margin: 80px auto;
+      text-align: center;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .payment-disabled {
+      padding: 18px;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      background: #fafafa;
+    }
+
+    .payment-disabled-title {
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .address {
+      line-height: 1.7;
+    }
+
+    @media (max-width: 600px) {
+      .container {
+        margin-top: 18px;
+      }
+
+      .card {
+        padding: 18px;
+      }
+
+      .seller-name {
+        font-size: 21px;
+      }
+
+      .summary-row {
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .summary-value {
+        text-align: left;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="page">
+
+  <header class="header">
+    <div class="header-inner">
+
+      <div class="brand">
+        Buyer Checkout
+      </div>
+
+      <div class="secure">
+        Secure checkout
+      </div>
+
+    </div>
+  </header>
+
+
+  <main class="container">
+
+    <!-- =====================================================
+         LOADING
+         ===================================================== -->
+
+    <div
+      id="loading"
+      class="loading"
+    >
+
+      <div class="loading-title">
+        Loading your order...
+      </div>
+
+      <div class="muted">
+        Please wait.
+      </div>
+
+    </div>
+
+
+    <!-- =====================================================
+         ERROR
+         ===================================================== -->
+
+    <div
+      id="errorPage"
+      class="card error-page hidden"
+    >
+
+      <h2>
+        Checkout unavailable
+      </h2>
+
+      <p
+        id="errorMessage"
+        class="muted"
+      >
+        This checkout link could not be loaded.
+      </p>
+
+    </div>
+
+
+    <!-- =====================================================
+         CHECKOUT
+         ===================================================== -->
+
+    <div
+      id="checkoutPage"
+      class="hidden"
+    >
+
+      <!-- SELLER -->
+
+      <section class="card">
+
+        <div class="muted">
+          You're purchasing from
+        </div>
+
+        <div
+          id="sellerName"
+          class="seller-name"
+        >
+        </div>
+
+        <div
+          id="checkoutStatus"
+          class="status"
+        >
+        </div>
+
+      </section>
+
+
+      <!-- ITEMS -->
+
+      <section class="card">
+
+        <h2 class="card-title">
+          Your items
+        </h2>
+
+        <div id="itemsContainer">
+        </div>
+
+        <div
+          id="noItems"
+          class="notice hidden"
+        >
+          No item details are currently available for this checkout.
+        </div>
+
+      </section>
+
+
+      <!-- ORDER SUMMARY -->
+
+      <section class="card">
+
+        <h2 class="card-title">
+          Order summary
+        </h2>
+
+        <div class="summary-row">
+
+          <span class="summary-label">
+            Reference
+          </span>
+
+          <span
+            id="referenceNumber"
+            class="summary-value"
+          >
+          </span>
+
+        </div>
+
+
+        <div class="summary-row">
+
+          <span class="summary-label">
+            Subtotal
+          </span>
+
+          <span
+            id="subtotal"
+            class="summary-value"
+          >
+          </span>
+
+        </div>
+
+
+        <div class="summary-row">
+
+          <span class="summary-label">
+            Shipping
+          </span>
+
+          <span
+            id="shippingFee"
+            class="summary-value"
+          >
+          </span>
+
+        </div>
+
+
+        <div class="total-row">
+
+          <span>
+            Total
+          </span>
+
+          <span id="totalAmount">
+          </span>
+
+        </div>
+
+      </section>
+
+
+      <!-- SHIPPING -->
+
+      <section class="card">
+
+        <h2 class="card-title">
+          Delivery details
+        </h2>
+
+        <div class="summary-row">
+
+          <span class="summary-label">
+            Recipient
+          </span>
+
+          <span
+            id="shippingName"
+            class="summary-value"
+          >
+          </span>
+
+        </div>
+
+
+        <div class="summary-row">
+
+          <span class="summary-label">
+            Phone
+          </span>
+
+          <span
+            id="shippingPhone"
+            class="summary-value"
+          >
+          </span>
+
+        </div>
+
+
+        <div class="summary-row">
+
+          <span class="summary-label">
+            Address
+          </span>
+
+          <span
+            id="shippingAddress"
+            class="summary-value address"
+          >
+          </span>
+
+        </div>
+
+
+        <div class="summary-row">
+
+          <span class="summary-label">
+            Courier
+          </span>
+
+          <span
+            id="courier"
+            class="summary-value"
+          >
+          </span>
+
+        </div>
+
+      </section>
+
+
+      <!-- PAYMENT -->
+
+      <section class="card">
+
+        <h2 class="card-title">
+          Payment
+        </h2>
+
+
+        <!-- PAYMONGO AVAILABLE -->
+
+        <div
+          id="onlinePayment"
+          class="hidden"
+        >
+
+          <div class="notice notice-success">
+
+            Online payment is available for this order.
+
+          </div>
+
+
+          <button
+            id="payButton"
+            class="button button-primary"
+            type="button"
+          >
+            Pay Online
+          </button>
+
+        </div>
+
+
+        <!-- PAYMONGO NOT AVAILABLE -->
+
+        <div
+          id="manualPayment"
+          class="payment-disabled hidden"
+        >
+
+          <div class="payment-disabled-title">
+            Online payment is not available
+          </div>
+
+          <div class="muted">
+            This seller has not enabled online payment for this checkout.
+            Please coordinate payment directly with the seller.
+          </div>
+
+        </div>
+
+      </section>
+
+
+      <!-- WAIT FOR MORE -->
+
+      <section
+        id="checkoutChoiceSection"
+        class="card"
+      >
+
+        <h2 class="card-title">
+          Checkout option
+        </h2>
+
+        <div class="muted">
+          If you expect to win more items, you may wait before completing
+          your consolidated checkout.
+        </div>
+
+        <button
+          id="waitButton"
+          class="button button-secondary"
+          type="button"
+        >
+          Wait for More Items
+        </button>
+
+      </section>
+
+    </div>
+
+  </main>
+
+</div>
+
+
+<script>
+
+  /* =========================================================
+     CONFIG
+     ========================================================= */
+
+  const SUPABASE_FUNCTION_BASE =
+    "https://ithmrccqlmuodylilfsx.supabase.co/functions/v1";
+
+
+  /* =========================================================
+     STATE
+     ========================================================= */
+
+  let checkoutData =
+    null;
+
+
+  /* =========================================================
+     DOM
+     ========================================================= */
+
+  const loading =
+    document.getElementById(
+      "loading"
+    );
+
+  const errorPage =
+    document.getElementById(
+      "errorPage"
+    );
+
+  const errorMessage =
+    document.getElementById(
+      "errorMessage"
+    );
+
+  const checkoutPage =
+    document.getElementById(
+      "checkoutPage"
+    );
+
+  const sellerName =
+    document.getElementById(
+      "sellerName"
+    );
+
+  const checkoutStatus =
+    document.getElementById(
+      "checkoutStatus"
+    );
+
+  const itemsContainer =
+    document.getElementById(
+      "itemsContainer"
+    );
+
+  const noItems =
+    document.getElementById(
+      "noItems"
+    );
+
+  const referenceNumber =
+    document.getElementById(
+      "referenceNumber"
+    );
+
+  const subtotal =
+    document.getElementById(
+      "subtotal"
+    );
+
+  const shippingFee =
+    document.getElementById(
+      "shippingFee"
+    );
+
+  const totalAmount =
+    document.getElementById(
+      "totalAmount"
+    );
+
+  const shippingName =
+    document.getElementById(
+      "shippingName"
+    );
+
+  const shippingPhone =
+    document.getElementById(
+      "shippingPhone"
+    );
+
+  const shippingAddress =
+    document.getElementById(
+      "shippingAddress"
+    );
+
+  const courier =
+    document.getElementById(
+      "courier"
+    );
+
+  const onlinePayment =
+    document.getElementById(
+      "onlinePayment"
+    );
+
+  const manualPayment =
+    document.getElementById(
+      "manualPayment"
+    );
+
+  const payButton =
+    document.getElementById(
+      "payButton"
+    );
+
+  const waitButton =
+    document.getElementById(
+      "waitButton"
+    );
+
+
+  /* =========================================================
+     FORMAT MONEY
+     ========================================================= */
+
+  function formatMoney(
+    value
+  ) {
+
+    const amount =
+      Number(
+        value || 0
+      );
+
+    return new Intl.NumberFormat(
+      "en-PH",
+      {
+        style:
+          "currency",
+
+        currency:
+          "PHP"
+      }
+    ).format(
+      amount
+    );
+  }
+
+
+  /* =========================================================
+     SAFE TEXT
+     ========================================================= */
+
+  function setText(
+    element,
+    value,
+    fallback = "-"
+  ) {
+
+    element.textContent =
+      value === null ||
+      value === undefined ||
+      value === ""
+        ? fallback
+        : String(
+            value
+          );
+  }
+
+
+  /* =========================================================
+     TOKEN
+     ========================================================= */
+
+  function getCheckoutToken() {
+
+    const params =
+      new URLSearchParams(
+        window.location.search
+      );
+
+    return params.get(
+      "token"
+    );
+  }
+
+
+  /* =========================================================
+     ERROR
+     ========================================================= */
+
+  function showError(
+    message
+  ) {
+
+    loading.classList.add(
+      "hidden"
+    );
+
+    checkoutPage.classList.add(
+      "hidden"
+    );
+
+    errorPage.classList.remove(
+      "hidden"
+    );
+
+    setText(
+      errorMessage,
+      message,
+      "Checkout could not be loaded."
+    );
+  }
+
+
+  /* =========================================================
+     ADDRESS
+     ========================================================= */
+
+  function buildAddress(
+    data
+  ) {
+
+    const parts = [
+      data.shipping_address_line1,
+      data.shipping_address_line2,
+      data.shipping_city,
+      data.shipping_province,
+      data.shipping_postal_code,
+      data.shipping_country
+    ]
+      .filter(
+        Boolean
+      );
+
+    return parts.length
+      ? parts.join(
+          ", "
+        )
+      : "-";
+  }
+
+
+  /* =========================================================
+     RENDER ITEMS
+     ========================================================= */
+
+  function renderItems(
+    data
+  ) {
+
+    itemsContainer.innerHTML =
+      "";
+
+
+    let items =
+      [];
+
+
+    if (
+      data.checkout_type ===
+      "ORDER_GROUP"
+    ) {
+
+      items =
+        Array.isArray(
+          data.items
+        )
+          ? data.items
+          : [];
+
+    } else if (
+      data.checkout_type ===
+      "AUCTION_WINNER" &&
+      data.item
+    ) {
+
+      items = [
+        {
+          item_label:
+            data.item.item_label,
+
+          subtotal:
+            data.item.amount,
+
+          order_number:
+            data
+              ?.order
+              ?.order_number ||
+            null
+        }
+      ];
+
+    }
+
+
+    if (
+      items.length ===
+      0
+    ) {
+
+      noItems.classList.remove(
+        "hidden"
+      );
+
+      return;
+    }
+
+
+    noItems.classList.add(
+      "hidden"
+    );
+
+
+    items.forEach(
+      item => {
+
+        const wrapper =
+          document.createElement(
+            "div"
+          );
+
+        wrapper.className =
+          "item";
+
+
+        const name =
+          document.createElement(
+            "div"
+          );
+
+        name.className =
+          "item-name";
+
+        name.textContent =
+          item.item_label ||
+          "Auction Item";
+
+
+        const meta =
+          document.createElement(
+            "div"
+          );
+
+        meta.className =
+          "item-meta";
+
+        meta.textContent =
+          item.order_number
+            ? `Order ${item.order_number}`
+            : "";
+
+
+        const amount =
+          document.createElement(
+            "div"
+          );
+
+        amount.className =
+          "item-amount";
+
+        amount.textContent =
+          formatMoney(
+            item.subtotal ??
+            item.total_amount ??
+            0
+          );
+
+
+        wrapper.appendChild(
+          name
+        );
+
+        if (
+          meta.textContent
+        ) {
+
+          wrapper.appendChild(
+            meta
+          );
+
+        }
+
+        wrapper.appendChild(
+          amount
+        );
+
+
+        itemsContainer.appendChild(
+          wrapper
+        );
+
+      }
+    );
+  }
+
+
+  /* =========================================================
+     RENDER GROUP
+     ========================================================= */
+
+  function renderGroup(
+    data
+  ) {
+
+    const group =
+      data.order_group;
+
+
+    setText(
+      referenceNumber,
+      group.group_number
+    );
+
+
+    setText(
+      checkoutStatus,
+      group.group_status
+    );
+
+
+    subtotal.textContent =
+      formatMoney(
+        group.subtotal
+      );
+
+
+    shippingFee.textContent =
+      formatMoney(
+        group.shipping_fee
+      );
+
+
+    totalAmount.textContent =
+      formatMoney(
+        group.total_amount
+      );
+
+
+    setText(
+      shippingName,
+      group.shipping_name
+    );
+
+
+    setText(
+      shippingPhone,
+      group.shipping_phone
+    );
+
+
+    setText(
+      shippingAddress,
+      buildAddress(
+        group
+      )
+    );
+
+
+    setText(
+      courier,
+      group.preferred_courier_code
+    );
+
+
+    if (
+      group.buyer_checkout_choice
+    ) {
+
+      waitButton.disabled =
+        true;
+
+      waitButton.textContent =
+        group.buyer_checkout_choice ===
+        "WAIT_FOR_MORE"
+          ? "Waiting for More Items"
+          : "Checkout Choice Already Submitted";
+
+    }
+  }
+
+
+  /* =========================================================
+     RENDER SINGLE WINNER
+     ========================================================= */
+
+  function renderWinner(
+    data
+  ) {
+
+    const order =
+      data.order;
+
+
+    setText(
+      referenceNumber,
+      order?.order_number ||
+      data.bid_winner_id
+    );
+
+
+    setText(
+      checkoutStatus,
+      order?.order_status ||
+      data.winner_status
+    );
+
+
+    const itemAmount =
+      Number(
+        data
+          ?.item
+          ?.amount ||
+        0
+      );
+
+
+    subtotal.textContent =
+      formatMoney(
+        order?.subtotal ??
+        itemAmount
+      );
+
+
+    shippingFee.textContent =
+      formatMoney(
+        order?.shipping_fee ??
+        0
+      );
+
+
+    totalAmount.textContent =
+      formatMoney(
+        order?.total_amount ??
+        itemAmount
+      );
+
+
+    setText(
+      shippingName,
+      order?.shipping_name
+    );
+
+
+    setText(
+      shippingPhone,
+      order?.shipping_phone
+    );
+
+
+    setText(
+      shippingAddress,
+      order
+        ? buildAddress(
+            order
+          )
+        : "-"
+    );
+
+
+    setText(
+      courier,
+      order?.preferred_courier_code
+    );
+
+  }
+
+
+  /* =========================================================
+     PAYMENT
+     ========================================================= */
+
+  function renderPayment(
+    data
+  ) {
+
+    const enabled =
+      data
+        ?.payment
+        ?.payment_enabled ===
+      true;
+
+
+    if (
+      enabled
+    ) {
+
+      onlinePayment.classList.remove(
+        "hidden"
+      );
+
+      manualPayment.classList.add(
+        "hidden"
+      );
+
+    } else {
+
+      onlinePayment.classList.add(
+        "hidden"
+      );
+
+      manualPayment.classList.remove(
+        "hidden"
+      );
+
+    }
+  }
+
+
+  /* =========================================================
+     RENDER
+     ========================================================= */
+
+  function renderCheckout(
+    data
+  ) {
+
+    checkoutData =
+      data;
+
+
+    setText(
+      sellerName,
+      data
+        ?.seller
+        ?.name,
+      "Seller"
+    );
+
+
+    renderItems(
+      data
+    );
+
+
+    if (
+      data.checkout_type ===
+      "ORDER_GROUP"
+    ) {
+
+      renderGroup(
+        data
+      );
+
+    } else {
+
+      renderWinner(
+        data
+      );
+
+    }
+
+
+    renderPayment(
+      data
+    );
+
+
+    loading.classList.add(
+      "hidden"
+    );
+
+    errorPage.classList.add(
+      "hidden"
+    );
+
+    checkoutPage.classList.remove(
+      "hidden"
+    );
+
+  }
+
+
+  /* =========================================================
+     LOAD CHECKOUT
+     ========================================================= */
+
+  async function loadCheckout() {
+
+    const token =
+      getCheckoutToken();
+
+
+    if (
+      !token
+    ) {
+
+      showError(
+        "The checkout link is missing its secure token."
+      );
+
+      return;
+    }
+
+
+    try {
+
+      const response =
+        await fetch(
+          `${SUPABASE_FUNCTION_BASE}/buyer-checkout`,
+          {
+            method:
+              "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json"
+            },
+
+            body:
+              JSON.stringify(
+                {
+                  checkout_token:
+                    token
+                }
+              )
+          }
+        );
+
+
+      const result =
+        await response.json();
+
+
+      if (
+        !response.ok ||
+        result.success !==
+        true
+      ) {
+
+        if (
+          result.error ===
+          "CHECKOUT_EXPIRED"
+        ) {
+
+          showError(
+            "This checkout link has expired. Please contact the seller for a new link."
+          );
+
+          return;
+        }
+
+
+        if (
+          result.error ===
+          "CHECKOUT_NOT_ACTIVE"
+        ) {
+
+          showError(
+            "This checkout link is no longer active."
+          );
+
+          return;
+        }
+
+
+        showError(
+          result.message ||
+          result.error ||
+          "Checkout could not be loaded."
+        );
+
+        return;
+      }
+
+
+      renderCheckout(
+        result
+      );
+
+    } catch (
+      error
+    ) {
+
+      console.error(
+        error
+      );
+
+
+      showError(
+        "Unable to connect to the checkout service. Please try again."
+      );
+
+    }
+  }
+
+
+  /* =========================================================
+     PAY BUTTON
+     ========================================================= */
+
+  payButton.addEventListener(
+    "click",
+    () => {
+
+      /*
+       * We intentionally do NOT call create-payment yet.
+       *
+       * The existing create-payment endpoint is authenticated
+       * for CLIENT PORTAL users.
+       *
+       * Buyer payment needs its own token-secured endpoint.
+       */
+
+      alert(
+        "Online payment action will be connected in the next step."
+      );
+
+    }
+  );
+
+
+  /* =========================================================
+     WAIT BUTTON
+     ========================================================= */
+
+  waitButton.addEventListener(
+    "click",
+    () => {
+
+      /*
+       * Same principle:
+       *
+       * Buyer actions must go through a buyer-token-secured
+       * Edge Function instead of directly updating Supabase.
+       */
+
+      alert(
+        "Wait for More Items will be connected in the next step."
+      );
+
+    }
+  );
+
+
+  /* =========================================================
+     START
+     ========================================================= */
+
+  loadCheckout();
+
+</script>
+
+</body>
+</html>
