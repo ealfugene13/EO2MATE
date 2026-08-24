@@ -46,5 +46,6 @@ export default function App() {
 
   if (loading) return <LoadingScreen />;
   if (!session) return <LoginPage />;
+
   return <PortalPage session={session} />;
 }
