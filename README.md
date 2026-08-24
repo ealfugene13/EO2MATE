@@ -1,12 +1,16 @@
-# Auction Client UI v6
+# Auction Client UI v8
 
-Adds functional delivery actions:
-- Manual J&T booking confirmation
-- Tracking / booking input
-- BOOKED -> PICKED_UP
-- PICKED_UP -> IN_TRANSIT
-- IN_TRANSIT -> DELIVERED
+Adds client-facing Facebook onboarding.
 
-Required Edge Functions:
-- confirm-manual-delivery-booking
-- update-delivery-status
+## New
+- Facebook Setup navigation
+- Connect / reconnect Facebook button
+- Calls existing `facebook-oauth-start` with the logged-in client ID
+- Connected Page status display
+- Safe status lookup through `facebook-connection-status` Edge Function
+- Onboarding checklist and client requirements
+
+## Required Edge Function
+Deploy `facebook-connection-status.ts` as `facebook-connection-status`.
+
+Existing required functions remain unchanged.

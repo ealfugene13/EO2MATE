@@ -311,3 +311,99 @@ td { color: #354158; }
 .primary-button:disabled { opacity:.55; cursor:wait; }
 @media (max-width:900px) { .inline-form-grid { grid-template-columns:1fr; } .wide-field { grid-column:auto; } }
 @media (max-width:820px) { .action-card,.completion-card { align-items:flex-start; flex-direction:column; } }
+
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 820px) {
+  .header-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+
+/* Facebook onboarding */
+.onboarding-steps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.onboarding-step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #e1e6ef;
+  border-radius: 14px;
+  background: #fff;
+}
+.onboarding-step > span {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #edf1f6;
+  color: #68758a;
+  font-weight: 800;
+  flex: 0 0 auto;
+}
+.onboarding-step strong,
+.onboarding-step small { display: block; }
+.onboarding-step small { margin-top: 3px; color: #8490a2; font-size: 11px; }
+.onboarding-step.done > span { background: #e8f7f0; color: #147a53; }
+.onboarding-step.current { border-color: #9fb2d0; box-shadow: 0 0 0 3px rgba(29,53,87,.05); }
+.onboarding-step.current > span { background: #1d3557; color: white; }
+.facebook-connect-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 20px;
+  padding: 24px;
+  border-radius: 16px;
+  background: #172b4d;
+  color: white;
+}
+.facebook-connect-copy { display: flex; gap: 16px; align-items: center; }
+.facebook-icon {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: white;
+  color: #1877f2;
+  font-size: 32px;
+  font-weight: 900;
+}
+.facebook-connect-card h2 { margin: 0 0 7px; font-size: 19px; }
+.facebook-connect-card p { margin: 0; max-width: 700px; color: #c8d3e2; line-height: 1.5; font-size: 12px; }
+.facebook-connect-actions .primary-button { background: white; color: #172b4d; }
+.setup-requirements-card {
+  margin-top: 20px;
+  padding: 22px;
+  border: 1px solid #e1e6ef;
+  border-radius: 16px;
+  background: white;
+}
+.setup-requirements-card h2 { margin: 0 0 16px; font-size: 17px; }
+.requirements-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.requirements-grid div { padding: 15px; border: 1px solid #edf0f5; border-radius: 12px; background: #fafbfc; }
+.requirements-grid strong, .requirements-grid span { display: block; }
+.requirements-grid span { margin-top: 6px; color: #7c8799; font-size: 11px; line-height: 1.5; }
+.empty-table-cell { padding: 28px !important; text-align: center !important; color: #8a94a5; }
+@media (max-width: 1050px) { .onboarding-steps { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 820px) {
+  .facebook-connect-card { align-items: flex-start; flex-direction: column; }
+  .requirements-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 520px) { .onboarding-steps { grid-template-columns: 1fr; } }

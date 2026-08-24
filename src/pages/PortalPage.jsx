@@ -38,7 +38,7 @@ function StatusBadge({ status }) {
   } else if (normalized === "COMPLETED_WITH_WINNER") {
     className += " status-success";
   } else if (
-    ["PAYMENT_PENDING", "PENDING", "AWAITING_FINALIZER", "BOOKED", "PICKED_UP", "IN_TRANSIT", "SHIPPED"].includes(normalized)
+    ["PAYMENT_PENDING", "PENDING", "AWAITING_FINALIZER", "BOOKED", "PICKED_UP", "DROPPED_OFF", "IN_TRANSIT", "SHIPPED"].includes(normalized)
   ) {
     className += " status-warning";
   } else if (
@@ -106,9 +106,61 @@ export default function PortalPage({ session }) {
   const [deliveryActionLoading, setDeliveryActionLoading] = useState(false);
   const [deliveryActionMessage, setDeliveryActionMessage] = useState("");
 
+  const [facebookStatus, setFacebookStatus] = useState(null);
+  const [facebookLoading, setFacebookLoading] = useState(false);
+  const [facebookMessage, setFacebookMessage] = useState("");
+
   useEffect(() => {
     loadPortal();
+
+    const params = new URLSearchParams(window.location.search);
+    const facebookResult = params.get("facebook");
+    if (facebookResult) {
+      setPage("facebook");
+      setFacebookMessage(
+        facebookResult === "connected"
+          ? "Facebook authorization completed. Refreshing connection status..."
+          : `Facebook returned: ${facebookResult}`
+      );
+    }
   }, []);
+
+  async function loadFacebookStatus() {
+    setFacebookLoading(true);
+    setFacebookMessage("");
+
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        "facebook-connection-status",
+        { method: "POST", body: {} },
+      );
+
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.message || "Unable to load Facebook connection status.");
+
+      setFacebookStatus(data);
+    } catch (error) {
+      setFacebookMessage(error.message || "Unable to load Facebook connection status.");
+    } finally {
+      setFacebookLoading(false);
+    }
+  }
+
+  function connectFacebook() {
+    if (!client?.client_id) {
+      setFacebookMessage("Client account is not ready yet. Refresh and try again.");
+      return;
+    }
+
+    const baseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const connectUrl = `${baseUrl}/functions/v1/facebook-oauth-start?client_id=${encodeURIComponent(client.client_id)}`;
+    window.location.assign(connectUrl);
+  }
+
+  async function openFacebookSetup() {
+    setPage("facebook");
+    await loadFacebookStatus();
+  }
 
   async function loadPortal() {
     setLoading(true);
@@ -295,6 +347,171 @@ export default function PortalPage({ session }) {
     } finally {
       setDetailLoading(false);
     }
+  }
+
+  async function prepareDeliveryBooking() {
+    if (!deliveryDetail?.delivery_id) return;
+
+    setDeliveryActionLoading(true);
+    setDeliveryActionMessage("");
+    setErrorMessage("");
+
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        "create-delivery-booking",
+        {
+          body: {
+            delivery_id: deliveryDetail.delivery_id,
+          },
+        },
+      );
+
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.message || "Unable to prepare courier booking.");
+
+      await loadDeliveryDetail(deliveryDetail.delivery_id);
+
+      if (data?.manual_booking_required) {
+        setDeliveryActionMessage(
+          data?.message || "Manual courier booking is ready for confirmation.",
+        );
+      } else {
+        setDeliveryActionMessage("Courier booking prepared successfully.");
+      }
+    } catch (error) {
+      setErrorMessage(error.message || "Unable to prepare courier booking.");
+    } finally {
+      setDeliveryActionLoading(false);
+    }
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('\"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function printParcelLabel() {
+    if (!deliveryDetail?.tracking_number) {
+      setErrorMessage("A tracking number is required before printing a parcel label.");
+      return;
+    }
+
+    const popup = window.open("", "_blank", "width=650,height=900");
+
+    if (!popup) {
+      setErrorMessage("The print window was blocked by the browser. Allow pop-ups and try again.");
+      return;
+    }
+
+    const reference =
+      deliveryDetail.group_number ||
+      deliveryDetail.order_number ||
+      deliveryDetail.delivery_id;
+
+    const shipmentType =
+      deliveryDetail.fulfillment_method === "CLIENT_DROP_OFF"
+        ? "CLIENT DROP-OFF"
+        : "COURIER PICKUP";
+
+    const recipientAddress = [
+      deliveryDetail.address_line1,
+      deliveryDetail.address_line2,
+      [deliveryDetail.city, deliveryDetail.province, deliveryDetail.postal_code]
+        .filter(Boolean)
+        .join(", "),
+      deliveryDetail.country,
+    ]
+      .filter(Boolean)
+      .join("<br>");
+
+    const dropoffBlock =
+      deliveryDetail.fulfillment_method === "CLIENT_DROP_OFF"
+        ? `
+          <div class="section">
+            <div class="label">DROP-OFF LOCATION</div>
+            <div class="strong">${escapeHtml(deliveryDetail.dropoff_location_name || "-")}</div>
+            <div>${escapeHtml(deliveryDetail.dropoff_address || "-")}</div>
+          </div>
+        `
+        : "";
+
+    popup.document.write(`<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Parcel Label - ${escapeHtml(reference)}</title>
+  <style>
+    @page { size: 4in 6in; margin: 0; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Arial, Helvetica, sans-serif; color: #000; }
+    .label-sheet { width: 4in; min-height: 6in; padding: 0.18in; border: 2px solid #000; }
+    .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+    .courier { font-size: 22px; font-weight: 900; }
+    .mode { font-size: 11px; font-weight: 700; border: 1px solid #000; padding: 4px 6px; }
+    .tracking-label { font-size: 10px; font-weight: 700; margin-top: 12px; letter-spacing: .08em; }
+    .tracking { font-size: 22px; font-weight: 900; letter-spacing: .04em; padding: 8px 0 12px; border-bottom: 2px solid #000; word-break: break-all; }
+    .section { padding: 10px 0; border-bottom: 1px solid #000; font-size: 12px; line-height: 1.4; }
+    .label { font-size: 9px; font-weight: 800; letter-spacing: .08em; margin-bottom: 4px; }
+    .strong { font-size: 15px; font-weight: 800; }
+    .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 12px; padding-top: 10px; font-size: 10px; }
+    .meta b { display: block; font-size: 8px; letter-spacing: .06em; margin-bottom: 2px; }
+    .notice { margin-top: 12px; padding-top: 8px; border-top: 1px dashed #000; font-size: 8px; line-height: 1.35; }
+    @media print { body { width: 4in; height: 6in; } .label-sheet { border: 0; } }
+  </style>
+</head>
+<body>
+  <div class="label-sheet">
+    <div class="top">
+      <div>
+        <div class="courier">${escapeHtml(deliveryDetail.courier_name || deliveryDetail.courier_code || "COURIER")}</div>
+        <div style="font-size:10px">INTERNAL PARCEL LABEL</div>
+      </div>
+      <div class="mode">${escapeHtml(shipmentType)}</div>
+    </div>
+
+    <div class="tracking-label">TRACKING NUMBER</div>
+    <div class="tracking">${escapeHtml(deliveryDetail.tracking_number)}</div>
+
+    <div class="section">
+      <div class="label">SHIP TO</div>
+      <div class="strong">${escapeHtml(deliveryDetail.recipient_name || "-")}</div>
+      <div>${escapeHtml(deliveryDetail.recipient_phone || "-")}</div>
+      <div>${recipientAddress}</div>
+    </div>
+
+    ${dropoffBlock}
+
+    <div class="section">
+      <div class="label">SHIPMENT REFERENCE</div>
+      <div class="strong">${escapeHtml(reference)}</div>
+      <div>${escapeHtml(deliveryDetail.item_label || (deliveryDetail.order_group_id ? "Consolidated shipment" : "Shipment"))}</div>
+    </div>
+
+    <div class="meta">
+      <div><b>BOOKING REFERENCE</b>${escapeHtml(deliveryDetail.booking_reference || "-")}</div>
+      <div><b>DELIVERY STATUS</b>${escapeHtml(statusLabel(deliveryDetail.delivery_status))}</div>
+      <div><b>COURIER CODE</b>${escapeHtml(deliveryDetail.courier_code || "-")}</div>
+      <div><b>SHIPPING FEE</b>${escapeHtml(formatCurrency(deliveryDetail.shipping_fee))}</div>
+    </div>
+
+    <div class="notice">
+      Internal system-generated parcel label. If the courier supplies an official waybill/label, use the official courier document for carrier acceptance and scanning.
+    </div>
+  </div>
+  <script>
+    window.onload = () => {
+      setTimeout(() => window.print(), 150);
+    };
+  <\/script>
+</body>
+</html>`);
+
+    popup.document.close();
+    popup.focus();
   }
 
   async function confirmManualBooking(event) {
@@ -544,6 +761,10 @@ export default function PortalPage({ session }) {
             Dashboard
           </button>
 
+          <button className={`nav-item ${page === "facebook" ? "active" : ""}`} onClick={openFacebookSetup}>
+            Facebook Setup
+          </button>
+
           <button className={`nav-item ${page.includes("auction") ? "active" : ""}`} onClick={() => goToAuctions("ALL")}>
             Auctions
           </button>
@@ -582,6 +803,111 @@ export default function PortalPage({ session }) {
           <div className="dashboard-error global-error">
             {errorMessage}
           </div>
+        )}
+
+        {page === "facebook" && (
+          <>
+            <header className="dashboard-header">
+              <div>
+                <p className="eyebrow">ONBOARDING · FACEBOOK</p>
+                <h1>Connect Facebook Page</h1>
+                <p>Authorize your Facebook account and connect the Page that will run auctions.</p>
+              </div>
+
+              <button className="secondary-button" onClick={loadFacebookStatus} disabled={facebookLoading}>
+                {facebookLoading ? "Checking..." : "Refresh Status"}
+              </button>
+            </header>
+
+            {facebookMessage && (
+              <div className="success-message global-error">{facebookMessage}</div>
+            )}
+
+            <section className="onboarding-steps">
+              <div className="onboarding-step done">
+                <span>1</span>
+                <div><strong>Client Account</strong><small>{client?.name || "Account ready"}</small></div>
+              </div>
+              <div className={`onboarding-step ${facebookStatus?.connected ? "done" : "current"}`}>
+                <span>2</span>
+                <div><strong>Connect Facebook</strong><small>{facebookStatus?.connected ? "Connected" : "Authorization required"}</small></div>
+              </div>
+              <div className={`onboarding-step ${facebookStatus?.connected ? "done" : ""}`}>
+                <span>3</span>
+                <div><strong>Page Registration</strong><small>{facebookStatus?.connected ? `${facebookStatus.active_page_count || 0} active page(s)` : "Waiting for Facebook"}</small></div>
+              </div>
+              <div className="onboarding-step">
+                <span>4</span>
+                <div><strong>Delivery & Payment</strong><small>Configure after Facebook</small></div>
+              </div>
+            </section>
+
+            <section className="facebook-connect-card">
+              <div className="facebook-connect-copy">
+                <div className="facebook-icon">f</div>
+                <div>
+                  <h2>{facebookStatus?.connected ? "Facebook is connected" : "Connect your Facebook Page"}</h2>
+                  <p>Use the Facebook account that has management access to the Page you want to automate. You do not need your own Meta Developer app.</p>
+                </div>
+              </div>
+
+              <div className="facebook-connect-actions">
+                <button className="primary-button" onClick={connectFacebook}>
+                  {facebookStatus?.connected ? "Reconnect Facebook" : "Connect Facebook"}
+                </button>
+              </div>
+            </section>
+
+            <section className="dashboard-panel">
+              <div className="panel-header">
+                <div>
+                  <h2>Connected Pages</h2>
+                  <p>Pages registered to this client. Access tokens are never shown in the browser.</p>
+                </div>
+                <StatusBadge status={facebookStatus?.connected ? "CONNECTED" : "NOT_CONNECTED"} />
+              </div>
+
+              <div className="table-wrapper">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Page</th>
+                      <th>Facebook Page ID</th>
+                      <th>Status</th>
+                      <th>Authorization</th>
+                      <th>Connected</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(facebookStatus?.pages || []).map((fbPage) => (
+                      <tr key={fbPage.fb_page_id}>
+                        <td>{fbPage.page_name || "Facebook Page"}</td>
+                        <td>{fbPage.fb_page_id || "-"}</td>
+                        <td><StatusBadge status={fbPage.status || "ACTIVE"} /></td>
+                        <td><StatusBadge status={fbPage.token_present ? "AUTHORIZED" : "RECONNECT"} /></td>
+                        <td>{formatDateTime(fbPage.connected_at)}</td>
+                      </tr>
+                    ))}
+
+                    {!facebookLoading && !(facebookStatus?.pages || []).length && (
+                      <tr>
+                        <td colSpan="5" className="empty-table-cell">No Facebook Page connected yet.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section className="setup-requirements-card">
+              <h2>What the client needs</h2>
+              <div className="requirements-grid">
+                <div><strong>Facebook account</strong><span>Use the account that manages the business Page.</span></div>
+                <div><strong>Page access</strong><span>The account must have enough Page permissions to authorize your automation.</span></div>
+                <div><strong>No developer setup</strong><span>Your platform's Meta app handles OAuth, webhook and API integration.</span></div>
+              </div>
+            </section>
+          </>
         )}
 
         {page === "dashboard" && (
@@ -828,6 +1154,7 @@ export default function PortalPage({ session }) {
                 <option value="READY_FOR_BOOKING">Ready for booking</option>
                 <option value="BOOKED">Booked</option>
                 <option value="PICKED_UP">Picked up</option>
+                <option value="DROPPED_OFF">Dropped off</option>
                 <option value="IN_TRANSIT">In transit</option>
                 <option value="DELIVERED">Delivered</option>
                 <option value="FAILED">Failed</option>
@@ -1034,14 +1361,22 @@ export default function PortalPage({ session }) {
                     <h1>{deliveryDetail.group_number || deliveryDetail.order_number || deliveryDetail.delivery_id}</h1>
                     <p>{deliveryDetail.item_label || (deliveryDetail.order_group_id ? "Consolidated shipment" : "Shipment")}</p>
                   </div>
-                  <StatusBadge status={deliveryDetail.delivery_status} />
+                  <div className="header-actions">
+                    {deliveryDetail.tracking_number && (
+                      <button className="secondary-button" type="button" onClick={printParcelLabel}>
+                        Print Parcel Label
+                      </button>
+                    )}
+                    <StatusBadge status={deliveryDetail.delivery_status} />
+                  </div>
                 </header>
 
                 <section className="detail-grid">
                   <div className="detail-card">
-                    <div className="detail-card-header"><h2>Courier</h2></div>
+                    <div className="detail-card-header"><h2>Courier & Fulfillment</h2></div>
                     <DetailRow label="Courier code" value={deliveryDetail.courier_code || "-"} />
                     <DetailRow label="Courier name" value={deliveryDetail.courier_name || "-"} />
+                    <DetailRow label="Fulfillment method" value={statusLabel(deliveryDetail.fulfillment_method || "PICKUP_BY_COURIER")} />
                     <DetailRow label="Courier status" value={deliveryDetail.courier_status || "-"} />
                     <DetailRow label="Booking reference" value={deliveryDetail.booking_reference || "-"} />
                     <DetailRow label="Tracking number" value={deliveryDetail.tracking_number || "-"} />
@@ -1061,10 +1396,21 @@ export default function PortalPage({ session }) {
                     <DetailRow label="Country" value={deliveryDetail.country || "-"} />
                   </div>
 
+                  {deliveryDetail.fulfillment_method === "CLIENT_DROP_OFF" && (
+                    <div className="detail-card">
+                      <div className="detail-card-header"><h2>Drop-off Location</h2></div>
+                      <DetailRow label="Branch" value={deliveryDetail.dropoff_location_name || "-"} />
+                      <DetailRow label="Address" value={deliveryDetail.dropoff_address || "-"} />
+                      <DetailRow label="Latitude" value={deliveryDetail.dropoff_lat ?? "-"} />
+                      <DetailRow label="Longitude" value={deliveryDetail.dropoff_lng ?? "-"} />
+                    </div>
+                  )}
+
                   <div className="detail-card">
                     <div className="detail-card-header"><h2>Timeline</h2></div>
                     <DetailRow label="Booked at" value={formatDateTime(deliveryDetail.booked_at)} />
                     <DetailRow label="Picked up at" value={formatDateTime(deliveryDetail.picked_up_at)} />
+                    <DetailRow label="Dropped off at" value={formatDateTime(deliveryDetail.dropped_off_at)} />
                     <DetailRow label="In transit at" value={formatDateTime(deliveryDetail.shipped_at)} />
                     <DetailRow label="Delivered at" value={formatDateTime(deliveryDetail.delivered_at)} />
                     <DetailRow label="Failed at" value={formatDateTime(deliveryDetail.failed_at)} />
@@ -1077,8 +1423,16 @@ export default function PortalPage({ session }) {
                     <div className="form-card-header">
                       <div>
                         <h2>Confirm Manual Courier Booking</h2>
-                        <p>After booking in J&T, enter the actual booking and tracking details.</p>
+                        <p>Prepare the shipment first, then enter the real booking and tracking details from the courier.</p>
                       </div>
+                      <button
+                        className="secondary-button"
+                        type="button"
+                        disabled={deliveryActionLoading}
+                        onClick={prepareDeliveryBooking}
+                      >
+                        Prepare Booking
+                      </button>
                     </div>
 
                     <form className="inline-form-grid" onSubmit={confirmManualBooking}>
@@ -1106,14 +1460,31 @@ export default function PortalPage({ session }) {
                   </section>
                 )}
 
-                {deliveryDetail.delivery_status === "BOOKED" && (
+                {deliveryDetail.delivery_status === "BOOKED" && deliveryDetail.fulfillment_method === "CLIENT_DROP_OFF" && (
                   <section className="action-card">
-                    <div><h2>Parcel Pickup</h2><p>Use this when the courier has physically received the parcel.</p></div>
-                    <button className="primary-button" disabled={deliveryActionLoading} onClick={() => updateDeliveryStatus("PICKED_UP")}>Mark Picked Up</button>
+                    <div>
+                      <h2>Confirm Parcel Drop-off</h2>
+                      <p>Use this after the client has handed the parcel to the selected courier branch.</p>
+                    </div>
+                    <button className="primary-button" disabled={deliveryActionLoading} onClick={() => updateDeliveryStatus("DROPPED_OFF")}>
+                      Mark Dropped Off
+                    </button>
                   </section>
                 )}
 
-                {deliveryDetail.delivery_status === "PICKED_UP" && (
+                {deliveryDetail.delivery_status === "BOOKED" && deliveryDetail.fulfillment_method !== "CLIENT_DROP_OFF" && (
+                  <section className="action-card">
+                    <div>
+                      <h2>Parcel Pickup</h2>
+                      <p>Use this when the courier has physically received the parcel from the pickup location.</p>
+                    </div>
+                    <button className="primary-button" disabled={deliveryActionLoading} onClick={() => updateDeliveryStatus("PICKED_UP")}>
+                      Mark Picked Up
+                    </button>
+                  </section>
+                )}
+
+                {["PICKED_UP", "DROPPED_OFF"].includes(deliveryDetail.delivery_status) && (
                   <section className="action-card">
                     <div><h2>Shipment In Transit</h2><p>Use this when the parcel is moving through the courier network.</p></div>
                     <button className="primary-button" disabled={deliveryActionLoading} onClick={() => updateDeliveryStatus("IN_TRANSIT")}>Mark In Transit</button>
