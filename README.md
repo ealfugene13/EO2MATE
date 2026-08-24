@@ -1,12 +1,12 @@
-# Auction Client UI
+# Auction Client UI v2
 
-GitHub Pages-ready React/Vite client portal.
+Functional client portal with Dashboard drill-down, Auctions page, search/filter, Auction Detail, rules, bid history, winner/payment summary, Supabase Auth/RLS, and GitHub Pages deployment.
 
-## Required GitHub repository secrets
+Required views:
+- client_auction_list
+- client_auction_detail
+- client_auction_bid_history
 
-- `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_PUBLISHABLE_KEY`
-
-Set GitHub Pages source to **GitHub Actions**.
-
-Do not expose the Supabase service-role key in this frontend.
+Required GitHub Actions secrets:
+- VITE_SUPABASE_URL
+- VITE_SUPABASE_PUBLISHABLE_KEY
