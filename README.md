@@ -1,16 +1,20 @@
-# Auction Client UI v8
+# Auction Client UI v9
 
-Adds client-facing Facebook onboarding.
+Adds the first-time Facebook onboarding gate.
 
-## New
-- Facebook Setup navigation
-- Connect / reconnect Facebook button
-- Calls existing `facebook-oauth-start` with the logged-in client ID
-- Connected Page status display
-- Safe status lookup through `facebook-connection-status` Edge Function
-- Onboarding checklist and client requirements
+## Behavior
+
+- Authenticated client with no ACTIVE Facebook Page:
+  - automatically opens **Facebook Setup**
+- Client with an ACTIVE Facebook Page:
+  - continues directly to the **Dashboard**
+- Facebook OAuth callback result keeps the user on **Facebook Setup**
+- Connected clients get **Continue to Dashboard**
+- Facebook Setup remains available in the sidebar for reconnect/status checks
+- Dashboard can display a Facebook connection warning if a disconnected state is detected
 
 ## Required Edge Function
-Deploy `facebook-connection-status.ts` as `facebook-connection-status`.
 
-Existing required functions remain unchanged.
+- `facebook-connection-status`
+
+Existing Edge Functions remain unchanged.

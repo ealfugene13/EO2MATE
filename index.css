@@ -407,3 +407,48 @@ td { color: #354158; }
   .requirements-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 520px) { .onboarding-steps { grid-template-columns: 1fr; } }
+
+
+/* =========================================================
+   V9 ONBOARDING GATE
+   ========================================================= */
+
+.connection-warning-card {
+  margin-bottom: 22px;
+  padding: 18px 20px;
+  border: 1px solid #f0d59a;
+  border-radius: 14px;
+  background: #fff9e8;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.connection-warning-card div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.connection-warning-card strong {
+  color: #775512;
+}
+
+.connection-warning-card span {
+  color: #8a7447;
+  font-size: 12px;
+}
+
+.facebook-connect-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 680px) {
+  .connection-warning-card {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

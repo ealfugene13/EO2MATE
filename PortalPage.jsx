@@ -109,6 +109,7 @@ export default function PortalPage({ session }) {
   const [facebookStatus, setFacebookStatus] = useState(null);
   const [facebookLoading, setFacebookLoading] = useState(false);
   const [facebookMessage, setFacebookMessage] = useState("");
+  const [onboardingChecked, setOnboardingChecked] = useState(false);
 
   useEffect(() => {
     loadPortal();
@@ -125,7 +126,12 @@ export default function PortalPage({ session }) {
     }
   }, []);
 
-  async function loadFacebookStatus() {
+  async function loadFacebookStatus(options = {}) {
+    const {
+      applyOnboardingGate = false,
+      preserveCurrentPage = false,
+    } = options;
+
     setFacebookLoading(true);
     setFacebookMessage("");
 
@@ -136,13 +142,49 @@ export default function PortalPage({ session }) {
       );
 
       if (error) throw error;
-      if (!data?.success) throw new Error(data?.message || "Unable to load Facebook connection status.");
+      if (!data?.success) {
+        throw new Error(
+          data?.message ||
+          "Unable to load Facebook connection status."
+        );
+      }
 
       setFacebookStatus(data);
+
+      if (applyOnboardingGate) {
+        const params = new URLSearchParams(window.location.search);
+        const facebookResult = params.get("facebook");
+
+        if (facebookResult) {
+          setPage("facebook");
+          setFacebookMessage(
+            facebookResult === "connected"
+              ? "Facebook authorization completed. Connection status refreshed."
+              : `Facebook returned: ${facebookResult}`
+          );
+        } else if (!data.connected && !preserveCurrentPage) {
+          setPage("facebook");
+        }
+      }
+
+      return data;
     } catch (error) {
-      setFacebookMessage(error.message || "Unable to load Facebook connection status.");
+      const message =
+        error.message ||
+        "Unable to load Facebook connection status.";
+
+      setFacebookMessage(message);
+
+      if (applyOnboardingGate && !preserveCurrentPage) {
+        setPage("facebook");
+      }
+
+      return null;
     } finally {
       setFacebookLoading(false);
+      if (applyOnboardingGate) {
+        setOnboardingChecked(true);
+      }
     }
   }
 
@@ -159,7 +201,9 @@ export default function PortalPage({ session }) {
 
   async function openFacebookSetup() {
     setPage("facebook");
-    await loadFacebookStatus();
+    await loadFacebookStatus({
+      preserveCurrentPage: true,
+    });
   }
 
   async function loadPortal() {
@@ -226,6 +270,17 @@ export default function PortalPage({ session }) {
       setOrders(orderResult.data || []);
       setPayments(paymentResult.data || []);
       setDeliveries(deliveryResult.data || []);
+
+      /*
+       * First-time onboarding gate.
+       *
+       * A client with no ACTIVE Facebook Page is sent to
+       * Facebook Setup automatically. Connected returning
+       * clients continue to the Dashboard.
+       */
+      await loadFacebookStatus({
+        applyOnboardingGate: true,
+      });
     } catch (error) {
       setErrorMessage(error.message || "Unable to load portal.");
     } finally {
@@ -738,8 +793,8 @@ export default function PortalPage({ session }) {
     return (
       <div className="loading-screen">
         <div className="loading-card">
-          <h2>Loading dashboard</h2>
-          <p>Retrieving auction, order, payment and delivery data...</p>
+          <h2>Loading client portal</h2>
+          <p>Checking your account, Facebook connection and dashboard data...</p>
         </div>
       </div>
     );
@@ -855,6 +910,16 @@ export default function PortalPage({ session }) {
                 <button className="primary-button" onClick={connectFacebook}>
                   {facebookStatus?.connected ? "Reconnect Facebook" : "Connect Facebook"}
                 </button>
+
+                {facebookStatus?.connected && (
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    onClick={() => setPage("dashboard")}
+                  >
+                    Continue to Dashboard
+                  </button>
+                )}
               </div>
             </section>
 
@@ -923,6 +988,25 @@ export default function PortalPage({ session }) {
                 Refresh
               </button>
             </header>
+
+            {onboardingChecked && facebookStatus && !facebookStatus.connected && (
+              <section className="connection-warning-card">
+                <div>
+                  <strong>Facebook connection required</strong>
+                  <span>
+                    Connect a Facebook Page before using auction automation.
+                  </span>
+                </div>
+
+                <button
+                  className="primary-button"
+                  type="button"
+                  onClick={openFacebookSetup}
+                >
+                  Connect Facebook
+                </button>
+              </section>
+            )}
 
             <section className="metrics-grid">
               <MetricCard title="Active auctions" value={auctionMetrics.active} subtitle="Currently open" onClick={() => goToAuctions("ACTIVE")} />
