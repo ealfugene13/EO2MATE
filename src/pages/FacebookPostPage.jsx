@@ -78,20 +78,15 @@ function formatFacebookAuctionDate(value) {
   }).format(date);
 }
 
-function getPageLabel(page, includeId = false) {
-  const name =
+function getPageLabel(page) {
+  return (
     page?.page_name ||
     page?.fb_page_name ||
     page?.name ||
     page?.page_title ||
     page?.display_name ||
-    "Facebook Page";
-
-  if (includeId && page?.fb_page_id) {
-    return `${name} · ${page.fb_page_id}`;
-  }
-
-  return name;
+    "Facebook Page"
+  );
 }
 
 function buildRuleLines(rules, { includeItem = false, item = "" } = {}) {
@@ -367,19 +362,11 @@ export default function FacebookPostPage({ client }) {
   ).toUpperCase();
 
   const environmentOptions = useMemo(() => {
-    const rank = {
-      CLNT: 1,
-      TEST: 2,
-      PROD: 3,
-    };
-
     return ["CLNT", "TEST", "PROD"].map((mode) => ({
       mode,
-      enabled:
-        rank[mode] <=
-        (rank[allowedEnvironment] || 1),
+      enabled: true,
     }));
-  }, [allowedEnvironment]);
+  }, []);
 
   const mainCaption = useMemo(() => {
     const lines = [];
@@ -514,18 +501,7 @@ export default function FacebookPostPage({ client }) {
       problems.push("Select a Facebook Page.");
     }
 
-    const selectedMode =
-      environmentOptions.find(
-        (option) =>
-          option.mode ===
-          environment
-      );
 
-    if (!selectedMode?.enabled) {
-      problems.push(
-        `${environment} is visible but not enabled for this client. Ask EO2MATE Admin to change the allowed mode.`
-      );
-    }
 
     if (!items.length) {
       problems.push("Upload at least one image.");
@@ -730,21 +706,20 @@ export default function FacebookPostPage({ client }) {
               onChange={(e) => setEnvironment(e.target.value)}
               disabled={publishing || Boolean(publishedPost)}
             >
-              {environmentOptions.map(({ mode, enabled }) => (
+              {environmentOptions.map(({ mode }) => (
                 <option
                   key={mode}
                   value={mode}
-                  disabled={!enabled}
                 >
                   {mode === "CLNT"
-                    ? `EO2MATE-CLNT · Manual payment${enabled ? "" : " 🔒"}`
+                    ? "EO2MATE-CLNT · Manual payment"
                     : mode === "TEST"
-                      ? `EO2MATE-TEST · PayMongo test${enabled ? "" : " 🔒"}`
-                      : `EO2MATE-PROD · Live payment${enabled ? "" : " 🔒"}`}
+                      ? "EO2MATE-TEST · PayMongo test"
+                      : "EO2MATE-PROD · Live payment"}
                 </option>
               ))}
             </select>
-            <small>Admin entitlement: {allowedEnvironment}</small>
+            <small>Choose the operating mode for this auction post.</small>
           </label>
 
           <div className="fb-auction-type-field">
