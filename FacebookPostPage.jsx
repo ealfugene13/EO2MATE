@@ -330,6 +330,7 @@ export default function FacebookPostPage({ client }) {
   const [draggingId, setDraggingId] = useState(null);
   const [showPreview, setShowPreview] = useState(true);
   const [publishing, setPublishing] = useState(false);
+  const [processingFiles, setProcessingFiles] = useState(false);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
@@ -530,49 +531,60 @@ export default function FacebookPostPage({ client }) {
     setFieldErrors({});
   }
 
-  function addFiles(fileList) {
+  async function addFiles(fileList) {
     const files = Array.from(fileList || []);
 
     if (!files.length) return;
 
+    setProcessingFiles(true);
     setErrorMessage("");
     clearFieldError("images");
 
-    const remaining = MAX_IMAGES - items.length;
-    const selected = files.slice(0, remaining);
-    const errors = [];
+    try {
+      /*
+       * Yield once so the processing overlay can render before
+       * image validation / preview objects are created.
+       */
+      await new Promise((resolve) => window.setTimeout(resolve, 0));
 
-    const accepted = selected.filter((file) => {
-      if (!["image/jpeg", "image/png"].includes(file.type)) {
-        errors.push(`${file.name}: use JPG or PNG.`);
-        return false;
+      const remaining = MAX_IMAGES - items.length;
+      const selected = files.slice(0, remaining);
+      const errors = [];
+
+      const accepted = selected.filter((file) => {
+        if (!["image/jpeg", "image/png"].includes(file.type)) {
+          errors.push(`${file.name}: use JPG or PNG.`);
+          return false;
+        }
+
+        if (file.size > MAX_IMAGE_BYTES) {
+          errors.push(`${file.name}: maximum size is 10 MB.`);
+          return false;
+        }
+
+        return true;
+      });
+
+      if (files.length > remaining) {
+        errors.push(`Maximum ${MAX_IMAGES} images per Facebook post.`);
       }
 
-      if (file.size > MAX_IMAGE_BYTES) {
-        errors.push(`${file.name}: maximum size is 10 MB.`);
-        return false;
+      setItems((current) => [
+        ...current,
+        ...accepted.map((file, index) =>
+          createItem(file, current.length + index)
+        ),
+      ]);
+
+      if (errors.length) {
+        setErrorMessage(errors.join(" "));
+      }
+    } finally {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
       }
 
-      return true;
-    });
-
-    if (files.length > remaining) {
-      errors.push(`Maximum ${MAX_IMAGES} images per Facebook post.`);
-    }
-
-    setItems((current) => [
-      ...current,
-      ...accepted.map((file, index) =>
-        createItem(file, current.length + index)
-      ),
-    ]);
-
-    if (errors.length) {
-      setErrorMessage(errors.join(" "));
-    }
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
+      setProcessingFiles(false);
     }
   }
 
@@ -756,26 +768,55 @@ export default function FacebookPostPage({ client }) {
     });
   }
 
-  function resetFormForNewPost() {
+  function resetFormForNewPost({
+    keepSuccessPopup = false,
+  } = {}) {
     itemsRef.current.forEach((item) => {
       URL.revokeObjectURL(item.previewUrl);
     });
 
+    /*
+     * Full NEW POST reset.
+     *
+     * Keep only account/setup context:
+     *   - connected Facebook Pages
+     *   - subscription/environment reference data
+     *
+     * Clear every seller-entered auction value.
+     */
     setPostType("SINGLE");
     setSellerCaption("");
     setSingleItem("");
-    setSharedRules({ ...DEFAULT_RULES });
+    setSharedRules({
+      minBid: "",
+      increment: "",
+      minimumBidders: "1",
+      buyout: "",
+      buyoutUntil: "",
+      auctionEnds: "",
+      bidCutoff: "60",
+      antiSniper: "0",
+    });
     setItems([]);
+    itemsRef.current = [];
     setDraggingId(null);
     setShowPreview(true);
     setFieldErrors({});
     setErrorMessage("");
     setMessage("");
 
+    if (!keepSuccessPopup) {
+      setSuccessPopup(null);
+    }
+
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
 
+    /*
+     * Page and operating mode are setup context, not auction input.
+     * Keep them selected for convenience when creating another post.
+     */
     if (pages.length) {
       setSelectedPageId(String(pages[0].fb_page_id));
     }
@@ -880,7 +921,7 @@ export default function FacebookPostPage({ client }) {
        * Reset immediately after a confirmed successful publish,
        * so the screen is ready for a new auction.
        */
-      resetFormForNewPost();
+      resetFormForNewPost({ keepSuccessPopup: true });
 
       setSuccessPopup(successData);
     } catch (error) {
@@ -1050,7 +1091,7 @@ export default function FacebookPostPage({ client }) {
           type="button"
           className="icon-button refresh-icon-button"
           onClick={loadPostingSetup}
-          disabled={loading || publishing}
+          disabled={loading || publishing || processingFiles}
           title="Refresh Facebook Pages and Operating Modes"
           aria-label="Refresh Facebook Pages and Operating Modes"
         >
@@ -1088,7 +1129,7 @@ export default function FacebookPostPage({ client }) {
                 setSelectedPageId(e.target.value);
                 clearFieldError("page");
               }}
-              disabled={loading || publishing}
+              disabled={loading || publishing || processingFiles}
               aria-invalid={Boolean(fieldErrors.page)}
             >
               {!pages.length && (
@@ -1120,7 +1161,7 @@ export default function FacebookPostPage({ client }) {
                 setEnvironment(e.target.value);
                 clearFieldError("environment");
               }}
-              disabled={loading || publishing}
+              disabled={loading || publishing || processingFiles}
               aria-invalid={Boolean(fieldErrors.environment)}
             >
               {!selectableEnvironments.length && (
@@ -1250,7 +1291,7 @@ export default function FacebookPostPage({ client }) {
               type="button"
               className="secondary-button"
               onClick={() => fileInputRef.current?.click()}
-              disabled={publishing || items.length >= MAX_IMAGES}
+              disabled={publishing || processingFiles || items.length >= MAX_IMAGES}
             >
               Add photos
             </button>
@@ -1274,7 +1315,7 @@ export default function FacebookPostPage({ client }) {
               fieldErrors.images ? "eo2-upload-error" : ""
             }`}
             onClick={() => fileInputRef.current?.click()}
-            disabled={publishing}
+            disabled={publishing || processingFiles}
           >
             <span className="fb-upload-icon">+</span>
             <strong>
@@ -1463,31 +1504,54 @@ export default function FacebookPostPage({ client }) {
             type="button"
             className="primary-button"
             onClick={publishAuction}
-            disabled={loading || publishing}
+            disabled={loading || publishing || processingFiles}
           >
             {publishing ? "Publishing…" : "Publish to Facebook"}
           </button>
         </div>
       </section>
 
-      {publishing && (
+      {(loading || processingFiles || publishing) && (
         <div
           className="eo2-publish-overlay"
           role="dialog"
           aria-modal="true"
-          aria-label="Publishing auction"
+          aria-label={
+            publishing
+              ? "Publishing auction"
+              : processingFiles
+                ? "Processing images"
+                : "Loading posting setup"
+          }
         >
           <div className="eo2-publish-card">
             <div className="eo2-spinner" />
-            <h2>Publishing auction…</h2>
+
+            <h2>
+              {publishing
+                ? "Publishing auction…"
+                : processingFiles
+                  ? "Processing images…"
+                  : "Loading posting setup…"}
+            </h2>
+
             <p>
-              Uploading images, creating the Facebook post and activating
-              EO2MATE automation.
+              {publishing
+                ? "Uploading images, creating the Facebook post and activating EO2MATE automation."
+                : processingFiles
+                  ? "Checking the selected images and preparing previews."
+                  : "Loading Facebook Pages, operating modes and client posting setup."}
             </p>
+
             <div className="eo2-progress-track">
               <div className="eo2-progress-bar" />
             </div>
-            <small>Please keep this page open until publishing completes.</small>
+
+            <small>
+              {publishing
+                ? "Please keep this page open until publishing completes."
+                : "This will close automatically when processing is complete."}
+            </small>
           </div>
         </div>
       )}
@@ -1503,8 +1567,7 @@ export default function FacebookPostPage({ client }) {
             <div className="eo2-success-icon">✓</div>
             <h2 id="eo2-success-title">Auction published</h2>
             <p>
-              The Facebook post was created successfully and the form has
-              been refreshed for a new auction.
+              The Facebook post was created successfully. Click Create New Post to start with a clean auction form.
             </p>
             <p>
               <strong>Page:</strong> {successPopup.page_name}
@@ -1528,9 +1591,9 @@ export default function FacebookPostPage({ client }) {
               <button
                 type="button"
                 className="primary-button"
-                onClick={() => setSuccessPopup(null)}
+                onClick={() => resetFormForNewPost()}
               >
-                Create Another Auction
+                Create New Post
               </button>
             </div>
           </div>
