@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../supabase";
 import SetupPage from "./SetupPage";
+import OnboardingPage from "./OnboardingPage";
+import AdminClientsPage from "./AdminClientsPage";
 
 function formatCurrency(value) {
   if (value === null || value === undefined || value === "") return "-";
@@ -99,6 +101,9 @@ function DetailRow({ label, value }) {
 
 export default function PortalPage({ session }) {
   const [client, setClient] = useState(null);
+  const [platformAdmin, setPlatformAdmin] = useState(null);
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const [onboardingStatus, setOnboardingStatus] = useState(null);
 
   const [auctions, setAuctions] = useState([]);
   const [orders, setOrders] = useState([]);
@@ -435,28 +440,83 @@ export default function PortalPage({ session }) {
     setErrorMessage("");
 
     try {
-      const { data: clientUser, error: clientUserError } = await supabase
-        .from("client_users")
-        .select("client_id, role, status")
-        .eq("user_id", session.user.id)
-        .eq("status", "ACTIVE")
-        .maybeSingle();
+      const [adminResult, membershipResult] = await Promise.all([
+        supabase
+          .from("platform_admins")
+          .select("user_id, role, status")
+          .eq("user_id", session.user.id)
+          .eq("status", "ACTIVE")
+          .maybeSingle(),
+        supabase
+          .from("client_users")
+          .select("client_id, role, status, created_at")
+          .eq("user_id", session.user.id)
+          .eq("status", "ACTIVE")
+          .order("created_at", { ascending: true })
+          .limit(1)
+          .maybeSingle(),
+      ]);
 
-      if (clientUserError) throw clientUserError;
-      if (!clientUser) throw new Error("Your login is not mapped to an active client.");
+      if (adminResult.error) throw adminResult.error;
+      if (membershipResult.error) throw membershipResult.error;
+
+      const admin = adminResult.data || null;
+      const clientUser = membershipResult.data || null;
+
+      setPlatformAdmin(admin);
+
+      if (!clientUser) {
+        setClient(null);
+
+        if (admin) {
+          setNeedsOnboarding(false);
+          setPage("admin-clients");
+          return;
+        }
+
+        const { data: onboardingData, error: onboardingError } =
+          await supabase.functions.invoke("client-onboarding", {
+            method: "POST",
+            body: { action: "STATUS" },
+          });
+
+        if (onboardingError) throw onboardingError;
+
+        setOnboardingStatus(onboardingData || null);
+        setNeedsOnboarding(true);
+        return;
+      }
 
       const { data: clientData, error: clientError } = await supabase
         .from("master_clients")
-        .select("client_id, name, status, created_at")
+        .select("*")
         .eq("client_id", clientUser.client_id)
         .maybeSingle();
 
       if (clientError) throw clientError;
+      if (!clientData) throw new Error("Your client account could not be found.");
 
       setClient({
         ...clientData,
         role: clientUser.role,
       });
+
+      const { data: onboardingData, error: onboardingError } =
+        await supabase.functions.invoke("client-onboarding", {
+          method: "POST",
+          body: { action: "STATUS" },
+        });
+
+      if (onboardingError) throw onboardingError;
+
+      setOnboardingStatus(onboardingData || null);
+
+      if (onboardingData?.onboarding_complete !== true && !admin) {
+        setNeedsOnboarding(true);
+        return;
+      }
+
+      setNeedsOnboarding(false);
 
       const [
         auctionResult,
@@ -1107,6 +1167,37 @@ export default function PortalPage({ session }) {
     );
   }
 
+  if (needsOnboarding) {
+    return (
+      <OnboardingPage
+        session={session}
+        initialStatus={onboardingStatus}
+        onComplete={loadPortal}
+      />
+    );
+  }
+
+  if (platformAdmin && !client) {
+    return (
+      <div className="app-shell">
+        <aside className="sidebar">
+          <div className="sidebar-brand">
+            <div className="brand-logo small">E</div>
+            <div><strong>EO2MATE</strong><span>Platform Admin</span></div>
+          </div>
+          <nav className="sidebar-nav">
+            <button className="nav-item active">Clients</button>
+          </nav>
+          <div className="sidebar-footer">
+            <div className="user-mini-card"><strong>{session.user.email}</strong><span>{platformAdmin.role}</span></div>
+            <button className="logout-button" onClick={handleLogout}>Sign out</button>
+          </div>
+        </aside>
+        <main className="dashboard-content"><AdminClientsPage /></main>
+      </div>
+    );
+  }
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -1119,6 +1210,14 @@ export default function PortalPage({ session }) {
         </div>
 
         <nav className="sidebar-nav">
+          {platformAdmin && (
+            <button
+              className={`nav-item ${page === "admin-clients" ? "active" : ""}`}
+              onClick={() => setPage("admin-clients")}
+            >
+              Admin · Clients
+            </button>
+          )}
           <button className={`nav-item ${page === "dashboard" ? "active" : ""}`} onClick={() => setPage("dashboard")}>
             Dashboard
           </button>
@@ -1181,6 +1280,10 @@ export default function PortalPage({ session }) {
           <div className="dashboard-error global-error">
             {errorMessage}
           </div>
+        )}
+
+        {page === "admin-clients" && platformAdmin && (
+          <AdminClientsPage />
         )}
 
         {page === "facebook" && (

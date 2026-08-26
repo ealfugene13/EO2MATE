@@ -16,15 +16,26 @@ const COMMAND_ACTIONS = [
   { value: "START_PAYMENT", label: "Start / resend payment" },
   { value: "REFRESH_PAYMENT", label: "Refresh payment QR" },
   { value: "HELP", label: "Show help / commands" },
-  { value: "MARK_MANUAL_PAID", label: "Mark CLNT manual payment as paid" },
-  { value: "REVERSE_MANUAL_PAID", label: "Reverse CLNT manual paid status" },
 ];
 
 const COMMAND_SCOPES = [
   { value: "BUYER", label: "Buyer only" },
-  { value: "PAGE_ONLY", label: "Page only" },
-  { value: "BOTH", label: "Buyer + Page" },
 ];
+
+const CLIENT_EDITABLE_SETTING_KEYS = new Set([
+  "PAYMENT_DEADLINE_HOURS",
+  "PAYMENT_REOPEN_HOURS",
+  "ORDER_GROUP_WINDOW_HOURS",
+  "WINNER_LINK_EXPIRY_HOURS",
+  "ANNOUNCEMENT_INTERVAL_HOURS",
+  "INVALID_COMMAND_REPLY_ENABLED",
+]);
+
+const CLIENT_ALLOWED_COMMAND_ACTIONS = new Set([
+  "START_PAYMENT",
+  "REFRESH_PAYMENT",
+  "HELP",
+]);
 
 function normalizeCommand(value) {
   return String(value || "").trim().replace(/\s+/g, " ").toUpperCase();
@@ -185,9 +196,11 @@ export default function SetupPage({ client }) {
       map.set(row.setting_key, { ...current, override: row, effective: row });
     });
 
-    return Array.from(map.values()).sort((a, b) =>
-      a.effective.setting_key.localeCompare(b.effective.setting_key)
-    );
+    return Array.from(map.values())
+      .filter((item) => CLIENT_EDITABLE_SETTING_KEYS.has(item.effective.setting_key))
+      .sort((a, b) =>
+        a.effective.setting_key.localeCompare(b.effective.setting_key)
+      );
   }, [settings]);
 
   const mergedCommands = useMemo(() => {
@@ -203,11 +216,13 @@ export default function SetupPage({ client }) {
       map.set(key, { ...current, override: row, effective: row });
     });
 
-    return Array.from(map.values()).sort((a, b) =>
-      normalizeCommand(a.effective.command_text).localeCompare(
-        normalizeCommand(b.effective.command_text)
-      )
-    );
+    return Array.from(map.values())
+      .filter((item) => CLIENT_ALLOWED_COMMAND_ACTIONS.has(String(item.effective.action_code || "").toUpperCase()))
+      .sort((a, b) =>
+        normalizeCommand(a.effective.command_text).localeCompare(
+          normalizeCommand(b.effective.command_text)
+        )
+      );
   }, [commands]);
 
   function clearFeedback() {
