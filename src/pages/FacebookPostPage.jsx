@@ -316,30 +316,36 @@ export default function FacebookPostPage({ client }) {
     setErrorMessage("");
 
     try {
-      const [pagesResult, subscriptionResult] = await Promise.all([
-        supabase
-          .from("fb_pages")
-          .select("*")
-          .eq("client_id", client.client_id)
-          .eq("status", "ACTIVE"),
+      const { data, error } =
+        await supabase.functions.invoke(
+          "facebook-auction-publish",
+          {
+            method: "POST",
+            body: {
+              action: "LIST_SETUP",
+              client_id: client.client_id,
+            },
+          }
+        );
 
-        supabase
-          .from("client_subscriptions")
-          .select("*")
-          .eq("client_id", client.client_id)
-          .maybeSingle(),
-      ]);
+      if (error) throw error;
 
-      if (pagesResult.error) throw pagesResult.error;
-      if (subscriptionResult.error) throw subscriptionResult.error;
+      if (!data?.success) {
+        throw new Error(
+          data?.message ||
+          "Unable to load Facebook posting setup."
+        );
+      }
 
-      const pageRows = pagesResult.data || [];
+      const pageRows = data.pages || [];
 
       setPages(pageRows);
-      setSubscription(subscriptionResult.data || null);
+      setSubscription(data.subscription || null);
 
       if (pageRows.length && !selectedPageId) {
-        setSelectedPageId(String(pageRows[0].fb_page_id));
+        setSelectedPageId(
+          String(pageRows[0].fb_page_id)
+        );
       }
     } catch (error) {
       setErrorMessage(error.message || "Unable to load Facebook posting setup.");
