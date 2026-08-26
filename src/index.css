@@ -1078,3 +1078,296 @@ textarea:focus {
     height: 38px;
   }
 }
+
+
+/* =========================================================
+   V15 CLNT / PAGE-ONLY COMMAND SETUP
+   ========================================================= */
+.setup-clnt-note {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid #d9e6dc;
+  border-radius: 11px;
+  background: #f4faf5;
+  color: #526b57;
+}
+.setup-clnt-note strong {
+  color: #2f5d3a;
+  font-size: 11px;
+}
+.setup-clnt-note span {
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+
+/* =========================================================
+   V16 AUTOMATION CONTROL
+   ========================================================= */
+.automation-hierarchy-note {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding: 13px 16px;
+  border: 1px solid #dbe5f1;
+  border-radius: 14px;
+  background: #f7faff;
+  color: #52647d;
+}
+.automation-hierarchy-icon {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border-radius: 10px;
+  background: #e8f0fa;
+  color: #345b87;
+  font-weight: 900;
+}
+.automation-hierarchy-note > div:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.automation-hierarchy-note strong {
+  color: #2b3c54;
+  font-size: 12px;
+}
+.automation-hierarchy-note span {
+  font-size: 11px;
+  line-height: 1.5;
+}
+.automation-control-panel {
+  margin-bottom: 18px;
+}
+.automation-control-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto auto;
+  gap: 14px;
+  align-items: center;
+  padding: 16px 20px;
+  border-top: 1px solid #edf1f5;
+  background: #fff;
+  transition: background .16s ease;
+}
+.automation-control-row:hover {
+  background: #fbfcfe;
+}
+.automation-control-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.automation-control-copy strong {
+  color: #27364c;
+  font-size: 12px;
+}
+.automation-control-copy span {
+  color: #768196;
+  font-size: 10px;
+  word-break: break-all;
+}
+.automation-control-copy small {
+  color: #9a6531;
+  font-size: 10px;
+  line-height: 1.45;
+}
+.automation-switch-orb {
+  width: 40px;
+  height: 24px;
+  padding: 3px;
+  display: flex;
+  align-items: center;
+  border-radius: 999px;
+  transition: background .2s ease;
+}
+.automation-switch-orb span {
+  width: 18px;
+  height: 18px;
+  display: block;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 5px rgba(20,29,45,.18);
+  transition: transform .2s ease;
+}
+.automation-switch-orb.enabled {
+  background: #4d956b;
+}
+.automation-switch-orb.enabled span {
+  transform: translateX(16px);
+}
+.automation-switch-orb.disabled {
+  background: #c7ccd5;
+}
+.control-off-button,
+.control-on-button {
+  min-height: 36px;
+  min-width: 82px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform .16s ease, box-shadow .16s ease, background .16s ease;
+}
+.control-off-button {
+  border: 1px solid #e2bcbc;
+  background: #fff7f7;
+  color: #a04444;
+}
+.control-on-button {
+  border: 1px solid #bcd9c6;
+  background: #f4fbf6;
+  color: #33704b;
+}
+.control-off-button:hover:not(:disabled),
+.control-on-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 7px 16px rgba(29,42,63,.08);
+}
+.control-off-button:disabled,
+.control-on-button:disabled {
+  opacity: .42;
+  cursor: not-allowed;
+}
+.automation-permission-note {
+  padding: 11px 20px;
+  border-top: 1px solid #edf1f5;
+  background: #fafbfc;
+  color: #7a8493;
+  font-size: 10px;
+  line-height: 1.5;
+}
+.post-command-guide {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 12px;
+  padding: 18px 20px;
+}
+.post-command-guide > div {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid #e5eaf1;
+  border-radius: 13px;
+  background: #fbfcfe;
+}
+.post-command-guide code {
+  align-self: flex-start;
+  padding: 6px 9px;
+  border-radius: 8px;
+  background: #26364d;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+}
+.post-command-guide span {
+  color: #6f7c8e;
+  font-size: 10px;
+  line-height: 1.55;
+}
+.empty-control-state {
+  padding: 28px 20px;
+  color: #8590a0;
+  font-size: 11px;
+  text-align: center;
+}
+.control-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 12000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(19,28,43,.5);
+  backdrop-filter: blur(3px);
+}
+.control-modal {
+  width: min(460px,100%);
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  gap: 14px 16px;
+  padding: 22px;
+  border: 1px solid #e0e5ed;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 26px 80px rgba(20,29,45,.28);
+}
+.control-modal-icon {
+  width: 48px;
+  height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  font-size: 20px;
+  font-weight: 900;
+}
+.control-modal-icon.on {
+  background: #e7f5ec;
+  color: #2f7650;
+}
+.control-modal-icon.off {
+  background: #fbeaea;
+  color: #a04040;
+}
+.control-modal-copy h3 {
+  margin: 2px 0 5px;
+  color: #26354b;
+  font-size: 17px;
+}
+.control-modal-copy p {
+  margin: 0 0 4px;
+  color: #4e5d72;
+  font-size: 12px;
+  font-weight: 700;
+}
+.control-modal-copy small {
+  color: #7b8696;
+  font-size: 10px;
+  line-height: 1.5;
+}
+.control-modal-reason {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: #56647a;
+  font-size: 10px;
+  font-weight: 800;
+}
+.control-modal-reason textarea {
+  min-height: 82px;
+  resize: vertical;
+  padding: 10px 12px;
+  border: 1px solid #dce2ea;
+  background: #fff;
+  color: #26354b;
+}
+.control-modal-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+}
+@media (max-width: 760px) {
+  .automation-control-row {
+    grid-template-columns: 40px 1fr;
+  }
+  .automation-control-row > .status-badge,
+  .automation-control-row > button {
+    grid-column: 2;
+    justify-self: start;
+  }
+  .post-command-guide {
+    grid-template-columns: 1fr;
+  }
+}

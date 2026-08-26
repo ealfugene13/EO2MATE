@@ -16,6 +16,14 @@ const COMMAND_ACTIONS = [
   { value: "START_PAYMENT", label: "Start / resend payment" },
   { value: "REFRESH_PAYMENT", label: "Refresh payment QR" },
   { value: "HELP", label: "Show help / commands" },
+  { value: "MARK_MANUAL_PAID", label: "Mark CLNT manual payment as paid" },
+  { value: "REVERSE_MANUAL_PAID", label: "Reverse CLNT manual paid status" },
+];
+
+const COMMAND_SCOPES = [
+  { value: "BUYER", label: "Buyer only" },
+  { value: "PAGE_ONLY", label: "Page only" },
+  { value: "BOTH", label: "Buyer + Page" },
 ];
 
 function normalizeCommand(value) {
@@ -120,6 +128,7 @@ export default function SetupPage({ client }) {
   const [commandForm, setCommandForm] = useState({
     command_text: "",
     action_code: "START_PAYMENT",
+    sender_scope: "BUYER",
     description: "",
     is_active: true,
   });
@@ -428,6 +437,7 @@ export default function SetupPage({ client }) {
     setCommandForm({
       command_text: "",
       action_code: "START_PAYMENT",
+      sender_scope: "BUYER",
       description: "",
       is_active: true,
     });
@@ -440,6 +450,7 @@ export default function SetupPage({ client }) {
     setCommandForm({
       command_text: normalizeCommand(row.command_text),
       action_code: row.action_code || "START_PAYMENT",
+      sender_scope: row.sender_scope || "BUYER",
       description: row.description || "",
       is_active: row.is_active !== false,
     });
@@ -478,6 +489,7 @@ export default function SetupPage({ client }) {
           .update({
             command_text: command,
             action_code: commandForm.action_code,
+            sender_scope: commandForm.sender_scope,
             description: commandForm.description || null,
             is_active: commandForm.is_active,
             updated_at: new Date().toISOString(),
@@ -492,6 +504,7 @@ export default function SetupPage({ client }) {
             client_id: client.client_id,
             command_text: command,
             action_code: commandForm.action_code,
+            sender_scope: commandForm.sender_scope,
             description: commandForm.description || null,
             is_active: commandForm.is_active,
           });
@@ -840,6 +853,19 @@ export default function SetupPage({ client }) {
             </select>
           </label>
 
+          <label>
+            Sender scope
+            <select
+              value={commandForm.sender_scope}
+              onChange={(e) => setCommandForm((old) => ({ ...old, sender_scope: e.target.value }))}
+              disabled={!isAdmin}
+            >
+              {COMMAND_SCOPES.map((scope) => (
+                <option key={scope.value} value={scope.value}>{scope.label}</option>
+              ))}
+            </select>
+          </label>
+
           <label className="setup-description-field">
             Description
             <input
@@ -876,6 +902,7 @@ export default function SetupPage({ client }) {
               <tr>
                 <th>Command</th>
                 <th>Action</th>
+                <th>Sender</th>
                 <th>Source</th>
                 <th>Status</th>
                 <th>Description</th>
@@ -884,7 +911,7 @@ export default function SetupPage({ client }) {
             </thead>
             <tbody>
               {mergedCommands.length === 0 ? (
-                <tr><td colSpan="6" className="empty-table-cell">No Messenger commands found.</td></tr>
+                <tr><td colSpan="7" className="empty-table-cell">No Messenger commands found.</td></tr>
               ) : mergedCommands.map((item) => {
                 const row = item.effective;
                 const key = normalizeCommand(row.command_text);
@@ -899,6 +926,15 @@ export default function SetupPage({ client }) {
                   >
                     <td><strong>{key}</strong></td>
                     <td>{row.action_code}</td>
+                    <td>
+                      <StatusPill active={String(row.sender_scope || "BUYER").toUpperCase() !== "PAGE_ONLY"}>
+                        {String(row.sender_scope || "BUYER").toUpperCase() === "PAGE_ONLY"
+                          ? "Page only"
+                          : String(row.sender_scope || "BUYER").toUpperCase() === "BOTH"
+                            ? "Buyer + Page"
+                            : "Buyer only"}
+                      </StatusPill>
+                    </td>
                     <td>{item.override ? "Client override" : "Global default"}</td>
                     <td><StatusPill active={row.is_active}>{row.is_active ? "Active" : "Disabled"}</StatusPill></td>
                     <td className="setup-description-cell">{row.description || "-"}</td>

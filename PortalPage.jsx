@@ -149,6 +149,14 @@ export default function PortalPage({ session }) {
   const [paymentAccountLoading, setPaymentAccountLoading] = useState(false);
   const [paymentAccountMessage, setPaymentAccountMessage] = useState("");
 
+
+  const [automationControls, setAutomationControls] = useState([]);
+  const [automationPages, setAutomationPages] = useState([]);
+  const [automationControlLoading, setAutomationControlLoading] = useState(false);
+  const [automationControlMessage, setAutomationControlMessage] = useState("");
+  const [automationModal, setAutomationModal] = useState(null);
+  const [automationReason, setAutomationReason] = useState("");
+
   useEffect(() => {
     loadPortal();
 
@@ -292,6 +300,127 @@ export default function PortalPage({ session }) {
     const baseUrl = import.meta.env.VITE_SUPABASE_URL;
     const connectUrl = `${baseUrl}/functions/v1/facebook-oauth-start?client_id=${encodeURIComponent(client.client_id)}`;
     window.location.assign(connectUrl);
+  }
+
+
+  function findAutomationControl(scopeType, scopeId) {
+    return automationControls.find(
+      (row) =>
+        String(row.scope_type || "").toUpperCase() === String(scopeType).toUpperCase() &&
+        String(row.scope_id || "") === String(scopeId || "")
+    ) || null;
+  }
+
+  function automationScopeEnabled(scopeType, scopeId) {
+    const control = findAutomationControl(scopeType, scopeId);
+    return control ? control.is_enabled !== false : true;
+  }
+
+  function automationScopeReason(scopeType, scopeId) {
+    return findAutomationControl(scopeType, scopeId)?.reason || "";
+  }
+
+  async function loadAutomationControls() {
+    if (!client?.client_id) return;
+
+    setAutomationControlLoading(true);
+    setAutomationControlMessage("");
+
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        "automation-admin",
+        {
+          method: "POST",
+          body: {
+            action: "LIST",
+            client_id: client.client_id,
+          },
+        },
+      );
+
+      if (error) throw error;
+      if (!data?.success) {
+        throw new Error(data?.message || "Unable to load automation controls.");
+      }
+
+      setAutomationControls(data.controls || []);
+      setAutomationPages(data.pages || []);
+      return data;
+    } catch (error) {
+      setAutomationControlMessage(
+        error.message || "Unable to load automation controls."
+      );
+      return null;
+    } finally {
+      setAutomationControlLoading(false);
+    }
+  }
+
+  async function openAutomationControl() {
+    setPage("automation-control");
+    await loadAutomationControls();
+  }
+
+  function requestAutomationChange({
+    scopeType,
+    scopeId,
+    label,
+    enabled,
+  }) {
+    setAutomationReason("");
+    setAutomationModal({
+      scopeType,
+      scopeId,
+      label,
+      enabled,
+    });
+  }
+
+  async function confirmAutomationChange() {
+    if (!automationModal || !client?.client_id) return;
+
+    if (!automationModal.enabled && !automationReason.trim()) {
+      setAutomationControlMessage("Please enter a reason before disabling automation.");
+      return;
+    }
+
+    setAutomationControlLoading(true);
+    setAutomationControlMessage("");
+
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        "automation-admin",
+        {
+          method: "POST",
+          body: {
+            action: "SET",
+            client_id: client.client_id,
+            scope_type: automationModal.scopeType,
+            scope_id: automationModal.scopeId,
+            is_enabled: automationModal.enabled,
+            reason: automationReason.trim() || null,
+          },
+        },
+      );
+
+      if (error) throw error;
+      if (!data?.success) {
+        throw new Error(data?.message || "Unable to update automation control.");
+      }
+
+      setAutomationControlMessage(
+        `${automationModal.label} automation ${automationModal.enabled ? "enabled" : "disabled"}.`
+      );
+      setAutomationModal(null);
+      setAutomationReason("");
+      await loadAutomationControls();
+    } catch (error) {
+      setAutomationControlMessage(
+        error.message || "Unable to update automation control."
+      );
+    } finally {
+      setAutomationControlLoading(false);
+    }
   }
 
   async function openFacebookSetup() {
@@ -1019,6 +1148,13 @@ export default function PortalPage({ session }) {
             Delivery
           </button>
 
+          <button
+            className={`nav-item ${page === "automation-control" ? "active" : ""}`}
+            onClick={openAutomationControl}
+          >
+            Automation Control
+          </button>
+
           <button className={`nav-item ${page === "setup" ? "active" : ""}`} onClick={() => setPage("setup")}>
             Setup
           </button>
@@ -1155,6 +1291,269 @@ export default function PortalPage({ session }) {
                 <div><strong>Facebook account</strong><span>Use the account that manages the business Page.</span></div>
                 <div><strong>Page access</strong><span>The account must have enough Page permissions to authorize your automation.</span></div>
                 <div><strong>No developer setup</strong><span>Your platform's Meta app handles OAuth, webhook and API integration.</span></div>
+              </div>
+            </section>
+          </>
+        )}
+
+        {page === "automation-control" && (
+          <>
+            {automationModal && (
+              <div className="control-modal-backdrop">
+                <div className="control-modal" role="dialog" aria-modal="true">
+                  <div className={`control-modal-icon ${automationModal.enabled ? "on" : "off"}`}>
+                    {automationModal.enabled ? "✓" : "!"}
+                  </div>
+
+                  <div className="control-modal-copy">
+                    <h3>
+                      {automationModal.enabled ? "Enable automation?" : "Disable automation?"}
+                    </h3>
+                    <p>
+                      {automationModal.label}
+                    </p>
+                    <small>
+                      {automationModal.enabled
+                        ? "Processing can resume immediately, subject to any higher-level suspension."
+                        : "New automated activity will stop at this scope. Existing records are preserved."}
+                    </small>
+                  </div>
+
+                  <label className="control-modal-reason">
+                    Reason {automationModal.enabled ? "(optional)" : "(required)"}
+                    <textarea
+                      rows="3"
+                      value={automationReason}
+                      onChange={(e) => setAutomationReason(e.target.value)}
+                      placeholder={
+                        automationModal.enabled
+                          ? "Example: Subscription renewed"
+                          : "Example: Subscription overdue"
+                      }
+                    />
+                  </label>
+
+                  <div className="control-modal-actions">
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={() => {
+                        setAutomationModal(null);
+                        setAutomationReason("");
+                      }}
+                      disabled={automationControlLoading}
+                    >
+                      Cancel
+                    </button>
+
+                    <button
+                      type="button"
+                      className={automationModal.enabled ? "primary-button" : "danger-confirm-button"}
+                      onClick={confirmAutomationChange}
+                      disabled={automationControlLoading}
+                    >
+                      {automationModal.enabled ? "Enable" : "Disable"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <header className="dashboard-header">
+              <div>
+                <p className="eyebrow">AUTOMATION GOVERNANCE</p>
+                <h1>Automation Control</h1>
+                <p>Pause or resume EO2MATE without deleting client, Page, auction, or transaction data.</p>
+              </div>
+
+              <button
+                className="icon-button refresh-icon-button"
+                type="button"
+                onClick={loadAutomationControls}
+                disabled={automationControlLoading}
+                title="Refresh automation controls"
+                aria-label="Refresh automation controls"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M20 6v5h-5" />
+                  <path d="M4 18v-5h5" />
+                  <path d="M6.1 9a7 7 0 0 1 11.3-2.1L20 9" />
+                  <path d="M4 15l2.6 2.1A7 7 0 0 0 17.9 15" />
+                </svg>
+              </button>
+            </header>
+
+            {automationControlMessage && (
+              <div className="success-message global-error">
+                {automationControlMessage}
+              </div>
+            )}
+
+            <section className="automation-hierarchy-note">
+              <div className="automation-hierarchy-icon">i</div>
+              <div>
+                <strong>Control priority</strong>
+                <span>Client OFF overrides Page ON and Post ON. Page OFF overrides Post ON. A post runs only when all three levels are enabled.</span>
+              </div>
+            </section>
+
+            <section className="dashboard-panel automation-control-panel">
+              <div className="panel-header">
+                <div>
+                  <h2>Client automation</h2>
+                  <p>Use this for account-wide suspension such as an overdue EO2MATE subscription.</p>
+                </div>
+              </div>
+
+              <div className="automation-control-row client-scope">
+                <div className={`automation-switch-orb ${automationScopeEnabled("CLIENT", client?.client_id) ? "enabled" : "disabled"}`}>
+                  <span />
+                </div>
+
+                <div className="automation-control-copy">
+                  <strong>{client?.name || "Current client"}</strong>
+                  <span>
+                    Client-wide auction, Messenger and payment automation
+                  </span>
+                  {!automationScopeEnabled("CLIENT", client?.client_id) && (
+                    <small>
+                      Reason: {automationScopeReason("CLIENT", client?.client_id) || "No reason recorded"}
+                    </small>
+                  )}
+                </div>
+
+                <StatusBadge
+                  status={
+                    automationScopeEnabled("CLIENT", client?.client_id)
+                      ? "ACTIVE"
+                      : "SUSPENDED"
+                  }
+                />
+
+                <button
+                  type="button"
+                  className={
+                    automationScopeEnabled("CLIENT", client?.client_id)
+                      ? "control-off-button"
+                      : "control-on-button"
+                  }
+                  disabled={
+                    automationControlLoading ||
+                    String(client?.role || "").toUpperCase() !== "SUPER_ADMIN"
+                  }
+                  title={
+                    String(client?.role || "").toUpperCase() === "SUPER_ADMIN"
+                      ? "Change client automation"
+                      : "Client-level suspension requires SUPER_ADMIN"
+                  }
+                  onClick={() =>
+                    requestAutomationChange({
+                      scopeType: "CLIENT",
+                      scopeId: client?.client_id,
+                      label: client?.name || "Current client",
+                      enabled: !automationScopeEnabled("CLIENT", client?.client_id),
+                    })
+                  }
+                >
+                  {automationScopeEnabled("CLIENT", client?.client_id) ? "Turn Off" : "Turn On"}
+                </button>
+              </div>
+
+              {String(client?.role || "").toUpperCase() !== "SUPER_ADMIN" && (
+                <div className="automation-permission-note">
+                  Client-level ON/OFF is locked to SUPER_ADMIN so a subscription-suspended client cannot reactivate itself.
+                </div>
+              )}
+            </section>
+
+            <section className="dashboard-panel automation-control-panel">
+              <div className="panel-header">
+                <div>
+                  <h2>Facebook Page automation</h2>
+                  <p>Pause one Page while leaving the client's other connected Pages running.</p>
+                </div>
+              </div>
+
+              <div className="automation-page-list">
+                {(automationPages || []).map((fbPage) => {
+                  const pageEnabled = automationScopeEnabled("PAGE", fbPage.fb_page_id);
+                  const clientEnabled = automationScopeEnabled("CLIENT", client?.client_id);
+                  const effectiveEnabled = clientEnabled && pageEnabled;
+
+                  return (
+                    <div className="automation-control-row" key={fbPage.fb_page_id}>
+                      <div className={`automation-switch-orb ${effectiveEnabled ? "enabled" : "disabled"}`}>
+                        <span />
+                      </div>
+
+                      <div className="automation-control-copy">
+                        <strong>{fbPage.page_name || "Facebook Page"}</strong>
+                        <span>{fbPage.fb_page_id}</span>
+                        {!pageEnabled && (
+                          <small>
+                            Reason: {automationScopeReason("PAGE", fbPage.fb_page_id) || "No reason recorded"}
+                          </small>
+                        )}
+                        {pageEnabled && !clientEnabled && (
+                          <small>Blocked by client-level suspension.</small>
+                        )}
+                      </div>
+
+                      <StatusBadge status={effectiveEnabled ? "ACTIVE" : "SUSPENDED"} />
+
+                      <button
+                        type="button"
+                        className={pageEnabled ? "control-off-button" : "control-on-button"}
+                        disabled={
+                          automationControlLoading ||
+                          !["ADMIN", "OWNER", "SUPER_ADMIN"].includes(
+                            String(client?.role || "").toUpperCase()
+                          )
+                        }
+                        onClick={() =>
+                          requestAutomationChange({
+                            scopeType: "PAGE",
+                            scopeId: fbPage.fb_page_id,
+                            label: fbPage.page_name || fbPage.fb_page_id,
+                            enabled: !pageEnabled,
+                          })
+                        }
+                      >
+                        {pageEnabled ? "Turn Off" : "Turn On"}
+                      </button>
+                    </div>
+                  );
+                })}
+
+                {!automationControlLoading && !(automationPages || []).length && (
+                  <div className="empty-control-state">
+                    No connected Facebook Pages found for this client.
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <section className="dashboard-panel automation-control-panel">
+              <div className="panel-header">
+                <div>
+                  <h2>Post-level control</h2>
+                  <p>The Facebook Page owner controls individual auction posts directly from the main comment section.</p>
+                </div>
+              </div>
+
+              <div className="post-command-guide">
+                <div>
+                  <code>EO2MATE OFF</code>
+                  <span>Pause bids, announcements and automatic winner/closing processing for that specific post.</span>
+                </div>
+                <div>
+                  <code>EO2MATE ON</code>
+                  <span>Resume the post. Higher-level Client/Page suspension still takes priority.</span>
+                </div>
+              </div>
+
+              <div className="automation-permission-note">
+                These commands are accepted only when posted by the Facebook Page itself on the main auction post, for both Single and Multiple Auction.
               </div>
             </section>
           </>
