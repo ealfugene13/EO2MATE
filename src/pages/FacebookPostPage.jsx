@@ -607,8 +607,7 @@ export default function FacebookPostPage({ client }) {
     const confirmed = window.confirm(
       `Publish this ${postType === "SINGLE" ? "Single" : "Multiple"} Auction to Facebook?\n\n` +
       `Page: ${getPageLabel(
-        pages.find((page) => String(page.fb_page_id) === selectedPageId),
-        true
+        pages.find((page) => String(page.fb_page_id) === selectedPageId)
       )}\n` +
       `Mode: ${environment}\n` +
       `Images: ${items.length}`
@@ -718,7 +717,7 @@ export default function FacebookPostPage({ client }) {
               {!pages.length && <option value="">No active Page connected</option>}
               {pages.map((page) => (
                 <option key={page.fb_page_id} value={page.fb_page_id}>
-                  {getPageLabel(page, true)}
+                  {getPageLabel(page)}
                 </option>
               ))}
             </select>
@@ -738,10 +737,10 @@ export default function FacebookPostPage({ client }) {
                   disabled={!enabled}
                 >
                   {mode === "CLNT"
-                    ? `EO2MATE-CLNT · Manual payment${enabled ? "" : " · Locked"}`
+                    ? `EO2MATE-CLNT · Manual payment${enabled ? "" : " 🔒"}`
                     : mode === "TEST"
-                      ? `EO2MATE-TEST · PayMongo test${enabled ? "" : " · Locked"}`
-                      : `EO2MATE-PROD · Live payment${enabled ? "" : " · Locked"}`}
+                      ? `EO2MATE-TEST · PayMongo test${enabled ? "" : " 🔒"}`
+                      : `EO2MATE-PROD · Live payment${enabled ? "" : " 🔒"}`}
                 </option>
               ))}
             </select>
