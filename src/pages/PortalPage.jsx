@@ -3,6 +3,7 @@ import { supabase } from "../supabase";
 import SetupPage from "./SetupPage";
 import OnboardingPage from "./OnboardingPage";
 import AdminClientsPage from "./AdminClientsPage";
+import FacebookPostPage from "./FacebookPostPage";
 import EO2MateLogo from "../components/EO2MateLogo";
 
 function formatCurrency(value) {
@@ -1223,6 +1224,13 @@ export default function PortalPage({ session }) {
             Facebook Setup
           </button>
 
+          <button
+            className={`nav-item ${page === "facebook-post" ? "active" : ""}`}
+            onClick={() => setPage("facebook-post")}
+          >
+            Create Auction Post
+          </button>
+
           <button className={`nav-item ${page.includes("auction") ? "active" : ""}`} onClick={() => goToAuctions("ALL")}>
             Auctions
           </button>
@@ -1281,6 +1289,10 @@ export default function PortalPage({ session }) {
 
         {page === "admin-clients" && platformAdmin && (
           <AdminClientsPage />
+        )}
+
+        {page === "facebook-post" && (
+          <FacebookPostPage client={client} />
         )}
 
         {page === "facebook" && (
