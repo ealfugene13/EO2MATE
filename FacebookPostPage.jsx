@@ -1054,6 +1054,256 @@ export default function FacebookPostPage({ client }) {
           flex-wrap: wrap;
         }
 
+
+        .fb-posting-panel {
+          border: 1px solid rgba(148, 163, 184, .18);
+          border-radius: 20px;
+          background:
+            linear-gradient(
+              180deg,
+              rgba(255,255,255,.035),
+              rgba(255,255,255,0)
+            );
+          overflow: visible;
+        }
+
+        .fb-posting-panel .panel-header {
+          margin-bottom: 18px;
+        }
+
+        .fb-posting-panel .panel-header h2 {
+          letter-spacing: -.02em;
+        }
+
+        .fb-posting-panel label {
+          display: flex;
+          flex-direction: column;
+          gap: 7px;
+          font-size: .82rem;
+          font-weight: 700;
+          letter-spacing: .01em;
+          color: var(--text-color, #111827);
+          min-width: 0;
+        }
+
+        .fb-posting-panel label > small:not(.eo2-field-error-text) {
+          font-weight: 500;
+          line-height: 1.45;
+          opacity: .64;
+        }
+
+        .fb-posting-panel input,
+        .fb-posting-panel select,
+        .fb-posting-panel textarea {
+          width: 100%;
+          min-height: 46px;
+          border: 1px solid rgba(148, 163, 184, .42);
+          border-radius: 12px;
+          padding: 11px 13px;
+          background: rgba(255, 255, 255, .96);
+          color: #111827;
+          font: inherit;
+          font-size: .94rem;
+          font-weight: 500;
+          outline: none;
+          transition:
+            border-color .18s ease,
+            box-shadow .18s ease,
+            background .18s ease,
+            transform .18s ease;
+          box-sizing: border-box;
+        }
+
+        .fb-posting-panel textarea {
+          min-height: 118px;
+          resize: vertical;
+          line-height: 1.55;
+        }
+
+        .fb-posting-panel select {
+          appearance: none;
+          -webkit-appearance: none;
+          padding-right: 42px;
+          background-image:
+            linear-gradient(45deg, transparent 50%, currentColor 50%),
+            linear-gradient(135deg, currentColor 50%, transparent 50%);
+          background-position:
+            calc(100% - 18px) calc(50% - 2px),
+            calc(100% - 13px) calc(50% - 2px);
+          background-size: 5px 5px, 5px 5px;
+          background-repeat: no-repeat;
+        }
+
+        .fb-posting-panel input:hover:not(:disabled),
+        .fb-posting-panel select:hover:not(:disabled),
+        .fb-posting-panel textarea:hover:not(:disabled) {
+          border-color: rgba(100, 116, 139, .72);
+        }
+
+        .fb-posting-panel input:focus,
+        .fb-posting-panel select:focus,
+        .fb-posting-panel textarea:focus {
+          border-color: var(--accent-color, #2563eb);
+          box-shadow:
+            0 0 0 3px color-mix(
+              in srgb,
+              var(--accent-color, #2563eb) 16%,
+              transparent
+            );
+          background: #fff;
+        }
+
+        .fb-posting-panel input:disabled,
+        .fb-posting-panel select:disabled,
+        .fb-posting-panel textarea:disabled {
+          cursor: not-allowed;
+          opacity: .62;
+          background: rgba(148, 163, 184, .10);
+        }
+
+        .fb-posting-panel input[type="number"] {
+          font-variant-numeric: tabular-nums;
+        }
+
+        .fb-posting-panel input[type="datetime-local"] {
+          position: relative;
+          min-width: 0;
+          padding-right: 12px;
+          font-variant-numeric: tabular-nums;
+          color-scheme: light;
+        }
+
+        .fb-posting-panel input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+          width: 22px;
+          height: 22px;
+          padding: 4px;
+          margin-left: 6px;
+          border-radius: 8px;
+          cursor: pointer;
+          opacity: .72;
+          transition:
+            opacity .15s ease,
+            background .15s ease;
+        }
+
+        .fb-posting-panel input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover {
+          opacity: 1;
+          background: rgba(148, 163, 184, .16);
+        }
+
+        .fb-post-setup-grid,
+        .fb-rule-grid {
+          gap: 16px !important;
+          align-items: start;
+        }
+
+        .fb-post-setup-grid {
+          grid-template-columns:
+            repeat(auto-fit, minmax(220px, 1fr)) !important;
+        }
+
+        .fb-rule-grid {
+          grid-template-columns:
+            repeat(auto-fit, minmax(200px, 1fr)) !important;
+        }
+
+        .fb-item-editor {
+          padding: 15px;
+          border-top: 1px solid rgba(148, 163, 184, .18);
+          background: rgba(148, 163, 184, .035);
+        }
+
+        .fb-item-editor details {
+          margin-top: 14px;
+          border: 1px solid rgba(148, 163, 184, .22);
+          border-radius: 12px;
+          overflow: hidden;
+        }
+
+        .fb-item-editor summary {
+          cursor: pointer;
+          padding: 12px 14px;
+          font-weight: 700;
+          user-select: none;
+        }
+
+        .fb-item-editor details[open] summary {
+          border-bottom: 1px solid rgba(148, 163, 184, .18);
+        }
+
+        .fb-item-editor details .fb-rule-grid {
+          padding: 14px;
+        }
+
+        .fb-upload-empty {
+          min-height: 180px;
+          border: 1.5px dashed rgba(100, 116, 139, .45);
+          border-radius: 18px;
+          background:
+            linear-gradient(
+              180deg,
+              rgba(148, 163, 184, .055),
+              rgba(148, 163, 184, .015)
+            );
+          transition:
+            border-color .18s ease,
+            background .18s ease,
+            transform .18s ease,
+            box-shadow .18s ease;
+        }
+
+        .fb-upload-empty:hover:not(:disabled) {
+          border-color: var(--accent-color, #2563eb);
+          background:
+            color-mix(
+              in srgb,
+              var(--accent-color, #2563eb) 5%,
+              transparent
+            );
+          transform: translateY(-1px);
+          box-shadow: 0 8px 28px rgba(15, 23, 42, .08);
+        }
+
+        .fb-photo-card {
+          border-radius: 16px;
+          overflow: hidden;
+          border: 1px solid rgba(148, 163, 184, .20);
+          background: rgba(255,255,255,.025);
+        }
+
+        .primary-button,
+        .secondary-button,
+        .icon-button {
+          min-height: 42px;
+          border-radius: 11px !important;
+          font-weight: 700;
+          letter-spacing: -.01em;
+        }
+
+        .fb-publish-actions {
+          padding-top: 8px;
+        }
+
+        @media (prefers-color-scheme: dark) {
+          .fb-posting-panel input,
+          .fb-posting-panel select,
+          .fb-posting-panel textarea {
+            background: rgba(15, 23, 42, .58);
+            color: #f8fafc;
+            border-color: rgba(148, 163, 184, .30);
+          }
+
+          .fb-posting-panel input:focus,
+          .fb-posting-panel select:focus,
+          .fb-posting-panel textarea:focus {
+            background: rgba(15, 23, 42, .82);
+          }
+
+          .fb-posting-panel input[type="datetime-local"] {
+            color-scheme: dark;
+          }
+        }
+
         @media (max-width: 720px) {
           .fb-post-setup-grid,
           .fb-rule-grid,
@@ -1073,6 +1323,16 @@ export default function FacebookPostPage({ client }) {
           .eo2-publish-card,
           .eo2-success-card {
             padding: 22px 18px;
+          }
+
+          .fb-posting-panel input,
+          .fb-posting-panel select,
+          .fb-posting-panel textarea {
+            font-size: 16px;
+          }
+
+          .fb-posting-panel input[type="datetime-local"] {
+            min-height: 50px;
           }
         }
       `}</style>
