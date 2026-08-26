@@ -452,3 +452,94 @@ td { color: #354158; }
     flex-direction: column;
   }
 }
+
+
+/* =========================================================
+   V10 OPTIONAL PAYMENT SETUP
+   ========================================================= */
+.payment-setup-card {
+  margin-bottom: 22px;
+  padding: 18px 20px;
+  border: 1px solid #dfe5ee;
+  border-radius: 14px;
+  background: #fff;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+}
+.payment-setup-card.active { border-color: #bfe6d1; background: #f6fcf8; }
+.payment-setup-copy { display: flex; align-items: center; gap: 14px; }
+.payment-logo { width: 42px; height: 42px; border-radius: 12px; display:flex; align-items:center; justify-content:center; font-weight:800; background:#25334b; color:#fff; }
+.payment-setup-copy div:last-child { display:flex; flex-direction:column; gap:4px; }
+.payment-setup-copy span { color:#687386; font-size:12px; }
+.payment-setup-copy small { color:#8d96a5; font-size:11px; }
+.payment-setup-actions { display:flex; gap:9px; flex-wrap:wrap; justify-content:flex-end; }
+@media (max-width: 800px) { .payment-setup-card { align-items:flex-start; flex-direction:column; } .payment-setup-actions { justify-content:flex-start; } }
+
+/* =========================================================
+   V11 PAYMENT LIFECYCLE MANAGEMENT
+   ========================================================= */
+.payment-groups-panel { margin-bottom: 20px; }
+.payment-group-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid #edf0f5;
+}
+.payments-toolbar { margin-top: 20px; }
+.table-action-button {
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  padding: 8px 11px;
+  background: #fff;
+  color: #1d3557;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.table-action-button:hover { background: #f6f8fb; }
+.table-muted { color: #98a1b0; font-size: 11px; }
+.reopen-payment-card {
+  margin-bottom: 20px;
+  padding: 22px;
+  border: 1px solid #efd9a7;
+  border-radius: 16px;
+  background: #fffaf0;
+}
+.reopen-payment-card h2 { margin: 4px 0 7px; font-size: 18px; }
+.reopen-payment-card p { margin: 0; color: #74684e; font-size: 12px; line-height: 1.5; }
+.reopen-payment-form {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 14px;
+  margin-top: 18px;
+}
+.reopen-payment-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #4b5565;
+}
+.reopen-payment-form input {
+  width: 100%;
+  padding: 12px 13px;
+  border: 1px solid #d8d1bf;
+  border-radius: 10px;
+  background: #fff;
+  outline: none;
+}
+.reopen-payment-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+.status-badge.status-warning + .status-badge { margin-left: 4px; }
+@media (max-width: 900px) {
+  .payment-group-toolbar,
+  .reopen-payment-form { grid-template-columns: 1fr; }
+}

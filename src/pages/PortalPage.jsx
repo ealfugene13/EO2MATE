@@ -23,6 +23,31 @@ function formatDateTime(value) {
   });
 }
 
+function formatTimeRemaining(value) {
+  if (!value) return "-";
+
+  const deadline = new Date(value).getTime();
+  if (Number.isNaN(deadline)) return "-";
+
+  const diff = deadline - Date.now();
+  if (diff <= 0) return "Expired";
+
+  const totalMinutes = Math.floor(diff / 60000);
+  const days = Math.floor(totalMinutes / 1440);
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  const minutes = totalMinutes % 60;
+
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${minutes}m`;
+}
+
+function paymentGroupStatus(group) {
+  if (group?.payment_expired_at) return "PAYMENT_EXPIRED";
+  if (group?.payment_reopened_at && !group?.payment_expired_at) return "PAYMENT_REOPENED";
+  return group?.group_status || "-";
+}
+
 function statusLabel(value) {
   return String(value || "-").replaceAll("_", " ");
 }
@@ -38,11 +63,11 @@ function StatusBadge({ status }) {
   } else if (normalized === "COMPLETED_WITH_WINNER") {
     className += " status-success";
   } else if (
-    ["PAYMENT_PENDING", "PENDING", "AWAITING_FINALIZER", "BOOKED", "PICKED_UP", "DROPPED_OFF", "IN_TRANSIT", "SHIPPED"].includes(normalized)
+    ["PAYMENT_PENDING", "PAYMENT_REOPENED", "PENDING", "AWAITING_FINALIZER", "BOOKED", "PICKED_UP", "DROPPED_OFF", "IN_TRANSIT", "SHIPPED"].includes(normalized)
   ) {
     className += " status-warning";
   } else if (
-    ["CANCELLED", "FAILED", "EXPIRED", "REFUNDED", "INVALID"].includes(normalized)
+    ["CANCELLED", "PAYMENT_EXPIRED", "FAILED", "EXPIRED", "REFUNDED", "INVALID"].includes(normalized)
   ) {
     className += " status-danger";
   } else {
@@ -77,6 +102,7 @@ export default function PortalPage({ session }) {
   const [auctions, setAuctions] = useState([]);
   const [orders, setOrders] = useState([]);
   const [payments, setPayments] = useState([]);
+  const [paymentGroups, setPaymentGroups] = useState([]);
   const [deliveries, setDeliveries] = useState([]);
 
   const [page, setPage] = useState("dashboard");
@@ -96,6 +122,13 @@ export default function PortalPage({ session }) {
   const [paymentSearch, setPaymentSearch] = useState("");
   const [paymentStatusFilter, setPaymentStatusFilter] = useState("ALL");
   const [paymentDetail, setPaymentDetail] = useState(null);
+  const [paymentGroupSearch, setPaymentGroupSearch] = useState("");
+  const [paymentGroupStatusFilter, setPaymentGroupStatusFilter] = useState("ALL");
+  const [reopenGroup, setReopenGroup] = useState(null);
+  const [reopenHours, setReopenHours] = useState("24");
+  const [reopenReason, setReopenReason] = useState("");
+  const [reopenLoading, setReopenLoading] = useState(false);
+  const [reopenMessage, setReopenMessage] = useState("");
 
   const [deliverySearch, setDeliverySearch] = useState("");
   const [deliveryStatusFilter, setDeliveryStatusFilter] = useState("ALL");
@@ -110,6 +143,10 @@ export default function PortalPage({ session }) {
   const [facebookLoading, setFacebookLoading] = useState(false);
   const [facebookMessage, setFacebookMessage] = useState("");
   const [onboardingChecked, setOnboardingChecked] = useState(false);
+
+  const [paymentAccountStatus, setPaymentAccountStatus] = useState(null);
+  const [paymentAccountLoading, setPaymentAccountLoading] = useState(false);
+  const [paymentAccountMessage, setPaymentAccountMessage] = useState("");
 
   useEffect(() => {
     loadPortal();
@@ -162,8 +199,6 @@ export default function PortalPage({ session }) {
               ? "Facebook authorization completed. Connection status refreshed."
               : `Facebook returned: ${facebookResult}`
           );
-        } else if (!data.connected && !preserveCurrentPage) {
-          setPage("facebook");
         }
       }
 
@@ -175,9 +210,8 @@ export default function PortalPage({ session }) {
 
       setFacebookMessage(message);
 
-      if (applyOnboardingGate && !preserveCurrentPage) {
-        setPage("facebook");
-      }
+      // Facebook is optional for portal access.
+      // Keep the client on the dashboard even when status cannot be loaded.
 
       return null;
     } finally {
@@ -186,6 +220,66 @@ export default function PortalPage({ session }) {
         setOnboardingChecked(true);
       }
     }
+  }
+
+  async function loadPaymentAccountStatus() {
+    setPaymentAccountLoading(true);
+    setPaymentAccountMessage("");
+
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        "client-payment-status",
+        { method: "POST", body: {} },
+      );
+
+      if (error) throw error;
+      if (!data?.success) {
+        throw new Error(data?.message || "Unable to load payment setup status.");
+      }
+
+      setPaymentAccountStatus(data);
+      return data;
+    } catch (error) {
+      setPaymentAccountMessage(error.message || "Unable to load payment setup status.");
+      return null;
+    } finally {
+      setPaymentAccountLoading(false);
+    }
+  }
+
+  async function markPayMongoAccountCreated() {
+    setPaymentAccountLoading(true);
+    setPaymentAccountMessage("");
+
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        "mark-paymongo-account-created",
+        { method: "POST", body: {} },
+      );
+
+      if (error) throw error;
+      if (!data?.success) {
+        throw new Error(data?.message || "Unable to update PayMongo setup status.");
+      }
+
+      setPaymentAccountStatus(data);
+      setPaymentAccountMessage(
+        "PayMongo account recorded. Online checkout remains disabled until the account is linked and activated for this client."
+      );
+    } catch (error) {
+      setPaymentAccountMessage(error.message || "Unable to update PayMongo setup status.");
+    } finally {
+      setPaymentAccountLoading(false);
+    }
+  }
+
+  function openPayMongo() {
+    const status = String(paymentAccountStatus?.account_status || "NOT_CONFIGURED").toUpperCase();
+    const url = status === "NOT_CONFIGURED"
+      ? (paymentAccountStatus?.setup_url || "https://dashboard.paymongo.com/signup")
+      : (paymentAccountStatus?.dashboard_url || "https://dashboard.paymongo.com/login");
+
+    window.open(url, "_blank", "noopener,noreferrer");
   }
 
   function connectFacebook() {
@@ -238,6 +332,7 @@ export default function PortalPage({ session }) {
         auctionResult,
         orderResult,
         paymentResult,
+        paymentGroupResult,
         deliveryResult,
       ] = await Promise.all([
         supabase
@@ -256,6 +351,12 @@ export default function PortalPage({ session }) {
           .order("created_at", { ascending: false }),
 
         supabase
+          .from("order_groups")
+          .select("*")
+          .eq("client_id", clientUser.client_id)
+          .order("created_at", { ascending: false }),
+
+        supabase
           .from("client_delivery_list")
           .select("*")
           .order("created_at", { ascending: false }),
@@ -264,11 +365,13 @@ export default function PortalPage({ session }) {
       if (auctionResult.error) throw auctionResult.error;
       if (orderResult.error) throw orderResult.error;
       if (paymentResult.error) throw paymentResult.error;
+      if (paymentGroupResult.error) throw paymentGroupResult.error;
       if (deliveryResult.error) throw deliveryResult.error;
 
       setAuctions(auctionResult.data || []);
       setOrders(orderResult.data || []);
       setPayments(paymentResult.data || []);
+      setPaymentGroups(paymentGroupResult.data || []);
       setDeliveries(deliveryResult.data || []);
 
       /*
@@ -278,9 +381,12 @@ export default function PortalPage({ session }) {
        * Facebook Setup automatically. Connected returning
        * clients continue to the Dashboard.
        */
-      await loadFacebookStatus({
-        applyOnboardingGate: true,
-      });
+      await Promise.all([
+        loadFacebookStatus({
+          applyOnboardingGate: true,
+        }),
+        loadPaymentAccountStatus(),
+      ]);
     } catch (error) {
       setErrorMessage(error.message || "Unable to load portal.");
     } finally {
@@ -732,6 +838,77 @@ export default function PortalPage({ session }) {
     });
   }, [payments, paymentStatusFilter, paymentSearch]);
 
+  const filteredPaymentGroups = useMemo(() => {
+    return paymentGroups.filter((group) => {
+      const status = paymentGroupStatus(group);
+      const matchesStatus =
+        paymentGroupStatusFilter === "ALL" ||
+        status === paymentGroupStatusFilter;
+
+      const haystack = [
+        group.group_number,
+        group.buyer_name,
+        group.buyer_fb_user_id,
+        group.environment,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      const matchesSearch =
+        !paymentGroupSearch.trim() ||
+        haystack.includes(paymentGroupSearch.trim().toLowerCase());
+
+      return matchesStatus && matchesSearch;
+    });
+  }, [paymentGroups, paymentGroupStatusFilter, paymentGroupSearch]);
+
+  const isPaymentAdmin = ["ADMIN", "OWNER", "SUPER_ADMIN"].includes(
+    String(client?.role || "").toUpperCase(),
+  );
+
+  async function reopenExpiredPayment() {
+    if (!reopenGroup?.order_group_id) return;
+
+    const hours = Number(reopenHours);
+    if (!Number.isFinite(hours) || hours <= 0 || hours > 168) {
+      setErrorMessage("Payment extension must be between 1 and 168 hours.");
+      return;
+    }
+
+    setReopenLoading(true);
+    setErrorMessage("");
+    setReopenMessage("");
+
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        "payment-admin",
+        {
+          body: {
+            order_group_id: reopenGroup.order_group_id,
+            hours,
+            reason: reopenReason.trim() || null,
+          },
+        },
+      );
+
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.message || "Unable to reopen payment.");
+
+      setReopenMessage(
+        `Payment reopened until ${formatDateTime(data.new_deadline_at)}. The buyer can request a new QR in Messenger.`,
+      );
+      setReopenGroup(null);
+      setReopenReason("");
+      setReopenHours("24");
+      await loadPortal();
+    } catch (error) {
+      setErrorMessage(error.message || "Unable to reopen payment.");
+    } finally {
+      setReopenLoading(false);
+    }
+  }
+
   const filteredDeliveries = useMemo(() => {
     return deliveries.filter((delivery) => {
       const matchesStatus =
@@ -828,7 +1005,12 @@ export default function PortalPage({ session }) {
             Orders
           </button>
 
-          <button className={`nav-item ${page.includes("payment") ? "active" : ""}`} onClick={() => goToPayments("ALL")}>
+          <button
+            className={`nav-item ${page.includes("payment") ? "active" : ""}`}
+            onClick={() => paymentAccountStatus?.payment_enabled && goToPayments("ALL")}
+            disabled={!paymentAccountStatus?.payment_enabled}
+            title={paymentAccountStatus?.payment_enabled ? "Payments" : "Set up and activate PayMongo to enable online payments"}
+          >
             Payments
           </button>
 
@@ -893,7 +1075,7 @@ export default function PortalPage({ session }) {
               </div>
               <div className="onboarding-step">
                 <span>4</span>
-                <div><strong>Delivery & Payment</strong><small>Configure after Facebook</small></div>
+                <div><strong>Optional Services</strong><small>Facebook and PayMongo can be configured anytime</small></div>
               </div>
             </section>
 
@@ -911,15 +1093,13 @@ export default function PortalPage({ session }) {
                   {facebookStatus?.connected ? "Reconnect Facebook" : "Connect Facebook"}
                 </button>
 
-                {facebookStatus?.connected && (
-                  <button
-                    className="secondary-button"
-                    type="button"
-                    onClick={() => setPage("dashboard")}
-                  >
-                    Continue to Dashboard
-                  </button>
-                )}
+                <button
+                  className="secondary-button"
+                  type="button"
+                  onClick={() => setPage("dashboard")}
+                >
+                  {facebookStatus?.connected ? "Continue to Dashboard" : "Skip for Now"}
+                </button>
               </div>
             </section>
 
@@ -992,9 +1172,9 @@ export default function PortalPage({ session }) {
             {onboardingChecked && facebookStatus && !facebookStatus.connected && (
               <section className="connection-warning-card">
                 <div>
-                  <strong>Facebook connection required</strong>
+                  <strong>Facebook auction automation is not configured</strong>
                   <span>
-                    Connect a Facebook Page before using auction automation.
+                    You can use the portal now and connect a Facebook Page whenever you are ready to automate auctions.
                   </span>
                 </div>
 
@@ -1008,10 +1188,68 @@ export default function PortalPage({ session }) {
               </section>
             )}
 
+            <section className={`payment-setup-card ${paymentAccountStatus?.payment_enabled ? "active" : ""}`}>
+              <div className="payment-setup-copy">
+                <div className="payment-logo">P</div>
+                <div>
+                  <strong>PayMongo</strong>
+                  <span>
+                    {paymentAccountStatus?.payment_enabled
+                      ? "Online checkout is active for this client."
+                      : String(paymentAccountStatus?.account_status || "NOT_CONFIGURED").toUpperCase() === "NOT_CONFIGURED"
+                        ? "Optional: create a PayMongo account to enable automated online payments later."
+                        : "PayMongo account exists, but automated checkout is not active yet."}
+                  </span>
+                  <small>Status: {statusLabel(paymentAccountStatus?.account_status || "NOT_CONFIGURED")}</small>
+                </div>
+              </div>
+
+              <div className="payment-setup-actions">
+                <button
+                  className="primary-button"
+                  type="button"
+                  onClick={openPayMongo}
+                  disabled={paymentAccountLoading}
+                >
+                  {String(paymentAccountStatus?.account_status || "NOT_CONFIGURED").toUpperCase() === "NOT_CONFIGURED"
+                    ? "Set Up PayMongo"
+                    : "Open PayMongo Dashboard"}
+                </button>
+
+                {String(paymentAccountStatus?.account_status || "NOT_CONFIGURED").toUpperCase() === "NOT_CONFIGURED" && (
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    onClick={markPayMongoAccountCreated}
+                    disabled={paymentAccountLoading}
+                  >
+                    I Already Have PayMongo
+                  </button>
+                )}
+
+                <button
+                  className="secondary-button"
+                  type="button"
+                  onClick={loadPaymentAccountStatus}
+                  disabled={paymentAccountLoading}
+                >
+                  Refresh
+                </button>
+              </div>
+            </section>
+
+            {paymentAccountMessage && (
+              <div className="success-message global-error">{paymentAccountMessage}</div>
+            )}
+
             <section className="metrics-grid">
               <MetricCard title="Active auctions" value={auctionMetrics.active} subtitle="Currently open" onClick={() => goToAuctions("ACTIVE")} />
               <MetricCard title="Pending orders" value={orderMetrics.pending} subtitle="Awaiting payment" onClick={() => goToOrders("PAYMENT_PENDING")} />
-              <MetricCard title="Pending payments" value={paymentMetrics.pending} subtitle="Awaiting settlement" onClick={() => goToPayments("pending")} />
+              {paymentAccountStatus?.payment_enabled ? (
+                <MetricCard title="Pending payments" value={paymentMetrics.pending} subtitle="Awaiting settlement" onClick={() => goToPayments("pending")} />
+              ) : (
+                <MetricCard title="Online payments" value="Off" subtitle="PayMongo not active" onClick={openPayMongo} />
+              )}
               <MetricCard title="Ready for booking" value={deliveryMetrics.ready} subtitle="Paid and ready" onClick={() => goToDeliveries("READY_FOR_BOOKING")} />
               <MetricCard title="Delivered" value={deliveryMetrics.delivered} subtitle="Completed deliveries" onClick={() => goToDeliveries("DELIVERED")} />
             </section>
@@ -1164,18 +1402,150 @@ export default function PortalPage({ session }) {
           </>
         )}
 
-        {page === "payments" && (
+        {page === "payments" && paymentAccountStatus?.payment_enabled && (
           <>
             <header className="dashboard-header">
               <div>
                 <p className="eyebrow">PAYMENT MANAGEMENT</p>
                 <h1>Payments</h1>
-                <p>Monitor PayMongo transactions and settlement status.</p>
+                <p>Monitor PayMongo transactions, payment deadlines and manual payment extensions.</p>
               </div>
               <button className="secondary-button" onClick={loadPortal}>Refresh</button>
             </header>
 
-            <section className="toolbar-card">
+            {reopenMessage && <div className="success-message global-error">{reopenMessage}</div>}
+
+            <section className="dashboard-panel payment-groups-panel">
+              <div className="panel-header">
+                <div>
+                  <h2>Order groups & payment windows</h2>
+                  <p>Expired groups can be manually reopened by an authorized admin.</p>
+                </div>
+              </div>
+
+              <div className="payment-group-toolbar">
+                <input
+                  className="search-input"
+                  value={paymentGroupSearch}
+                  onChange={(e) => setPaymentGroupSearch(e.target.value)}
+                  placeholder="Search group or buyer..."
+                />
+                <select
+                  className="filter-select"
+                  value={paymentGroupStatusFilter}
+                  onChange={(e) => setPaymentGroupStatusFilter(e.target.value)}
+                >
+                  <option value="ALL">All group statuses</option>
+                  <option value="PAYMENT_PENDING">Payment pending</option>
+                  <option value="PAYMENT_EXPIRED">Payment expired</option>
+                  <option value="PAYMENT_REOPENED">Payment reopened</option>
+                  <option value="PAID">Paid</option>
+                  <option value="CANCELLED">Cancelled</option>
+                </select>
+              </div>
+
+              <div className="table-wrapper">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Group</th><th>Buyer</th><th>Total</th><th>Status</th><th>Deadline</th><th>Time remaining</th><th>Reopens</th><th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredPaymentGroups.length === 0 ? (
+                      <tr><td colSpan="8" className="empty-table-cell">No payment groups found.</td></tr>
+                    ) : filteredPaymentGroups.map((group) => {
+                      const effectiveDeadline = group.payment_reopen_deadline_at || group.payment_deadline_at;
+                      const expired = Boolean(group.payment_expired_at);
+
+                      return (
+                        <tr key={group.order_group_id}>
+                          <td>{group.group_number || group.order_group_id}</td>
+                          <td>{group.buyer_name || "-"}</td>
+                          <td>{formatCurrency(group.total_amount)}</td>
+                          <td><StatusBadge status={paymentGroupStatus(group)} /></td>
+                          <td>{formatDateTime(effectiveDeadline)}</td>
+                          <td>{expired ? "Expired" : formatTimeRemaining(effectiveDeadline)}</td>
+                          <td>{group.payment_reopen_count || 0}</td>
+                          <td>
+                            {expired && isPaymentAdmin ? (
+                              <button
+                                type="button"
+                                className="table-action-button"
+                                onClick={() => {
+                                  setReopenGroup(group);
+                                  setReopenMessage("");
+                                }}
+                              >
+                                Allow Payment Again
+                              </button>
+                            ) : expired ? (
+                              <span className="table-muted">Admin required</span>
+                            ) : (
+                              <span className="table-muted">-</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            {reopenGroup && (
+              <section className="reopen-payment-card">
+                <div>
+                  <p className="eyebrow">ADMIN OVERRIDE</p>
+                  <h2>Allow Payment Again</h2>
+                  <p>Group <strong>{reopenGroup.group_number || reopenGroup.order_group_id}</strong> will receive a new payment window. The auction itself will remain closed.</p>
+                </div>
+
+                <div className="reopen-payment-form">
+                  <label>
+                    New payment window (hours)
+                    <input
+                      type="number"
+                      min="1"
+                      max="168"
+                      value={reopenHours}
+                      onChange={(e) => setReopenHours(e.target.value)}
+                    />
+                  </label>
+
+                  <label>
+                    Reason / remarks
+                    <input
+                      type="text"
+                      value={reopenReason}
+                      onChange={(e) => setReopenReason(e.target.value)}
+                      placeholder="Example: Buyer contacted admin and requested late payment"
+                    />
+                  </label>
+                </div>
+
+                <div className="reopen-payment-actions">
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={() => setReopenGroup(null)}
+                    disabled={reopenLoading}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="primary-button"
+                    onClick={reopenExpiredPayment}
+                    disabled={reopenLoading}
+                  >
+                    {reopenLoading ? "Reopening..." : "Confirm Reopen"}
+                  </button>
+                </div>
+              </section>
+            )}
+
+            <section className="toolbar-card payments-toolbar">
               <input className="search-input" value={paymentSearch} onChange={(e) => setPaymentSearch(e.target.value)} placeholder="Search payment..." />
               <select className="filter-select" value={paymentStatusFilter} onChange={(e) => setPaymentStatusFilter(e.target.value)}>
                 <option value="ALL">All statuses</option>
@@ -1188,7 +1558,7 @@ export default function PortalPage({ session }) {
             </section>
 
             <section className="dashboard-panel">
-              <div className="panel-header"><div><h2>Payment list</h2><p>{filteredPayments.length} record(s)</p></div></div>
+              <div className="panel-header"><div><h2>Payment transactions</h2><p>{filteredPayments.length} record(s)</p></div></div>
               <div className="table-wrapper">
                 <table>
                   <thead>
