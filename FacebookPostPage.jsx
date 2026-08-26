@@ -526,9 +526,10 @@ export default function FacebookPostPage({ client }) {
   const [pages, setPages] = useState([]);
   const [subscription, setSubscription] = useState(null);
   const [environments, setEnvironments] = useState([]);
+  const [postTypes, setPostTypes] = useState([]);
   const [selectedPageId, setSelectedPageId] = useState("");
   const [environment, setEnvironment] = useState("");
-  const [postType, setPostType] = useState("SINGLE");
+  const [postType, setPostType] = useState("");
   const [sellerCaption, setSellerCaption] = useState("");
   const [singleItem, setSingleItem] = useState("");
   const [sharedRules, setSharedRules] = useState({ ...DEFAULT_RULES });
@@ -654,10 +655,29 @@ export default function FacebookPostPage({ client }) {
 
       const pageRows = data.pages || [];
       const environmentRows = data.environments || [];
+      const postTypeRows = data.auction_post_types || [];
 
       setPages(pageRows);
       setSubscription(data.subscription || null);
       setEnvironments(environmentRows);
+      setPostTypes(postTypeRows);
+
+      setPostType((current) => {
+        if (
+          current &&
+          postTypeRows.some(
+            (row) =>
+              String(row.post_type_code).toUpperCase() ===
+              String(current).toUpperCase()
+          )
+        ) {
+          return current;
+        }
+
+        return postTypeRows.length
+          ? String(postTypeRows[0].post_type_code).toUpperCase()
+          : "";
+      });
 
       setSelectedPageId((current) => {
         if (
@@ -679,6 +699,19 @@ export default function FacebookPostPage({ client }) {
     }
   }
 
+  const selectedPostType = useMemo(
+    () =>
+      postTypes.find(
+        (row) =>
+          String(row.post_type_code).toUpperCase() ===
+          String(postType).toUpperCase()
+      ) || null,
+    [postTypes, postType]
+  );
+
+  const isMultiple =
+    selectedPostType?.is_multiple === true;
+
   const mainCaption = useMemo(() => {
     const lines = [];
 
@@ -691,13 +724,11 @@ export default function FacebookPostPage({ client }) {
       lines.push("");
     }
 
-    lines.push(
-      postType === "SINGLE"
-        ? "[Auction-Single]"
-        : "[Auction-Multiple]"
-    );
+    if (selectedPostType?.caption_marker) {
+      lines.push(selectedPostType.caption_marker);
+    }
 
-    if (postType === "SINGLE") {
+    if (!isMultiple) {
       lines.push(
         ...buildRuleLines(sharedRules, {
           includeItem: true,
@@ -713,12 +744,14 @@ export default function FacebookPostPage({ client }) {
     sellerCaption,
     environment,
     postType,
+    selectedPostType,
+    isMultiple,
     sharedRules,
     singleItem,
   ]);
 
   const photoCaptions = useMemo(() => {
-    if (postType !== "MULTIPLE") return [];
+    if (!isMultiple) return [];
 
     return items.map((item) => {
       const effective = mergeRules(sharedRules, item);
@@ -728,7 +761,7 @@ export default function FacebookPostPage({ client }) {
         item: item.item,
       }).join("\n");
     });
-  }, [postType, items, sharedRules]);
+  }, [isMultiple, items, sharedRules]);
 
   function changePostType(nextType) {
     setPostType(nextType);
@@ -847,7 +880,7 @@ export default function FacebookPostPage({ client }) {
       errors.images = "Upload at least one image.";
     }
 
-    if (postType === "SINGLE") {
+    if (!isMultiple) {
       if (!singleItem.trim()) {
         errors.singleItem = "Item name is required.";
       }
@@ -990,7 +1023,11 @@ export default function FacebookPostPage({ client }) {
      *
      * Clear every seller-entered auction value.
      */
-    setPostType("SINGLE");
+    setPostType(
+      postTypes.length
+        ? String(postTypes[0].post_type_code).toUpperCase()
+        : ""
+    );
     setSellerCaption("");
     setSingleItem("");
     setSharedRules({
@@ -1057,8 +1094,9 @@ export default function FacebookPostPage({ client }) {
 
     const confirmed = window.confirm(
       `Publish this ${
-        postType === "SINGLE" ? "Single" : "Multiple"
-      } Auction to Facebook?\n\n` +
+        selectedPostType?.display_name ||
+        "Auction"
+      } to Facebook?\n\n` +
       `Page: ${
         pages.find(
           (page) => String(page.fb_page_id) === selectedPageId
@@ -1082,7 +1120,7 @@ export default function FacebookPostPage({ client }) {
         post_type: postType,
         main_caption: mainCaption,
         photo_captions:
-          postType === "MULTIPLE"
+          isMultiple
             ? photoCaptions
             : items.map(() => ""),
       };
@@ -1764,10 +1802,22 @@ export default function FacebookPostPage({ client }) {
             <select
               value={postType}
               onChange={(e) => changePostType(e.target.value)}
-              disabled={publishing}
+              disabled={publishing || processingFiles || loading}
             >
-              <option value="SINGLE">Single Auction</option>
-              <option value="MULTIPLE">Multiple Auction</option>
+              {!postTypes.length && (
+                <option value="">
+                  No active Auction post type available
+                </option>
+              )}
+
+              {postTypes.map((row) => (
+                <option
+                  key={row.post_type_code}
+                  value={String(row.post_type_code).toUpperCase()}
+                >
+                  {row.display_name}
+                </option>
+              ))}
             </select>
           </label>
         </div>
@@ -1794,7 +1844,7 @@ export default function FacebookPostPage({ client }) {
           />
         </label>
 
-        {postType === "SINGLE" && (
+        {!isMultiple && (
           <label className={fieldClass(fieldErrors, "singleItem")}>
             Item Name <span className="eo2-required">*</span>
             <input
@@ -1817,7 +1867,7 @@ export default function FacebookPostPage({ client }) {
         )}
 
         <h3>
-          {postType === "MULTIPLE"
+          {isMultiple
             ? "Shared / default rules"
             : "Auction rules"}
         </h3>
@@ -1896,7 +1946,7 @@ export default function FacebookPostPage({ client }) {
         ) : (
           <div
             className={`fb-photo-grid ${
-              postType === "MULTIPLE" ? "multiple" : "single"
+              isMultiple ? "multiple" : "single"
             }`}
           >
             {items.map((item, index) => {
@@ -1923,7 +1973,7 @@ export default function FacebookPostPage({ client }) {
                       alt={`Auction ${index + 1}`}
                     />
                     <span className="fb-photo-number">
-                      {postType === "MULTIPLE"
+                      {isMultiple
                         ? `Item ${index + 1}`
                         : `Photo ${index + 1}`}
                     </span>
@@ -1944,7 +1994,7 @@ export default function FacebookPostPage({ client }) {
                     </button>
                   </div>
 
-                  {postType === "MULTIPLE" && (
+                  {isMultiple && (
                     <div className="fb-item-editor">
                       <label
                         className={fieldClass(
@@ -2050,7 +2100,7 @@ export default function FacebookPostPage({ client }) {
               </pre>
             </div>
 
-            {postType === "MULTIPLE" && (
+            {isMultiple && (
               <div>
                 <h3>Per-photo captions</h3>
                 {photoCaptions.map((caption, index) => (
