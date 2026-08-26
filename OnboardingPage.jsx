@@ -69,6 +69,40 @@ export default function OnboardingPage({ session, initialStatus = null, onComple
     );
   }
 
+  async function cancelOnboarding() {
+    const confirmed = window.confirm(
+      "Cancel onboarding? This will remove the draft EO2MATE business profile and trial setup. Your login account will be kept."
+    );
+
+    if (!confirmed) return;
+
+    setLoading(true);
+    setMessage("");
+    setErrorMessage("");
+
+    try {
+      const data = await invoke({ action: "CANCEL" });
+
+      setMessage(
+        data?.message ||
+        "Onboarding cancelled. Your login account was kept."
+      );
+
+      setStatus(null);
+
+      window.setTimeout(async () => {
+        await supabase.auth.signOut();
+      }, 500);
+    } catch (error) {
+      setErrorMessage(
+        error.message ||
+        "Unable to cancel onboarding."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function finishOnboarding() {
     setLoading(true);
     setMessage("");
@@ -147,15 +181,38 @@ export default function OnboardingPage({ session, initialStatus = null, onComple
         )}
 
         {client && !pages.length && (
-          <section className="wizard-action-card">
-            <div>
-              <strong>Connect your Facebook Page</strong>
-              <span>Use the Facebook account that manages the Page you want EO2MATE to automate.</span>
+          <>
+            <section className="wizard-action-card">
+              <div>
+                <strong>Connect your Facebook Page</strong>
+                <span>Use the Facebook account that manages the Page you want EO2MATE to automate.</span>
+              </div>
+
+              <div className="wizard-action-buttons">
+                <button
+                  className="secondary-button danger-outline-button"
+                  type="button"
+                  onClick={cancelOnboarding}
+                  disabled={loading}
+                >
+                  Cancel Onboarding
+                </button>
+
+                <button
+                  className="primary-button"
+                  type="button"
+                  onClick={connectFacebook}
+                  disabled={loading}
+                >
+                  Connect Facebook
+                </button>
+              </div>
+            </section>
+
+            <div className="wizard-cancel-note">
+              Cancelling removes only this incomplete EO2MATE business setup. Your login account remains available.
             </div>
-            <button className="primary-button" type="button" onClick={connectFacebook} disabled={loading}>
-              Connect Facebook
-            </button>
-          </section>
+          </>
         )}
 
         {pages.length > 0 && !status?.onboarding_complete && (

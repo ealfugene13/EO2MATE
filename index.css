@@ -1384,3 +1384,49 @@ textarea:focus {
 .admin-security-banner{display:flex;align-items:center;gap:12px;margin-bottom:18px;padding:13px 16px;border:1px solid #d8e5dc;border-radius:14px;background:#f4faf6}.admin-security-icon{width:34px;height:34px;display:grid;place-items:center;border-radius:10px;background:#dcefe3;color:#2f6545;font-size:12px;font-weight:900}.admin-security-banner>div:last-child{display:flex;flex-direction:column;gap:3px}.admin-security-banner strong{color:#315742;font-size:11px}.admin-security-banner span{color:#6d7d72;font-size:10px}
 .admin-client-editor{margin-bottom:18px;box-shadow:0 16px 44px rgba(40,58,83,.10)}.admin-client-form{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px;padding:18px 20px;background:#fbfcfe}.admin-client-form label{display:flex;flex-direction:column;gap:7px;color:#59687d;font-size:10px;font-weight:800}.admin-client-notes{grid-column:span 2}.admin-client-form-actions{display:flex;align-items:end;justify-content:flex-end;gap:8px}.admin-client-search{width:min(280px,100%);min-height:38px;padding:8px 11px;border:1px solid #dfe4ec}
 @media(max-width:760px){.wizard-stepper,.wizard-form,.wizard-summary,.admin-client-form{grid-template-columns:1fr}.admin-client-notes{grid-column:auto}.wizard-action-card{align-items:flex-start;flex-direction:column}}
+
+
+/* =========================================================
+   V18 CANCEL ONBOARDING
+   ========================================================= */
+.wizard-action-buttons {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: 0 0 auto;
+}
+
+.danger-outline-button {
+  border-color: #e5bcbc !important;
+  background: #fff8f8 !important;
+  color: #a24646 !important;
+}
+
+.danger-outline-button:hover:not(:disabled) {
+  background: #fff0f0 !important;
+  border-color: #d99f9f !important;
+}
+
+.wizard-cancel-note {
+  margin-top: 8px;
+  color: #8a94a3;
+  font-size: 9px;
+  line-height: 1.45;
+  text-align: right;
+}
+
+@media (max-width: 760px) {
+  .wizard-action-buttons {
+    width: 100%;
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .wizard-action-buttons button {
+    width: 100%;
+  }
+
+  .wizard-cancel-note {
+    text-align: left;
+  }
+}
