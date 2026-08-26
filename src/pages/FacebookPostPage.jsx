@@ -361,13 +361,6 @@ export default function FacebookPostPage({ client }) {
     "CLNT"
   ).toUpperCase();
 
-  const environmentOptions = useMemo(() => {
-    return ["CLNT", "TEST", "PROD"].map((mode) => ({
-      mode,
-      enabled: true,
-    }));
-  }, []);
-
   const mainCaption = useMemo(() => {
     const lines = [];
 
@@ -582,9 +575,10 @@ export default function FacebookPostPage({ client }) {
 
     const confirmed = window.confirm(
       `Publish this ${postType === "SINGLE" ? "Single" : "Multiple"} Auction to Facebook?\n\n` +
-      `Page: ${getPageLabel(
-        pages.find((page) => String(page.fb_page_id) === selectedPageId)
-      )}\n` +
+      `Page: ${
+        pages.find((page) => String(page.fb_page_id) === selectedPageId)?.page_name ||
+        "Facebook Page"
+      }\n` +
       `Mode: ${environment}\n` +
       `Images: ${items.length}`
     );
@@ -693,7 +687,7 @@ export default function FacebookPostPage({ client }) {
               {!pages.length && <option value="">No active Page connected</option>}
               {pages.map((page) => (
                 <option key={page.fb_page_id} value={page.fb_page_id}>
-                  {getPageLabel(page)}
+                  {page.page_name || "Facebook Page"}
                 </option>
               ))}
             </select>
@@ -706,18 +700,15 @@ export default function FacebookPostPage({ client }) {
               onChange={(e) => setEnvironment(e.target.value)}
               disabled={publishing || Boolean(publishedPost)}
             >
-              {environmentOptions.map(({ mode }) => (
-                <option
-                  key={mode}
-                  value={mode}
-                >
-                  {mode === "CLNT"
-                    ? "EO2MATE-CLNT · Manual payment"
-                    : mode === "TEST"
-                      ? "EO2MATE-TEST · PayMongo test"
-                      : "EO2MATE-PROD · Live payment"}
-                </option>
-              ))}
+              <option value="CLNT">
+                EO2MATE-CLNT · Manual payment
+              </option>
+              <option value="TEST">
+                EO2MATE-TEST · PayMongo test
+              </option>
+              <option value="PROD">
+                EO2MATE-PROD · Live payment
+              </option>
             </select>
             <small>Choose the operating mode for this auction post.</small>
           </label>
