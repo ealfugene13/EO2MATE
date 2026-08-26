@@ -3,6 +3,7 @@ import { supabase } from "../supabase";
 import SetupPage from "./SetupPage";
 import OnboardingPage from "./OnboardingPage";
 import AdminClientsPage from "./AdminClientsPage";
+import EO2MateLogo from "../components/EO2MateLogo";
 
 function formatCurrency(value) {
   if (value === null || value === undefined || value === "") return "-";
@@ -1181,9 +1182,9 @@ export default function PortalPage({ session }) {
     return (
       <div className="app-shell">
         <aside className="sidebar">
-          <div className="sidebar-brand">
-            <div className="brand-logo small">E</div>
-            <div><strong>EO2MATE</strong><span>Platform Admin</span></div>
+          <div className="sidebar-brand eo2-sidebar-brand">
+            <EO2MateLogo />
+            <span className="eo2-admin-label">Platform Admin</span>
           </div>
           <nav className="sidebar-nav">
             <button className="nav-item active">Clients</button>
@@ -1201,12 +1202,8 @@ export default function PortalPage({ session }) {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <div className="sidebar-brand">
-          <div className="brand-logo small">A</div>
-          <div>
-            <strong>Auction Automation</strong>
-            <span>Client Portal</span>
-          </div>
+        <div className="sidebar-brand eo2-sidebar-brand">
+          <EO2MateLogo />
         </div>
 
         <nav className="sidebar-nav">
@@ -1664,6 +1661,22 @@ export default function PortalPage({ session }) {
 
         {page === "dashboard" && (
           <>
+            <section className="eo2-dashboard-hero">
+              <div>
+                <p className="eyebrow">CLIENT DASHBOARD</p>
+                <h1>
+                  Welcome back,
+                  <span> {client?.name || "EO2MATE Client"}</span>
+                </h1>
+                <p>
+                  Manage your auctions, orders, payments and deliveries — all in one place.
+                </p>
+              </div>
+
+              <div className="eo2-dashboard-code-badge" aria-hidden="true">
+                &lt;/&gt;
+              </div>
+            </section>
             <header className="dashboard-header">
               <div>
                 <p className="eyebrow">CLIENT DASHBOARD</p>
