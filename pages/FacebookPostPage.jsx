@@ -78,14 +78,20 @@ function formatFacebookAuctionDate(value) {
   }).format(date);
 }
 
-function getPageLabel(page) {
-  return (
+function getPageLabel(page, includeId = false) {
+  const name =
     page?.page_name ||
     page?.fb_page_name ||
     page?.name ||
-    page?.fb_page_id ||
-    "Facebook Page"
-  );
+    page?.page_title ||
+    page?.display_name ||
+    "Facebook Page";
+
+  if (includeId && page?.fb_page_id) {
+    return `${name} · ${page.fb_page_id}`;
+  }
+
+  return name;
 }
 
 function buildRuleLines(rules, { includeItem = false, item = "" } = {}) {
@@ -361,9 +367,18 @@ export default function FacebookPostPage({ client }) {
   ).toUpperCase();
 
   const environmentOptions = useMemo(() => {
-    if (allowedEnvironment === "PROD") return ["CLNT", "TEST", "PROD"];
-    if (allowedEnvironment === "TEST") return ["CLNT", "TEST"];
-    return ["CLNT"];
+    const rank = {
+      CLNT: 1,
+      TEST: 2,
+      PROD: 3,
+    };
+
+    return ["CLNT", "TEST", "PROD"].map((mode) => ({
+      mode,
+      enabled:
+        rank[mode] <=
+        (rank[allowedEnvironment] || 1),
+    }));
   }, [allowedEnvironment]);
 
   const mainCaption = useMemo(() => {
@@ -499,8 +514,17 @@ export default function FacebookPostPage({ client }) {
       problems.push("Select a Facebook Page.");
     }
 
-    if (!environmentOptions.includes(environment)) {
-      problems.push(`${environment} is not enabled for this client.`);
+    const selectedMode =
+      environmentOptions.find(
+        (option) =>
+          option.mode ===
+          environment
+      );
+
+    if (!selectedMode?.enabled) {
+      problems.push(
+        `${environment} is visible but not enabled for this client. Ask EO2MATE Admin to change the allowed mode.`
+      );
     }
 
     if (!items.length) {
@@ -582,7 +606,10 @@ export default function FacebookPostPage({ client }) {
 
     const confirmed = window.confirm(
       `Publish this ${postType === "SINGLE" ? "Single" : "Multiple"} Auction to Facebook?\n\n` +
-      `Page: ${getPageLabel(pages.find((page) => String(page.fb_page_id) === selectedPageId))}\n` +
+      `Page: ${getPageLabel(
+        pages.find((page) => String(page.fb_page_id) === selectedPageId),
+        true
+      )}\n` +
       `Mode: ${environment}\n` +
       `Images: ${items.length}`
     );
@@ -656,7 +683,7 @@ export default function FacebookPostPage({ client }) {
           type="button"
           className="icon-button refresh-icon-button"
           onClick={loadPostingSetup}
-          disabled={loading || publishing}
+          disabled={loading || publishing || Boolean(publishedPost)}
           title="Refresh Facebook Pages"
           aria-label="Refresh Facebook Pages"
         >
@@ -691,7 +718,7 @@ export default function FacebookPostPage({ client }) {
               {!pages.length && <option value="">No active Page connected</option>}
               {pages.map((page) => (
                 <option key={page.fb_page_id} value={page.fb_page_id}>
-                  {getPageLabel(page)}
+                  {getPageLabel(page, true)}
                 </option>
               ))}
             </select>
@@ -702,15 +729,19 @@ export default function FacebookPostPage({ client }) {
             <select
               value={environment}
               onChange={(e) => setEnvironment(e.target.value)}
-              disabled={publishing}
+              disabled={publishing || Boolean(publishedPost)}
             >
-              {environmentOptions.map((mode) => (
-                <option key={mode} value={mode}>
+              {environmentOptions.map(({ mode, enabled }) => (
+                <option
+                  key={mode}
+                  value={mode}
+                  disabled={!enabled}
+                >
                   {mode === "CLNT"
-                    ? "EO2MATE-CLNT · Manual payment"
+                    ? `EO2MATE-CLNT · Manual payment${enabled ? "" : " · Locked"}`
                     : mode === "TEST"
-                      ? "EO2MATE-TEST · PayMongo test"
-                      : "EO2MATE-PROD · Live payment"}
+                      ? `EO2MATE-TEST · PayMongo test${enabled ? "" : " · Locked"}`
+                      : `EO2MATE-PROD · Live payment${enabled ? "" : " · Locked"}`}
                 </option>
               ))}
             </select>
@@ -996,14 +1027,20 @@ export default function FacebookPostPage({ client }) {
             </span>
           </div>
 
-          <button
-            type="button"
-            className="primary-button fb-publish-button"
-            onClick={publishAuction}
-            disabled={publishing || loading || !pages.length}
-          >
-            {publishing ? "Publishing..." : "Publish to Facebook"}
-          </button>
+          {!publishedPost ? (
+            <button
+              type="button"
+              className="primary-button fb-publish-button"
+              onClick={publishAuction}
+              disabled={publishing || loading || !pages.length}
+            >
+              {publishing ? "Publishing..." : "Publish to Facebook"}
+            </button>
+          ) : (
+            <div className="fb-already-published-badge">
+              ✓ Already published
+            </div>
+          )}
         </div>
 
         {publishedPost && (
@@ -1013,16 +1050,30 @@ export default function FacebookPostPage({ client }) {
               <span>Facebook Post ID: {publishedPost.fb_post_id}</span>
             </div>
 
-            {publishedPost.permalink_url && (
-              <a
-                href={publishedPost.permalink_url}
-                target="_blank"
-                rel="noreferrer"
-                className="primary-button"
+            <div className="fb-published-actions">
+              {publishedPost.permalink_url && (
+                <a
+                  href={publishedPost.permalink_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="primary-button"
+                >
+                  Open Facebook Post
+                </a>
+              )}
+
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => {
+                  setPublishedPost(null);
+                  setMessage("");
+                  setErrorMessage("");
+                }}
               >
-                Open Facebook Post
-              </a>
-            )}
+                Create Another Post
+              </button>
+            </div>
           </div>
         )}
       </section>
