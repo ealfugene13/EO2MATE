@@ -78,6 +78,178 @@ function formatFacebookAuctionDate(value) {
   }).format(date);
 }
 
+
+function splitDateTimeLocal(value) {
+  const raw = String(value || "").trim();
+
+  if (!raw || !raw.includes("T")) {
+    return {
+      date: "",
+      hour12: "12",
+      minute: "00",
+      period: "AM",
+    };
+  }
+
+  const [date, time = "00:00"] = raw.split("T");
+  const [hourRaw = "0", minuteRaw = "00"] = time.split(":");
+
+  let hour24 = Number(hourRaw);
+  const minute = String(minuteRaw || "00").padStart(2, "0");
+
+  if (!Number.isFinite(hour24)) hour24 = 0;
+
+  const period = hour24 >= 12 ? "PM" : "AM";
+  let hour12 = hour24 % 12;
+
+  if (hour12 === 0) hour12 = 12;
+
+  return {
+    date,
+    hour12: String(hour12).padStart(2, "0"),
+    minute,
+    period,
+  };
+}
+
+function combineDateTimeLocal({
+  date,
+  hour12,
+  minute,
+  period,
+}) {
+  if (!date) return "";
+
+  let hour = Number(hour12);
+
+  if (!Number.isFinite(hour) || hour < 1 || hour > 12) {
+    hour = 12;
+  }
+
+  if (period === "AM" && hour === 12) {
+    hour = 0;
+  } else if (period === "PM" && hour !== 12) {
+    hour += 12;
+  }
+
+  const safeMinute = String(minute || "00").padStart(2, "0");
+
+  return `${date}T${String(hour).padStart(2, "0")}:${safeMinute}`;
+}
+
+function ScrollDateTimePicker({
+  value,
+  onChange,
+  disabled = false,
+  hasError = false,
+  inputRef,
+}) {
+  const parts = splitDateTimeLocal(value);
+
+  const update = (patch) => {
+    onChange(
+      combineDateTimeLocal({
+        ...parts,
+        ...patch,
+      })
+    );
+  };
+
+  const hours = Array.from({ length: 12 }, (_, index) =>
+    String(index + 1).padStart(2, "0")
+  );
+
+  const minutes = Array.from({ length: 60 }, (_, index) =>
+    String(index).padStart(2, "0")
+  );
+
+  return (
+    <div
+      className={`eo2-datetime-picker ${
+        hasError ? "eo2-datetime-error" : ""
+      }`}
+      ref={inputRef}
+      tabIndex={-1}
+    >
+      <div className="eo2-date-part">
+        <span className="eo2-datetime-label">Date</span>
+        <input
+          type="date"
+          value={parts.date}
+          onChange={(e) =>
+            update({
+              date: e.target.value,
+            })
+          }
+          disabled={disabled}
+        />
+      </div>
+
+      <div className="eo2-time-part">
+        <span className="eo2-datetime-label">Time</span>
+
+        <div className="eo2-time-wheel-group">
+          <select
+            className="eo2-time-wheel"
+            value={parts.hour12}
+            onChange={(e) =>
+              update({
+                hour12: e.target.value,
+              })
+            }
+            disabled={disabled}
+            aria-label="Hour"
+            size="3"
+          >
+            {hours.map((hour) => (
+              <option key={hour} value={hour}>
+                {hour}
+              </option>
+            ))}
+          </select>
+
+          <span className="eo2-time-separator">:</span>
+
+          <select
+            className="eo2-time-wheel"
+            value={parts.minute}
+            onChange={(e) =>
+              update({
+                minute: e.target.value,
+              })
+            }
+            disabled={disabled}
+            aria-label="Minute"
+            size="3"
+          >
+            {minutes.map((minute) => (
+              <option key={minute} value={minute}>
+                {minute}
+              </option>
+            ))}
+          </select>
+
+          <select
+            className="eo2-time-period"
+            value={parts.period}
+            onChange={(e) =>
+              update({
+                period: e.target.value,
+              })
+            }
+            disabled={disabled}
+            aria-label="AM or PM"
+            size="2"
+          >
+            <option value="AM">AM</option>
+            <option value="PM">PM</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function getPageLabel(page) {
   return (
     page?.page_name ||
@@ -254,13 +426,12 @@ function RuleFields({
 
       <label className={fieldClass(fieldErrors, key("buyoutUntil"))}>
         Buyout Until
-        <input
-          ref={registerField(key("buyoutUntil"))}
-          type="datetime-local"
+        <ScrollDateTimePicker
+          inputRef={registerField(key("buyoutUntil"))}
           value={value.buyoutUntil}
-          onChange={(e) => set("buyoutUntil", e.target.value)}
+          onChange={(nextValue) => set("buyoutUntil", nextValue)}
           disabled={disabled || normalizeMoney(value.buyout) === 0}
-          aria-invalid={Boolean(fieldErrors[key("buyoutUntil")])}
+          hasError={Boolean(fieldErrors[key("buyoutUntil")])}
         />
         {fieldErrors[key("buyoutUntil")] && (
           <small className="eo2-field-error-text">{fieldErrors[key("buyoutUntil")]}</small>
@@ -269,13 +440,12 @@ function RuleFields({
 
       <label className={fieldClass(fieldErrors, key("auctionEnds"))}>
         Auction Ends <span className="eo2-required">*</span>
-        <input
-          ref={registerField(key("auctionEnds"))}
-          type="datetime-local"
+        <ScrollDateTimePicker
+          inputRef={registerField(key("auctionEnds"))}
           value={value.auctionEnds}
-          onChange={(e) => set("auctionEnds", e.target.value)}
+          onChange={(nextValue) => set("auctionEnds", nextValue)}
           disabled={disabled}
-          aria-invalid={Boolean(fieldErrors[key("auctionEnds")])}
+          hasError={Boolean(fieldErrors[key("auctionEnds")])}
         />
         {fieldErrors[key("auctionEnds")] && (
           <small className="eo2-field-error-text">{fieldErrors[key("auctionEnds")]}</small>
@@ -1304,6 +1474,94 @@ export default function FacebookPostPage({ client }) {
           }
         }
 
+
+        .eo2-datetime-picker {
+          display: grid;
+          grid-template-columns: minmax(150px, 1fr) minmax(220px, 1.25fr);
+          gap: 12px;
+          padding: 10px;
+          border: 1px solid rgba(148, 163, 184, .30);
+          border-radius: 14px;
+          background: rgba(148, 163, 184, .035);
+          min-width: 0;
+        }
+
+        .eo2-datetime-picker:focus-within {
+          border-color: var(--accent-color, #2563eb);
+          box-shadow:
+            0 0 0 3px color-mix(
+              in srgb,
+              var(--accent-color, #2563eb) 12%,
+              transparent
+            );
+        }
+
+        .eo2-datetime-error {
+          border-color: #dc2626 !important;
+          box-shadow: 0 0 0 3px rgba(220, 38, 38, .10);
+          background: rgba(254, 242, 242, .35);
+        }
+
+        .eo2-date-part,
+        .eo2-time-part {
+          min-width: 0;
+        }
+
+        .eo2-datetime-label {
+          display: block;
+          margin: 0 0 6px 2px;
+          font-size: .72rem;
+          font-weight: 800;
+          letter-spacing: .05em;
+          text-transform: uppercase;
+          opacity: .56;
+        }
+
+        .eo2-date-part input[type="date"] {
+          min-height: 48px;
+        }
+
+        .eo2-time-wheel-group {
+          display: grid;
+          grid-template-columns: minmax(64px, 1fr) auto minmax(64px, 1fr) minmax(68px, .8fr);
+          align-items: center;
+          gap: 7px;
+          min-width: 0;
+        }
+
+        .eo2-time-wheel,
+        .eo2-time-period {
+          appearance: auto !important;
+          -webkit-appearance: auto !important;
+          background-image: none !important;
+          padding: 0 !important;
+          min-height: 92px !important;
+          height: 92px;
+          overflow-y: auto;
+          scroll-behavior: smooth;
+          text-align: center;
+          font-variant-numeric: tabular-nums;
+          border-radius: 12px !important;
+        }
+
+        .eo2-time-period {
+          min-width: 68px;
+        }
+
+        .eo2-time-wheel option,
+        .eo2-time-period option {
+          min-height: 30px;
+          padding: 7px 5px;
+          text-align: center;
+          font-size: .95rem;
+        }
+
+        .eo2-time-separator {
+          font-size: 1.25rem;
+          font-weight: 800;
+          opacity: .62;
+        }
+
         @media (max-width: 720px) {
           .fb-post-setup-grid,
           .fb-rule-grid,
@@ -1331,8 +1589,19 @@ export default function FacebookPostPage({ client }) {
             font-size: 16px;
           }
 
-          .fb-posting-panel input[type="datetime-local"] {
-            min-height: 50px;
+          .eo2-datetime-picker {
+            grid-template-columns: 1fr;
+          }
+
+          .eo2-time-wheel-group {
+            grid-template-columns: minmax(68px, 1fr) auto minmax(68px, 1fr) minmax(72px, .8fr);
+          }
+
+          .eo2-time-wheel,
+          .eo2-time-period {
+            min-height: 100px !important;
+            height: 100px;
+            font-size: 16px;
           }
         }
       `}</style>
