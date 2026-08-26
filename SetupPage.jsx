@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../supabase";
 
 const SETTING_LABELS = {
@@ -30,12 +30,82 @@ function StatusPill({ active, children }) {
   );
 }
 
+
+function SetupPopup({
+  open,
+  type = "info",
+  title,
+  message,
+  confirmLabel = "OK",
+  cancelLabel = "Cancel",
+  onConfirm,
+  onCancel,
+  showCancel = false,
+}) {
+  if (!open) return null;
+
+  const icon =
+    type === "danger" ? "!" :
+    type === "success" ? "✓" :
+    "i";
+
+  return (
+    <div className="setup-modal-backdrop" role="presentation">
+      <div
+        className={`setup-modal setup-modal-${type}`}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="setup-modal-title"
+      >
+        <div className="setup-modal-icon" aria-hidden="true">{icon}</div>
+
+        <div className="setup-modal-copy">
+          <h3 id="setup-modal-title">{title}</h3>
+          <p>{message}</p>
+        </div>
+
+        <div className="setup-modal-actions">
+          {showCancel && (
+            <button type="button" className="secondary-button" onClick={onCancel}>
+              {cancelLabel}
+            </button>
+          )}
+
+          <button
+            type="button"
+            className={type === "danger" ? "danger-confirm-button" : "primary-button"}
+            onClick={onConfirm}
+          >
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function SetupPage({ client }) {
   const [settings, setSettings] = useState([]);
   const [commands, setCommands] = useState([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+
+  const [popup, setPopup] = useState({
+    open: false,
+    type: "info",
+    title: "",
+    message: "",
+    confirmLabel: "OK",
+    showCancel: false,
+    onConfirm: null,
+  });
+  const [highlightedRow, setHighlightedRow] = useState("");
+
+  const settingFormRef = useRef(null);
+  const commandFormRef = useRef(null);
+  const settingValueRef = useRef(null);
+  const commandActionRef = useRef(null);
 
   const [editingSetting, setEditingSetting] = useState(null);
   const [settingForm, setSettingForm] = useState({
@@ -136,8 +206,73 @@ export default function SetupPage({ client }) {
     setError("");
   }
 
+
+  function closePopup() {
+    setPopup((current) => ({
+      ...current,
+      open: false,
+      onConfirm: null,
+    }));
+  }
+
+  function showInfoPopup(title, popupMessage, type = "info") {
+    setPopup({
+      open: true,
+      type,
+      title,
+      message: popupMessage,
+      confirmLabel: "OK",
+      showCancel: false,
+      onConfirm: null,
+    });
+  }
+
+  function showConfirmPopup({
+    title,
+    popupMessage,
+    confirmLabel = "Confirm",
+    type = "warning",
+    onConfirm,
+  }) {
+    setPopup({
+      open: true,
+      type,
+      title,
+      message: popupMessage,
+      confirmLabel,
+      showCancel: true,
+      onConfirm,
+    });
+  }
+
+  function focusEditor(section, rowKey) {
+    setHighlightedRow(rowKey);
+
+    window.setTimeout(() => {
+      const target =
+        section === "setting"
+          ? settingFormRef.current
+          : commandFormRef.current;
+
+      target?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+
+      window.setTimeout(() => {
+        if (section === "setting") {
+          settingValueRef.current?.focus();
+          settingValueRef.current?.select?.();
+        } else {
+          commandActionRef.current?.focus();
+        }
+      }, 350);
+    }, 50);
+  }
+
   function resetSettingForm() {
     setEditingSetting(null);
+    setHighlightedRow("");
     setSettingForm({
       setting_key: "",
       setting_value: "",
@@ -158,6 +293,8 @@ export default function SetupPage({ client }) {
       description: row.description || "",
       is_active: row.is_active !== false,
     });
+
+    focusEditor("setting", `setting:${row.setting_key}`);
   }
 
   async function saveSetting(event) {
@@ -213,6 +350,11 @@ export default function SetupPage({ client }) {
       }
 
       setMessage(`${key} saved.`);
+      showInfoPopup(
+        editingSetting ? "Setting updated" : "Setting created",
+        `${key} was saved successfully and is now the effective client setup.`,
+        "success"
+      );
       resetSettingForm();
       await loadSetup();
     } catch (err) {
@@ -222,39 +364,67 @@ export default function SetupPage({ client }) {
     }
   }
 
-  async function deleteSetting(item) {
+  function deleteSetting(item) {
     clearFeedback();
 
     if (!isAdmin) return;
+
     if (!item.override) {
-      setError("Global defaults cannot be deleted. Edit the row to create a client override first.");
+      showInfoPopup(
+        "System default protected",
+        "This is a global default. Edit it first to create a client override. Only client overrides can be deleted from this screen.",
+        "info"
+      );
       return;
     }
 
-    if (!window.confirm(`Delete client override for ${item.override.setting_key}?`)) return;
+    showConfirmPopup({
+      title: "Delete setting override?",
+      popupMessage:
+        `Delete the client override for ${item.override.setting_key}? ` +
+        "EO2MATE will immediately fall back to the global default value.",
+      confirmLabel: "Delete Override",
+      type: "danger",
+      onConfirm: async () => {
+        closePopup();
+        setLoading(true);
 
-    setLoading(true);
+        try {
+          const { error: deleteError } = await supabase
+            .from("eo2mate_settings")
+            .delete()
+            .eq("setting_id", item.override.setting_id);
 
-    try {
-      const { error: deleteError } = await supabase
-        .from("eo2mate_settings")
-        .delete()
-        .eq("setting_id", item.override.setting_id);
+          if (deleteError) throw deleteError;
 
-      if (deleteError) throw deleteError;
+          setMessage(
+            `${item.override.setting_key} override deleted. Global default restored.`
+          );
+          showInfoPopup(
+            "Override deleted",
+            `${item.override.setting_key} now uses the global default again.`,
+            "success"
+          );
 
-      setMessage(`${item.override.setting_key} override deleted. Global default restored.`);
-      if (editingSetting === item.override.setting_key) resetSettingForm();
-      await loadSetup();
-    } catch (err) {
-      setError(err.message || "Unable to delete setting override.");
-    } finally {
-      setLoading(false);
-    }
+          if (editingSetting === item.override.setting_key) resetSettingForm();
+          await loadSetup();
+        } catch (err) {
+          setError(err.message || "Unable to delete setting override.");
+          showInfoPopup(
+            "Delete failed",
+            err.message || "Unable to delete setting override.",
+            "danger"
+          );
+        } finally {
+          setLoading(false);
+        }
+      },
+    });
   }
 
   function resetCommandForm() {
     setEditingCommand(null);
+    setHighlightedRow("");
     setCommandForm({
       command_text: "",
       action_code: "START_PAYMENT",
@@ -273,6 +443,8 @@ export default function SetupPage({ client }) {
       description: row.description || "",
       is_active: row.is_active !== false,
     });
+
+    focusEditor("command", `command:${normalizeCommand(row.command_text)}`);
   }
 
   async function saveCommand(event) {
@@ -328,6 +500,11 @@ export default function SetupPage({ client }) {
       }
 
       setMessage(`${command} saved.`);
+      showInfoPopup(
+        editingCommand ? "Command updated" : "Command created",
+        `${command} was saved successfully. Active Messenger payment conversations will use this setup.`,
+        "success"
+      );
       resetCommandForm();
       await loadSetup();
     } catch (err) {
@@ -337,44 +514,89 @@ export default function SetupPage({ client }) {
     }
   }
 
-  async function deleteCommand(item) {
+  function deleteCommand(item) {
     clearFeedback();
 
     if (!isAdmin) return;
+
     if (!item.override) {
-      setError("Global commands cannot be deleted. Edit the row to create a client override first.");
+      showInfoPopup(
+        "System command protected",
+        "This is a global command. Edit it first to create a client override. Only client overrides can be deleted from this screen.",
+        "info"
+      );
       return;
     }
 
-    if (!window.confirm(`Delete client override for ${normalizeCommand(item.override.command_text)}?`)) return;
+    const commandText = normalizeCommand(item.override.command_text);
 
-    setLoading(true);
+    showConfirmPopup({
+      title: "Delete command override?",
+      popupMessage:
+        `Delete the client override for "${commandText}"? ` +
+        "If a global command with the same text exists, EO2MATE will use that global command again.",
+      confirmLabel: "Delete Override",
+      type: "danger",
+      onConfirm: async () => {
+        closePopup();
+        setLoading(true);
 
-    try {
-      const { error: deleteError } = await supabase
-        .from("eo2mate_command_aliases")
-        .delete()
-        .eq("command_alias_id", item.override.command_alias_id);
+        try {
+          const { error: deleteError } = await supabase
+            .from("eo2mate_command_aliases")
+            .delete()
+            .eq("command_alias_id", item.override.command_alias_id);
 
-      if (deleteError) throw deleteError;
+          if (deleteError) throw deleteError;
 
-      setMessage(`${normalizeCommand(item.override.command_text)} override deleted.`);
-      if (editingCommand === normalizeCommand(item.override.command_text)) resetCommandForm();
-      await loadSetup();
-    } catch (err) {
-      setError(err.message || "Unable to delete command override.");
-    } finally {
-      setLoading(false);
-    }
+          setMessage(`${commandText} override deleted.`);
+          showInfoPopup(
+            "Command override deleted",
+            `${commandText} was removed from this client's overrides.`,
+            "success"
+          );
+
+          if (editingCommand === commandText) resetCommandForm();
+          await loadSetup();
+        } catch (err) {
+          setError(err.message || "Unable to delete command override.");
+          showInfoPopup(
+            "Delete failed",
+            err.message || "Unable to delete command override.",
+            "danger"
+          );
+        } finally {
+          setLoading(false);
+        }
+      },
+    });
   }
 
   return (
     <>
+      <SetupPopup
+        open={popup.open}
+        type={popup.type}
+        title={popup.title}
+        message={popup.message}
+        confirmLabel={popup.confirmLabel}
+        showCancel={popup.showCancel}
+        onCancel={closePopup}
+        onConfirm={() => {
+          if (popup.onConfirm) popup.onConfirm();
+          else closePopup();
+        }}
+      />
+
       <header className="dashboard-header">
         <div>
           <p className="eyebrow">EO2MATE CONFIGURATION</p>
           <h1>Setup</h1>
-          <p>CRUD for runtime rules and Messenger commands on one screen.</p>
+          <p>Manage runtime rules and Messenger commands on one screen.</p>
+          <div className="setup-fyi-chip">
+            <span>FYI</span>
+            Changes here affect new EO2MATE actions immediately. Completed payments and historical auction records are not rewritten.
+          </div>
         </div>
         <button className="secondary-button" onClick={loadSetup} disabled={loading}>
           {loading ? "Refreshing..." : "Refresh"}
@@ -401,7 +623,30 @@ export default function SetupPage({ client }) {
           </div>
         </div>
 
-        <form className="setup-inline-form" onSubmit={saveSetting}>
+        <div
+          className={`setup-edit-banner ${editingSetting ? "is-editing" : "is-creating"}`}
+          aria-live="polite"
+        >
+          <span className="setup-edit-icon">{editingSetting ? "✎" : "+"}</span>
+          <div>
+            <strong>
+              {editingSetting
+                ? `Editing: ${editingSetting}`
+                : "Create a client setting override"}
+            </strong>
+            <span>
+              {editingSetting
+                ? "The selected row is highlighted. Make your changes here, then click Save Changes."
+                : "Enter a client-specific value without changing the global default."}
+            </span>
+          </div>
+        </div>
+
+        <form
+          ref={settingFormRef}
+          className={`setup-inline-form ${editingSetting ? "setup-form-editing" : ""}`}
+          onSubmit={saveSetting}
+        >
           <label>
             Setting key
             <input
@@ -416,6 +661,7 @@ export default function SetupPage({ client }) {
             Value
             {settingForm.value_type === "BOOLEAN" ? (
               <select
+                ref={settingValueRef}
                 value={settingForm.setting_value}
                 onChange={(e) => setSettingForm((old) => ({ ...old, setting_value: e.target.value }))}
                 disabled={!isAdmin}
@@ -426,6 +672,7 @@ export default function SetupPage({ client }) {
               </select>
             ) : (
               <input
+                ref={settingValueRef}
                 value={settingForm.setting_value}
                 onChange={(e) => setSettingForm((old) => ({ ...old, setting_value: e.target.value }))}
                 placeholder="24"
@@ -474,7 +721,7 @@ export default function SetupPage({ client }) {
               </button>
             )}
             <button type="submit" className="primary-button" disabled={!isAdmin || loading}>
-              {editingSetting ? "Save" : "Create"}
+              {editingSetting ? "Save Changes" : "Create Setting"}
             </button>
           </div>
         </form>
@@ -498,7 +745,14 @@ export default function SetupPage({ client }) {
               ) : mergedSettings.map((item) => {
                 const row = item.effective;
                 return (
-                  <tr key={row.setting_key}>
+                  <tr
+                    key={row.setting_key}
+                    className={
+                      highlightedRow === `setting:${row.setting_key}`
+                        ? "setup-row-selected"
+                        : ""
+                    }
+                  >
                     <td>
                       <strong>{SETTING_LABELS[row.setting_key] || row.setting_key}</strong>
                       <div className="table-muted">{row.setting_key}</div>
@@ -538,7 +792,30 @@ export default function SetupPage({ client }) {
           </div>
         </div>
 
-        <form className="setup-inline-form command-form" onSubmit={saveCommand}>
+        <div
+          className={`setup-edit-banner ${editingCommand ? "is-editing" : "is-creating"}`}
+          aria-live="polite"
+        >
+          <span className="setup-edit-icon">{editingCommand ? "✎" : "+"}</span>
+          <div>
+            <strong>
+              {editingCommand
+                ? `Editing command: ${editingCommand}`
+                : "Create a Messenger command override"}
+            </strong>
+            <span>
+              {editingCommand
+                ? "The selected row is highlighted. Review the action/status, then click Save Changes."
+                : "Add an accepted command word or alias for the buyer."}
+            </span>
+          </div>
+        </div>
+
+        <form
+          ref={commandFormRef}
+          className={`setup-inline-form command-form ${editingCommand ? "setup-form-editing" : ""}`}
+          onSubmit={saveCommand}
+        >
           <label>
             Command
             <input
@@ -552,6 +829,7 @@ export default function SetupPage({ client }) {
           <label>
             Action
             <select
+              ref={commandActionRef}
               value={commandForm.action_code}
               onChange={(e) => setCommandForm((old) => ({ ...old, action_code: e.target.value }))}
               disabled={!isAdmin}
@@ -587,7 +865,7 @@ export default function SetupPage({ client }) {
               <button type="button" className="secondary-button" onClick={resetCommandForm} disabled={loading}>Cancel</button>
             )}
             <button type="submit" className="primary-button" disabled={!isAdmin || loading}>
-              {editingCommand ? "Save" : "Create"}
+              {editingCommand ? "Save Changes" : "Create Command"}
             </button>
           </div>
         </form>
@@ -611,7 +889,14 @@ export default function SetupPage({ client }) {
                 const row = item.effective;
                 const key = normalizeCommand(row.command_text);
                 return (
-                  <tr key={key}>
+                  <tr
+                    key={key}
+                    className={
+                      highlightedRow === `command:${key}`
+                        ? "setup-row-selected"
+                        : ""
+                    }
+                  >
                     <td><strong>{key}</strong></td>
                     <td>{row.action_code}</td>
                     <td>{item.override ? "Client override" : "Global default"}</td>

@@ -1169,9 +1169,14 @@ export default function PortalPage({ session }) {
                 <p>Monitor auctions, orders, payments and deliveries.</p>
               </div>
 
-              <button className="secondary-button" onClick={loadPortal}>
-                Refresh
-              </button>
+              <button className="icon-button refresh-icon-button" onClick={loadPortal} title="Refresh" aria-label="Refresh">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M20 6v5h-5" />
+            <path d="M4 18v-5h5" />
+            <path d="M6.1 9a7 7 0 0 1 11.3-2.1L20 9" />
+            <path d="M4 15l2.6 2.1A7 7 0 0 0 17.9 15" />
+          </svg>
+        </button>
             </header>
 
             {onboardingChecked && facebookStatus && !facebookStatus.connected && (
@@ -1233,13 +1238,18 @@ export default function PortalPage({ session }) {
                 )}
 
                 <button
-                  className="secondary-button"
+                  className="icon-button refresh-icon-button"
                   type="button"
                   onClick={loadPaymentAccountStatus}
                   disabled={paymentAccountLoading}
-                >
-                  Refresh
-                </button>
+                 title="Refresh" aria-label="Refresh">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M20 6v5h-5" />
+            <path d="M4 18v-5h5" />
+            <path d="M6.1 9a7 7 0 0 1 11.3-2.1L20 9" />
+            <path d="M4 15l2.6 2.1A7 7 0 0 0 17.9 15" />
+          </svg>
+        </button>
               </div>
             </section>
 
@@ -1316,7 +1326,14 @@ export default function PortalPage({ session }) {
                 <h1>Auctions</h1>
                 <p>Search, filter and inspect auction activity.</p>
               </div>
-              <button className="secondary-button" onClick={loadPortal}>Refresh</button>
+              <button className="icon-button refresh-icon-button" onClick={loadPortal} title="Refresh" aria-label="Refresh">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M20 6v5h-5" />
+            <path d="M4 18v-5h5" />
+            <path d="M6.1 9a7 7 0 0 1 11.3-2.1L20 9" />
+            <path d="M4 15l2.6 2.1A7 7 0 0 0 17.9 15" />
+          </svg>
+        </button>
             </header>
 
             <section className="toolbar-card">
@@ -1364,7 +1381,14 @@ export default function PortalPage({ session }) {
                 <h1>Orders</h1>
                 <p>Track winner orders from payment pending to completion.</p>
               </div>
-              <button className="secondary-button" onClick={loadPortal}>Refresh</button>
+              <button className="icon-button refresh-icon-button" onClick={loadPortal} title="Refresh" aria-label="Refresh">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M20 6v5h-5" />
+            <path d="M4 18v-5h5" />
+            <path d="M6.1 9a7 7 0 0 1 11.3-2.1L20 9" />
+            <path d="M4 15l2.6 2.1A7 7 0 0 0 17.9 15" />
+          </svg>
+        </button>
             </header>
 
             <section className="toolbar-card">
@@ -1415,7 +1439,14 @@ export default function PortalPage({ session }) {
                 <h1>Payments</h1>
                 <p>Monitor PayMongo transactions, payment deadlines and manual payment extensions.</p>
               </div>
-              <button className="secondary-button" onClick={loadPortal}>Refresh</button>
+              <button className="icon-button refresh-icon-button" onClick={loadPortal} title="Refresh" aria-label="Refresh">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M20 6v5h-5" />
+            <path d="M4 18v-5h5" />
+            <path d="M6.1 9a7 7 0 0 1 11.3-2.1L20 9" />
+            <path d="M4 15l2.6 2.1A7 7 0 0 0 17.9 15" />
+          </svg>
+        </button>
             </header>
 
             {reopenMessage && <div className="success-message global-error">{reopenMessage}</div>}
@@ -1601,7 +1632,14 @@ export default function PortalPage({ session }) {
                 <h1>Delivery</h1>
                 <p>Track paid orders from booking to successful delivery.</p>
               </div>
-              <button className="secondary-button" onClick={loadPortal}>Refresh</button>
+              <button className="icon-button refresh-icon-button" onClick={loadPortal} title="Refresh" aria-label="Refresh">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M20 6v5h-5" />
+            <path d="M4 18v-5h5" />
+            <path d="M6.1 9a7 7 0 0 1 11.3-2.1L20 9" />
+            <path d="M4 15l2.6 2.1A7 7 0 0 0 17.9 15" />
+          </svg>
+        </button>
             </header>
 
             <section className="metrics-grid compact-metrics">
