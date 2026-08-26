@@ -414,29 +414,65 @@ function RuleFields({
         <input
           ref={registerField(key("buyout"))}
           value={value.buyout}
-          onChange={(e) => set("buyout", e.target.value)}
+          onChange={(e) => {
+            const nextBuyout = e.target.value;
+            const parsedBuyout =
+              nextBuyout.trim() === ""
+                ? 0
+                : normalizeMoney(nextBuyout);
+
+            onChange({
+              ...value,
+              buyout: nextBuyout,
+              buyoutUntil:
+                parsedBuyout !== null &&
+                parsedBuyout > 0
+                  ? value.buyoutUntil
+                  : "",
+            });
+          }}
           placeholder={shared ? "Optional / 0 = disabled" : "Inherit"}
           disabled={disabled}
           aria-invalid={Boolean(fieldErrors[key("buyout")])}
         />
         {fieldErrors[key("buyout")] && (
-          <small className="eo2-field-error-text">{fieldErrors[key("buyout")]}</small>
+          <small className="eo2-field-error-text">
+            {fieldErrors[key("buyout")]}
+          </small>
         )}
       </label>
 
-      <label className={fieldClass(fieldErrors, key("buyoutUntil"))}>
-        Buyout Until
-        <ScrollDateTimePicker
-          inputRef={registerField(key("buyoutUntil"))}
-          value={value.buyoutUntil}
-          onChange={(nextValue) => set("buyoutUntil", nextValue)}
-          disabled={disabled || normalizeMoney(value.buyout) === 0}
-          hasError={Boolean(fieldErrors[key("buyoutUntil")])}
-        />
-        {fieldErrors[key("buyoutUntil")] && (
-          <small className="eo2-field-error-text">{fieldErrors[key("buyoutUntil")]}</small>
-        )}
-      </label>
+      {(() => {
+        const buyoutAmount =
+          value.buyout === ""
+            ? 0
+            : normalizeMoney(value.buyout);
+
+        if (
+          buyoutAmount === null ||
+          buyoutAmount <= 0
+        ) {
+          return null;
+        }
+
+        return (
+          <label className={fieldClass(fieldErrors, key("buyoutUntil"))}>
+            Buyout Until <span className="eo2-required">*</span>
+            <ScrollDateTimePicker
+              inputRef={registerField(key("buyoutUntil"))}
+              value={value.buyoutUntil}
+              onChange={(nextValue) => set("buyoutUntil", nextValue)}
+              disabled={disabled}
+              hasError={Boolean(fieldErrors[key("buyoutUntil")])}
+            />
+            {fieldErrors[key("buyoutUntil")] && (
+              <small className="eo2-field-error-text">
+                {fieldErrors[key("buyoutUntil")]}
+              </small>
+            )}
+          </label>
+        );
+      })()}
 
       <label className={fieldClass(fieldErrors, key("auctionEnds"))}>
         Auction Ends <span className="eo2-required">*</span>
