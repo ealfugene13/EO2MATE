@@ -543,3 +543,76 @@ td { color: #354158; }
   .payment-group-toolbar,
   .reopen-payment-form { grid-template-columns: 1fr; }
 }
+
+/* =========================================================
+   V12 ONE-SCREEN SETUP CRUD
+   ========================================================= */
+.setup-panel { margin-bottom: 22px; }
+.setup-inline-form {
+  display: grid;
+  grid-template-columns: minmax(210px, 1.1fr) minmax(150px, .7fr) 150px minmax(280px, 1.5fr) auto auto;
+  gap: 12px;
+  align-items: end;
+  padding: 18px 20px;
+  border-bottom: 1px solid #edf0f5;
+  background: #fbfcfe;
+}
+.setup-inline-form.command-form {
+  grid-template-columns: minmax(180px, .8fr) minmax(220px, 1fr) minmax(320px, 1.6fr) auto auto;
+}
+.setup-inline-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: #4b5565;
+  font-size: 11px;
+  font-weight: 750;
+}
+.setup-inline-form input:not([type="checkbox"]),
+.setup-inline-form select {
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid #d9dfeb;
+  border-radius: 10px;
+  background: #fff;
+  color: #25334b;
+  outline: none;
+}
+.setup-inline-form input:disabled,
+.setup-inline-form select:disabled {
+  background: #f2f4f7;
+  color: #8993a3;
+}
+.setup-checkbox {
+  min-height: 42px;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 8px !important;
+  padding: 0 4px;
+  white-space: nowrap;
+}
+.setup-checkbox input { width: 16px; height: 16px; }
+.setup-form-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 42px;
+}
+.row-actions { display: flex; gap: 7px; }
+.danger-button { color: #9a3333; border-color: #efc9c9; }
+.danger-button:hover:not(:disabled) { background: #fff2f2; }
+.table-action-button:disabled { opacity: .42; cursor: not-allowed; }
+.setup-description-cell { max-width: 360px; white-space: normal; line-height: 1.45; }
+@media (max-width: 1280px) {
+  .setup-inline-form,
+  .setup-inline-form.command-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .setup-description-field { grid-column: 1 / -1; }
+  .setup-form-actions { justify-content: flex-start; }
+}
+@media (max-width: 680px) {
+  .setup-inline-form,
+  .setup-inline-form.command-form { grid-template-columns: 1fr; }
+  .setup-description-field { grid-column: auto; }
+}

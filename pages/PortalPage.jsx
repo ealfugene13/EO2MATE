@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../supabase";
+import SetupPage from "./SetupPage";
 
 function formatCurrency(value) {
   if (value === null || value === undefined || value === "") return "-";
@@ -1018,6 +1019,10 @@ export default function PortalPage({ session }) {
             Delivery
           </button>
 
+          <button className={`nav-item ${page === "setup" ? "active" : ""}`} onClick={() => setPage("setup")}>
+            Setup
+          </button>
+
           <button className="nav-item" disabled>
             Reports
           </button>
@@ -1582,6 +1587,10 @@ export default function PortalPage({ session }) {
               </div>
             </section>
           </>
+        )}
+
+        {page === "setup" && (
+          <SetupPage client={client} />
         )}
 
         {page === "deliveries" && (
