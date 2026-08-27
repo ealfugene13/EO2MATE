@@ -1,2219 +1,1028 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { supabase } from "../supabase";
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "jsr:@supabase/supabase-js@2";
 
-const MAX_IMAGES = 10;
-const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const AUCTION_FINALIZER_SECRET = Deno.env.get("AUCTION_FINALIZER_SECRET") || "";
+const GRAPH_VERSION = "v23.0";
+const META_WEBHOOK_URL = `${SUPABASE_URL}/functions/v1/meta-webhook`;
 
-const DEFAULT_RULES = {
-  minBid: "500",
-  increment: "100",
-  minimumBidders: "1",
-  buyout: "",
-  buyoutUntil: "",
-  auctionEnds: "",
-  bidCutoff: "60",
-  antiSniper: "0",
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-function normalizeMoney(value) {
-  const raw = String(value ?? "")
-    .trim()
-    .toLowerCase()
-    .replaceAll(",", "")
-    .replaceAll("₱", "")
-    .replaceAll("php", "")
-    .replace(/\s+/g, "");
+const supabase = createClient(
+  SUPABASE_URL,
+  SUPABASE_SERVICE_ROLE_KEY,
+  {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  },
+);
 
-  if (!raw) return null;
-
-  let multiplier = 1;
-  let numeric = raw;
-
-  if (raw.endsWith("k")) {
-    multiplier = 1000;
-    numeric = raw.slice(0, -1);
-  } else if (raw.endsWith("h")) {
-    multiplier = 100;
-    numeric = raw.slice(0, -1);
-  }
-
-  const parsed = Number(numeric);
-
-  if (!Number.isFinite(parsed) || parsed < 0) return null;
-
-  return Math.round(parsed * multiplier);
-}
-
-function formatMoneyForCaption(value) {
-  const parsed = normalizeMoney(value);
-  if (parsed === null) return "";
-  return new Intl.NumberFormat("en-PH", {
-    maximumFractionDigits: 0,
-  }).format(parsed);
-}
-
-function phDateFromLocalInput(value) {
-  if (!value) return null;
-
-  const date = new Date(`${value}:00+08:00`);
-
-  if (Number.isNaN(date.getTime())) return null;
-
-  return date;
-}
-
-function formatFacebookAuctionDate(value) {
-  const date = phDateFromLocalInput(value);
-
-  if (!date) return "";
-
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone: "Asia/Manila",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  }).format(date);
-}
-
-
-function splitDateTimeLocal(value) {
-  const raw = String(value || "").trim();
-
-  if (!raw || !raw.includes("T")) {
-    return {
-      date: "",
-      hour12: "12",
-      minute: "00",
-      period: "AM",
-    };
-  }
-
-  const [date, time = "00:00"] = raw.split("T");
-  const [hourRaw = "0", minuteRaw = "00"] = time.split(":");
-
-  let hour24 = Number(hourRaw);
-  const minute = String(minuteRaw || "00").padStart(2, "0");
-
-  if (!Number.isFinite(hour24)) hour24 = 0;
-
-  const period = hour24 >= 12 ? "PM" : "AM";
-  let hour12 = hour24 % 12;
-
-  if (hour12 === 0) hour12 = 12;
-
-  return {
-    date,
-    hour12: String(hour12).padStart(2, "0"),
-    minute,
-    period,
-  };
-}
-
-function combineDateTimeLocal({
-  date,
-  hour12,
-  minute,
-  period,
-}) {
-  if (!date) return "";
-
-  let hour = Number(hour12);
-
-  if (!Number.isFinite(hour) || hour < 1 || hour > 12) {
-    hour = 12;
-  }
-
-  if (period === "AM" && hour === 12) {
-    hour = 0;
-  } else if (period === "PM" && hour !== 12) {
-    hour += 12;
-  }
-
-  const safeMinute = String(minute || "00").padStart(2, "0");
-
-  return `${date}T${String(hour).padStart(2, "0")}:${safeMinute}`;
-}
-
-function ScrollDateTimePicker({
-  value,
-  onChange,
-  disabled = false,
-  hasError = false,
-  inputRef,
-}) {
-  const parts = splitDateTimeLocal(value);
-
-  const update = (patch) => {
-    onChange(
-      combineDateTimeLocal({
-        ...parts,
-        ...patch,
-      })
-    );
-  };
-
-  const hours = Array.from({ length: 12 }, (_, index) =>
-    String(index + 1).padStart(2, "0")
-  );
-
-  const minutes = Array.from({ length: 60 }, (_, index) =>
-    String(index).padStart(2, "0")
-  );
-
-  return (
-    <div
-      className={`eo2-datetime-picker ${
-        hasError ? "eo2-datetime-error" : ""
-      }`}
-      ref={inputRef}
-      tabIndex={-1}
-    >
-      <div className="eo2-date-part">
-        <span className="eo2-datetime-label">Date</span>
-        <input
-          type="date"
-          value={parts.date}
-          onChange={(e) =>
-            update({
-              date: e.target.value,
-            })
-          }
-          disabled={disabled}
-        />
-      </div>
-
-      <div className="eo2-time-part">
-        <span className="eo2-datetime-label">Time</span>
-
-        <div className="eo2-time-wheel-group">
-          <select
-            className="eo2-time-wheel"
-            value={parts.hour12}
-            onChange={(e) =>
-              update({
-                hour12: e.target.value,
-              })
-            }
-            disabled={disabled}
-            aria-label="Hour"
-            size="3"
-          >
-            {hours.map((hour) => (
-              <option key={hour} value={hour}>
-                {hour}
-              </option>
-            ))}
-          </select>
-
-          <span className="eo2-time-separator">:</span>
-
-          <select
-            className="eo2-time-wheel"
-            value={parts.minute}
-            onChange={(e) =>
-              update({
-                minute: e.target.value,
-              })
-            }
-            disabled={disabled}
-            aria-label="Minute"
-            size="3"
-          >
-            {minutes.map((minute) => (
-              <option key={minute} value={minute}>
-                {minute}
-              </option>
-            ))}
-          </select>
-
-          <select
-            className="eo2-time-period"
-            value={parts.period}
-            onChange={(e) =>
-              update({
-                period: e.target.value,
-              })
-            }
-            disabled={disabled}
-            aria-label="AM or PM"
-            size="2"
-          >
-            <option value="AM">AM</option>
-            <option value="PM">PM</option>
-          </select>
-        </div>
-      </div>
-    </div>
+function json(data: unknown, status = 200) {
+  return new Response(
+    JSON.stringify(data),
+    {
+      status,
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "application/json",
+      },
+    },
   );
 }
 
-function getPageLabel(page) {
-  return (
-    page?.page_name ||
-    page?.fb_page_name ||
-    page?.name ||
-    page?.page_title ||
-    page?.display_name ||
-    "Facebook Page"
-  );
+function getString(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  const result = String(value).trim();
+  return result || null;
 }
 
-function buildRuleLines(rules, { includeItem = false, item = "" } = {}) {
-  const lines = [];
+async function getUser(req: Request) {
+  const auth = req.headers.get("Authorization") || "";
+  const match = auth.match(/^Bearer\s+(.+)$/i);
+  const token = match?.[1]?.trim();
 
-  if (includeItem && item.trim()) {
-    lines.push(`Item: ${item.trim()}`);
-  }
+  if (!token) return null;
 
-  const minBid = formatMoneyForCaption(rules.minBid);
-  const increment = formatMoneyForCaption(rules.increment);
-  const buyoutAmount = normalizeMoney(rules.buyout);
-  const buyout = buyoutAmount !== null ? formatMoneyForCaption(rules.buyout) : "";
+  const { data, error } = await supabase.auth.getUser(token);
 
-  if (minBid) lines.push(`Minimum Bid: ${minBid}`);
-  if (increment) lines.push(`Increment: ${increment}`);
+  if (error || !data?.user) return null;
 
-  const minimumBidders = Number(rules.minimumBidders || 1);
-  if (Number.isFinite(minimumBidders) && minimumBidders > 0) {
-    lines.push(`Minimum Bidders: ${Math.trunc(minimumBidders)}`);
-  }
-
-  /*
-   * EO2MATE standard:
-   * blank/null Buyout is treated as 0 server-side.
-   * Buyout 0 means disabled, so it does not need to be written
-   * into the Facebook caption.
-   */
-  if (buyoutAmount !== null && buyoutAmount > 0 && buyout) {
-    lines.push(`Buyout: ${buyout}`);
-
-    if (rules.buyoutUntil) {
-      lines.push(`Buyout Until: ${formatFacebookAuctionDate(rules.buyoutUntil)}`);
-    }
-  }
-
-  if (rules.auctionEnds) {
-    lines.push(`Auction Ends: ${formatFacebookAuctionDate(rules.auctionEnds)}`);
-  }
-
-  const bidCutoff = Number(rules.bidCutoff);
-  if (Number.isFinite(bidCutoff) && bidCutoff >= 0) {
-    lines.push(`Bid Cutoff: ${Math.trunc(bidCutoff)}`);
-  }
-
-  const antiSniper = Number(rules.antiSniper);
-  if (Number.isFinite(antiSniper) && antiSniper >= 0) {
-    lines.push(`Anti Sniper: ${Math.trunc(antiSniper)}`);
-  }
-
-  return lines;
+  return data.user;
 }
 
-function mergeRules(shared, item) {
-  return {
-    minBid: item.minBid || shared.minBid,
-    increment: item.increment || shared.increment,
-    minimumBidders: item.minimumBidders || shared.minimumBidders,
-    buyout: item.buyout !== "" ? item.buyout : shared.buyout,
-    buyoutUntil: item.buyoutUntil || shared.buyoutUntil,
-    auctionEnds: item.auctionEnds || shared.auctionEnds,
-    bidCutoff: item.bidCutoff !== "" ? item.bidCutoff : shared.bidCutoff,
-    antiSniper: item.antiSniper !== "" ? item.antiSniper : shared.antiSniper,
-  };
-}
+async function getMembership(userId: string, clientId: string) {
+  const { data, error } = await supabase
+    .from("client_users")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("client_id", clientId)
+    .eq("status", "ACTIVE")
+    .maybeSingle();
 
-function createItem(file, index) {
-  return {
-    id: `${Date.now()}-${index}-${Math.random().toString(36).slice(2)}`,
-    file,
-    previewUrl: URL.createObjectURL(file),
-    item: "",
-    minBid: "",
-    increment: "",
-    minimumBidders: "",
-    buyout: "",
-    buyoutUntil: "",
-    auctionEnds: "",
-    bidCutoff: "",
-    antiSniper: "",
-  };
-}
-
-function fieldClass(errors, fieldKey) {
-  return errors[fieldKey] ? "eo2-field-error" : "";
-}
-
-function RuleFields({
-  value,
-  onChange,
-  shared = false,
-  disabled = false,
-  fieldPrefix,
-  fieldErrors,
-  registerField,
-}) {
-  const set = (key, nextValue) => {
-    onChange({
-      ...value,
-      [key]: nextValue,
-    });
-  };
-
-  const key = (name) => `${fieldPrefix}.${name}`;
-
-  return (
-    <div className={`fb-rule-grid ${shared ? "shared" : "item-rules"}`}>
-      <label className={fieldClass(fieldErrors, key("minBid"))}>
-        Minimum Bid <span className="eo2-required">*</span>
-        <input
-          ref={registerField(key("minBid"))}
-          value={value.minBid}
-          onChange={(e) => set("minBid", e.target.value)}
-          placeholder={shared ? "500 or 5h" : "Inherit"}
-          disabled={disabled}
-          aria-invalid={Boolean(fieldErrors[key("minBid")])}
-        />
-        {fieldErrors[key("minBid")] && (
-          <small className="eo2-field-error-text">{fieldErrors[key("minBid")]}</small>
-        )}
-      </label>
-
-      <label className={fieldClass(fieldErrors, key("increment"))}>
-        Increment <span className="eo2-required">*</span>
-        <input
-          ref={registerField(key("increment"))}
-          value={value.increment}
-          onChange={(e) => set("increment", e.target.value)}
-          placeholder={shared ? "100 or 1h" : "Inherit"}
-          disabled={disabled}
-          aria-invalid={Boolean(fieldErrors[key("increment")])}
-        />
-        {fieldErrors[key("increment")] && (
-          <small className="eo2-field-error-text">{fieldErrors[key("increment")]}</small>
-        )}
-      </label>
-
-      <label>
-        Minimum Bidders
-        <input
-          type="number"
-          min="1"
-          step="1"
-          value={value.minimumBidders}
-          onChange={(e) => set("minimumBidders", e.target.value)}
-          placeholder={shared ? "1" : "Inherit"}
-          disabled={disabled}
-        />
-      </label>
-
-      <label className={fieldClass(fieldErrors, key("buyout"))}>
-        Buyout
-        <input
-          ref={registerField(key("buyout"))}
-          value={value.buyout}
-          onChange={(e) => {
-            const nextBuyout = e.target.value;
-            const parsedBuyout =
-              nextBuyout.trim() === ""
-                ? 0
-                : normalizeMoney(nextBuyout);
-
-            onChange({
-              ...value,
-              buyout: nextBuyout,
-              buyoutUntil:
-                parsedBuyout !== null &&
-                parsedBuyout > 0
-                  ? value.buyoutUntil
-                  : "",
-            });
-          }}
-          placeholder={shared ? "Optional / 0 = disabled" : "Inherit"}
-          disabled={disabled}
-          aria-invalid={Boolean(fieldErrors[key("buyout")])}
-        />
-        {fieldErrors[key("buyout")] && (
-          <small className="eo2-field-error-text">
-            {fieldErrors[key("buyout")]}
-          </small>
-        )}
-      </label>
-
-      {(() => {
-        const buyoutAmount =
-          value.buyout === ""
-            ? 0
-            : normalizeMoney(value.buyout);
-
-        if (
-          buyoutAmount === null ||
-          buyoutAmount <= 0
-        ) {
-          return null;
-        }
-
-        return (
-          <label className={fieldClass(fieldErrors, key("buyoutUntil"))}>
-            Buyout Until <span className="eo2-required">*</span>
-            <ScrollDateTimePicker
-              inputRef={registerField(key("buyoutUntil"))}
-              value={value.buyoutUntil}
-              onChange={(nextValue) => set("buyoutUntil", nextValue)}
-              disabled={disabled}
-              hasError={Boolean(fieldErrors[key("buyoutUntil")])}
-            />
-            {fieldErrors[key("buyoutUntil")] && (
-              <small className="eo2-field-error-text">
-                {fieldErrors[key("buyoutUntil")]}
-              </small>
-            )}
-          </label>
-        );
-      })()}
-
-      <label className={fieldClass(fieldErrors, key("auctionEnds"))}>
-        Auction Ends <span className="eo2-required">*</span>
-        <ScrollDateTimePicker
-          inputRef={registerField(key("auctionEnds"))}
-          value={value.auctionEnds}
-          onChange={(nextValue) => set("auctionEnds", nextValue)}
-          disabled={disabled}
-          hasError={Boolean(fieldErrors[key("auctionEnds")])}
-        />
-        {fieldErrors[key("auctionEnds")] && (
-          <small className="eo2-field-error-text">{fieldErrors[key("auctionEnds")]}</small>
-        )}
-      </label>
-
-      <label>
-        Bid Cutoff (mins)
-        <input
-          type="number"
-          min="0"
-          step="1"
-          value={value.bidCutoff}
-          onChange={(e) => set("bidCutoff", e.target.value)}
-          placeholder={shared ? "60" : "Inherit"}
-          disabled={disabled}
-        />
-      </label>
-
-      <label>
-        Anti Sniper (mins)
-        <input
-          type="number"
-          min="0"
-          step="1"
-          value={value.antiSniper}
-          onChange={(e) => set("antiSniper", e.target.value)}
-          placeholder={shared ? "0" : "Inherit"}
-          disabled={disabled}
-        />
-      </label>
-    </div>
-  );
-}
-
-export default function FacebookPostPage({ client }) {
-  const fileInputRef = useRef(null);
-  const uploadButtonRef = useRef(null);
-  const fieldRefs = useRef({});
-  const itemsRef = useRef([]);
-
-  const [pages, setPages] = useState([]);
-  const [subscription, setSubscription] = useState(null);
-  const [environments, setEnvironments] = useState([]);
-  const [postTypes, setPostTypes] = useState([]);
-  const [selectedPageId, setSelectedPageId] = useState("");
-  const [environment, setEnvironment] = useState("");
-  const [postType, setPostType] = useState("");
-  const [sellerCaption, setSellerCaption] = useState("");
-  const [singleItem, setSingleItem] = useState("");
-  const [sharedRules, setSharedRules] = useState({ ...DEFAULT_RULES });
-  const [items, setItems] = useState([]);
-  const [draggingId, setDraggingId] = useState(null);
-  const [showPreview, setShowPreview] = useState(true);
-  const [publishing, setPublishing] = useState(false);
-  const [processingFiles, setProcessingFiles] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState("");
-  const [errorMessage, setErrorMessage] = useState("");
-  const [fieldErrors, setFieldErrors] = useState({});
-  const [successPopup, setSuccessPopup] = useState(null);
-
-  itemsRef.current = items;
-
-  useEffect(() => {
-    loadPostingSetup();
-
-    return () => {
-      itemsRef.current.forEach((item) => URL.revokeObjectURL(item.previewUrl));
-    };
-  }, [client?.client_id]);
-
-  const allowedEnvironmentCode = String(
-    subscription?.allowed_environment ||
-    client?.default_environment ||
-    "CLNT"
-  ).toUpperCase();
-
-  const allowedEnvironmentRow = useMemo(
-    () =>
-      environments.find(
-        (row) =>
-          String(row.environment_code).toUpperCase() === allowedEnvironmentCode
-      ) || null,
-    [environments, allowedEnvironmentCode]
-  );
-
-  const selectableEnvironments = useMemo(() => {
-    if (!environments.length) return [];
-
-    const maxRank = Number(allowedEnvironmentRow?.environment_rank);
-
-    if (!Number.isFinite(maxRank)) {
-      return environments.filter((row) => row.is_active === true);
-    }
-
-    return environments.filter(
-      (row) =>
-        row.is_active === true &&
-        Number(row.environment_rank) <= maxRank
-    );
-  }, [environments, allowedEnvironmentRow]);
-
-  useEffect(() => {
-    if (!selectableEnvironments.length) return;
-
-    const currentValid = selectableEnvironments.some(
-      (row) =>
-        String(row.environment_code).toUpperCase() ===
-        String(environment).toUpperCase()
-    );
-
-    if (currentValid) return;
-
-    const preferred =
-      selectableEnvironments.find(
-        (row) =>
-          String(row.environment_code).toUpperCase() === allowedEnvironmentCode
-      ) ||
-      selectableEnvironments[selectableEnvironments.length - 1] ||
-      selectableEnvironments[0];
-
-    setEnvironment(String(preferred.environment_code).toUpperCase());
-  }, [selectableEnvironments, allowedEnvironmentCode, environment]);
-
-  function registerField(fieldKey) {
-    return (node) => {
-      if (node) {
-        fieldRefs.current[fieldKey] = node;
-      } else {
-        delete fieldRefs.current[fieldKey];
-      }
-    };
+  if (error) {
+    throw new Error(`client_users lookup failed: ${error.message}`);
   }
 
-  function clearFieldError(fieldKey) {
-    setFieldErrors((current) => {
-      if (!current[fieldKey]) return current;
-      const next = { ...current };
-      delete next[fieldKey];
-      return next;
-    });
+  return data;
+}
+
+async function getPage(clientId: string, fbPageId: string) {
+  const { data, error } = await supabase
+    .from("fb_pages")
+    .select("*")
+    .eq("client_id", clientId)
+    .eq("fb_page_id", fbPageId)
+    .eq("status", "ACTIVE")
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`fb_pages lookup failed: ${error.message}`);
   }
 
-  async function loadPostingSetup() {
-    if (!client?.client_id) return;
+  return data;
+}
 
-    setLoading(true);
-    setErrorMessage("");
+async function listClientPages(
+  clientId: string,
+) {
+  const { data, error } = await supabase
+    .from("fb_pages")
+    .select("*")
+    .eq("client_id", clientId)
+    .eq("status", "ACTIVE")
+    .order("connected_at", { ascending: true });
 
-    try {
-      const { data, error } = await supabase.functions.invoke(
-        "facebook-auction-publish",
-        {
-          method: "POST",
-          body: {
-            action: "LIST_SETUP",
-            client_id: client.client_id,
+  if (error) {
+    throw new Error(`fb_pages lookup failed: ${error.message}`);
+  }
+
+  const result: any[] = [];
+
+  for (const page of data || []) {
+    const fbPageId = getString(page?.fb_page_id);
+    const accessToken = getString(page?.access_token);
+
+    if (!fbPageId) continue;
+
+    let actualPageName: string | null = null;
+
+    /*
+     * Always prefer the actual current Facebook Page name.
+     * This avoids relying on local fb_pages schema/legacy columns.
+     */
+    if (accessToken) {
+      try {
+        const graphPage = await graphJson(
+          `${encodeURIComponent(fbPageId)}?fields=id,name&access_token=${encodeURIComponent(accessToken)}`,
+          {
+            method: "GET",
           },
-        }
-      );
+        );
 
-      if (error) throw error;
-
-      if (!data?.success) {
-        throw new Error(
-          data?.message ||
-          "Unable to load Facebook posting setup."
+        actualPageName = getString(graphPage?.name);
+      } catch (error) {
+        console.warn(
+          `Unable to resolve Facebook Page name for ${fbPageId}:`,
+          error instanceof Error ? error.message : String(error),
         );
       }
-
-      const pageRows = data.pages || [];
-      const environmentRows = data.environments || [];
-      const postTypeRows = data.auction_post_types || [];
-
-      setPages(pageRows);
-      setSubscription(data.subscription || null);
-      setEnvironments(environmentRows);
-      setPostTypes(postTypeRows);
-
-      setPostType((current) => {
-        if (
-          current &&
-          postTypeRows.some(
-            (row) =>
-              String(row.post_type_code).toUpperCase() ===
-              String(current).toUpperCase()
-          )
-        ) {
-          return current;
-        }
-
-        return postTypeRows.length
-          ? String(postTypeRows[0].post_type_code).toUpperCase()
-          : "";
-      });
-
-      setSelectedPageId((current) => {
-        if (
-          current &&
-          pageRows.some((page) => String(page.fb_page_id) === current)
-        ) {
-          return current;
-        }
-
-        return pageRows.length ? String(pageRows[0].fb_page_id) : "";
-      });
-    } catch (error) {
-      setErrorMessage(
-        error?.message ||
-        "Unable to load Facebook posting setup."
-      );
-    } finally {
-      setLoading(false);
     }
+
+    const storedName =
+      getString(page?.page_name) ||
+      getString(page?.fb_page_name) ||
+      getString(page?.name) ||
+      getString(page?.page_title) ||
+      getString(page?.display_name);
+
+    result.push({
+      fb_page_id: fbPageId,
+      page_name:
+        actualPageName ||
+        storedName ||
+        "Facebook Page",
+      status: page.status,
+      connected_at: page.connected_at || null,
+    });
   }
 
-  const selectedPostType = useMemo(
-    () =>
-      postTypes.find(
-        (row) =>
-          String(row.post_type_code).toUpperCase() ===
-          String(postType).toUpperCase()
-      ) || null,
-    [postTypes, postType]
-  );
+  return result;
+}
 
-  const isMultiple =
-    selectedPostType?.is_multiple === true;
 
-  const mainCaption = useMemo(() => {
-    const lines = [];
+async function listActiveEnvironments() {
+  const { data, error } = await supabase
+    .from("eo2mate_environments")
+    .select(
+      "environment_code, environment_name, environment_rank, description, is_active",
+    )
+    .eq("is_active", true)
+    .order("environment_rank", { ascending: true });
 
-    if (sellerCaption.trim()) {
-      lines.push(sellerCaption.trim(), "");
-    }
+  if (error) {
+    throw new Error(`eo2mate_environments lookup failed: ${error.message}`);
+  }
 
-    if (environment) {
-      lines.push(`EO2MATE-${environment}`);
-      lines.push("");
-    }
+  return data || [];
+}
 
-    if (selectedPostType?.caption_marker) {
-      lines.push(selectedPostType.caption_marker);
-    }
+async function getEnvironment(environmentCode: string) {
+  const code = String(environmentCode || "").trim().toUpperCase();
 
-    if (!isMultiple) {
-      lines.push(
-        ...buildRuleLines(sharedRules, {
-          includeItem: true,
-          item: singleItem,
-        })
-      );
-    } else {
-      lines.push(...buildRuleLines(sharedRules));
-    }
+  if (!code) return null;
 
-    return lines.join("\n").trim();
-  }, [
-    sellerCaption,
-    environment,
-    postType,
-    selectedPostType,
-    isMultiple,
-    sharedRules,
-    singleItem,
+  const { data, error } = await supabase
+    .from("eo2mate_environments")
+    .select(
+      "environment_code, environment_name, environment_rank, description, is_active",
+    )
+    .eq("environment_code", code)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`eo2mate_environments lookup failed: ${error.message}`);
+  }
+
+  return data;
+}
+
+
+async function listActiveAuctionPostTypes() {
+  const { data, error } = await supabase
+    .from("eo2mate_post_mode_types")
+    .select(`
+      mode_code,
+      post_type_code,
+      display_name,
+      caption_marker,
+      description,
+      is_active,
+      sort_order,
+      eo2mate_post_types!inner(
+        post_type_name,
+        is_multiple,
+        min_images,
+        is_active,
+        sort_order
+      ),
+      eo2mate_post_modes!inner(
+        mode_name,
+        is_active
+      )
+    `)
+    .eq("mode_code", "AUCTION")
+    .eq("is_active", true)
+    .eq("eo2mate_post_types.is_active", true)
+    .eq("eo2mate_post_modes.is_active", true)
+    .order("sort_order", { ascending: true });
+
+  if (error) {
+    throw new Error(`Auction post type lookup failed: ${error.message}`);
+  }
+
+  return (data || []).map((row: any) => ({
+    mode_code: row.mode_code,
+    post_type_code: row.post_type_code,
+    display_name: row.display_name,
+    caption_marker: row.caption_marker,
+    description: row.description || null,
+    is_multiple: row.eo2mate_post_types?.is_multiple === true,
+    min_images: Number(row.eo2mate_post_types?.min_images || 1),
+  }));
+}
+
+
+async function getAuctionPostType(
+  postTypeCode: string,
+) {
+  const code = String(postTypeCode || "")
+    .trim()
+    .toUpperCase();
+
+  if (!code) return null;
+
+  const rows =
+    await listActiveAuctionPostTypes();
+
+  return rows.find(
+    (row: any) =>
+      String(row.post_type_code).toUpperCase() === code,
+  ) || null;
+}
+
+
+async function getSubscription(clientId: string) {
+  const { data, error } = await supabase
+    .from("client_subscriptions")
+    .select("*")
+    .eq("client_id", clientId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`client_subscriptions lookup failed: ${error.message}`);
+  }
+
+  return data;
+}
+
+async function getAutomationControl(
+  clientId: string,
+  scopeType: "CLIENT" | "PAGE",
+  scopeId: string,
+) {
+  const { data, error } = await supabase
+    .from("eo2mate_automation_controls")
+    .select("*")
+    .eq("client_id", clientId)
+    .eq("scope_type", scopeType)
+    .eq("scope_id", scopeId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`automation control lookup failed: ${error.message}`);
+  }
+
+  return data;
+}
+
+async function assertPostingAllowed(
+  clientId: string,
+  fbPageId: string,
+  requestedEnvironment: string,
+) {
+  const [
+    subscription,
+    clientControl,
+    pageControl,
+    requestedEnvironmentRow,
+  ] = await Promise.all([
+    getSubscription(clientId),
+    getAutomationControl(clientId, "CLIENT", clientId),
+    getAutomationControl(clientId, "PAGE", fbPageId),
+    getEnvironment(requestedEnvironment),
   ]);
 
-  const photoCaptions = useMemo(() => {
-    if (!isMultiple) return [];
-
-    return items.map((item) => {
-      const effective = mergeRules(sharedRules, item);
-
-      return buildRuleLines(effective, {
-        includeItem: true,
-        item: item.item,
-      }).join("\n");
-    });
-  }, [isMultiple, items, sharedRules]);
-
-  function changePostType(nextType) {
-    setPostType(nextType);
-    setMessage("");
-    setErrorMessage("");
-    setFieldErrors({});
-  }
-
-  async function addFiles(fileList) {
-    const files = Array.from(fileList || []);
-
-    if (!files.length) return;
-
-    setProcessingFiles(true);
-    setErrorMessage("");
-    clearFieldError("images");
-
-    try {
-      /*
-       * Yield once so the processing overlay can render before
-       * image validation / preview objects are created.
-       */
-      await new Promise((resolve) => window.setTimeout(resolve, 0));
-
-      const remaining = MAX_IMAGES - items.length;
-      const selected = files.slice(0, remaining);
-      const errors = [];
-
-      const accepted = selected.filter((file) => {
-        if (!["image/jpeg", "image/png"].includes(file.type)) {
-          errors.push(`${file.name}: use JPG or PNG.`);
-          return false;
-        }
-
-        if (file.size > MAX_IMAGE_BYTES) {
-          errors.push(`${file.name}: maximum size is 10 MB.`);
-          return false;
-        }
-
-        return true;
-      });
-
-      if (files.length > remaining) {
-        errors.push(`Maximum ${MAX_IMAGES} images per Facebook post.`);
-      }
-
-      setItems((current) => [
-        ...current,
-        ...accepted.map((file, index) =>
-          createItem(file, current.length + index)
-        ),
-      ]);
-
-      if (errors.length) {
-        setErrorMessage(errors.join(" "));
-      }
-    } finally {
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-
-      setProcessingFiles(false);
-    }
-  }
-
-  function removeItem(id) {
-    setItems((current) => {
-      const target = current.find((item) => item.id === id);
-      if (target) URL.revokeObjectURL(target.previewUrl);
-      return current.filter((item) => item.id !== id);
-    });
-  }
-
-  function updateItem(id, patch) {
-    setItems((current) =>
-      current.map((item) =>
-        item.id === id
-          ? {
-              ...item,
-              ...patch,
-            }
-          : item
-      )
+  if (clientControl?.is_enabled === false) {
+    throw new Error(
+      clientControl?.reason
+        ? `Client automation is suspended: ${clientControl.reason}`
+        : "Client automation is suspended.",
     );
   }
 
-  function moveItem(draggedId, targetId) {
-    if (!draggedId || !targetId || draggedId === targetId) return;
-
-    setItems((current) => {
-      const next = [...current];
-      const fromIndex = next.findIndex((item) => item.id === draggedId);
-      const toIndex = next.findIndex((item) => item.id === targetId);
-
-      if (fromIndex < 0 || toIndex < 0) return current;
-
-      const [moved] = next.splice(fromIndex, 1);
-      next.splice(toIndex, 0, moved);
-
-      return next;
-    });
-  }
-
-  function validate() {
-    const errors = {};
-
-    if (!selectedPageId) {
-      errors.page = "Select a Facebook Page.";
-    }
-
-    if (!environment) {
-      errors.environment = "Select an operating mode.";
-    }
-
-    if (!items.length) {
-      errors.images = "Upload at least one image.";
-    }
-
-    if (!isMultiple) {
-      if (!singleItem.trim()) {
-        errors.singleItem = "Item name is required.";
-      }
-
-      if (normalizeMoney(sharedRules.minBid) === null) {
-        errors["shared.minBid"] = "Minimum Bid is required.";
-      }
-
-      if (normalizeMoney(sharedRules.increment) === null) {
-        errors["shared.increment"] = "Increment is required.";
-      }
-
-      const sharedEnd = phDateFromLocalInput(sharedRules.auctionEnds);
-
-      if (!sharedEnd) {
-        errors["shared.auctionEnds"] = "Auction Ends is required.";
-      } else if (sharedEnd.getTime() <= Date.now()) {
-        errors["shared.auctionEnds"] = "Auction Ends must be in the future.";
-      }
-
-      const buyoutAmount =
-        sharedRules.buyout === ""
-          ? 0
-          : normalizeMoney(sharedRules.buyout);
-
-      if (buyoutAmount === null) {
-        errors["shared.buyout"] = "Buyout amount is invalid.";
-      } else if (buyoutAmount > 0) {
-        const buyoutUntil = phDateFromLocalInput(sharedRules.buyoutUntil);
-
-        if (!buyoutUntil) {
-          errors["shared.buyoutUntil"] =
-            "Buyout Until is required when Buyout is enabled.";
-        } else if (
-          sharedEnd &&
-          buyoutUntil.getTime() > sharedEnd.getTime()
-        ) {
-          errors["shared.buyoutUntil"] =
-            "Buyout Until cannot be later than Auction Ends.";
-        }
-      }
-    } else {
-      items.forEach((item, index) => {
-        const prefix = `item.${item.id}`;
-
-        if (!item.item.trim()) {
-          errors[`${prefix}.item`] =
-            `Item ${index + 1} name is required.`;
-        }
-
-        const effective = mergeRules(sharedRules, item);
-        const end = phDateFromLocalInput(effective.auctionEnds);
-
-        if (normalizeMoney(effective.minBid) === null) {
-          errors[`${prefix}.minBid`] =
-            `Item ${index + 1}: Minimum Bid is required.`;
-        }
-
-        if (normalizeMoney(effective.increment) === null) {
-          errors[`${prefix}.increment`] =
-            `Item ${index + 1}: Increment is required.`;
-        }
-
-        if (!end) {
-          errors[`${prefix}.auctionEnds`] =
-            `Item ${index + 1}: Auction Ends is required.`;
-        } else if (end.getTime() <= Date.now()) {
-          errors[`${prefix}.auctionEnds`] =
-            `Item ${index + 1}: Auction Ends must be in the future.`;
-        }
-
-        const buyoutAmount =
-          effective.buyout === ""
-            ? 0
-            : normalizeMoney(effective.buyout);
-
-        if (buyoutAmount === null) {
-          errors[`${prefix}.buyout`] =
-            `Item ${index + 1}: Buyout amount is invalid.`;
-        } else if (buyoutAmount > 0) {
-          const buyoutUntil = phDateFromLocalInput(effective.buyoutUntil);
-
-          if (!buyoutUntil) {
-            errors[`${prefix}.buyoutUntil`] =
-              `Item ${index + 1}: Buyout Until is required when Buyout is enabled.`;
-          } else if (
-            end &&
-            buyoutUntil.getTime() > end.getTime()
-          ) {
-            errors[`${prefix}.buyoutUntil`] =
-              `Item ${index + 1}: Buyout Until cannot be later than Auction Ends.`;
-          }
-        }
-      });
-    }
-
-    return errors;
-  }
-
-  function focusFirstError(errors) {
-    const firstKey = Object.keys(errors)[0];
-
-    if (!firstKey) return;
-
-    window.requestAnimationFrame(() => {
-      let node = fieldRefs.current[firstKey];
-
-      if (firstKey === "images") {
-        node = uploadButtonRef.current;
-      }
-
-      if (!node) return;
-
-      node.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      });
-
-      window.setTimeout(() => {
-        if (typeof node.focus === "function") {
-          node.focus({ preventScroll: true });
-        }
-      }, 350);
-    });
-  }
-
-  function resetFormForNewPost({
-    keepSuccessPopup = false,
-  } = {}) {
-    itemsRef.current.forEach((item) => {
-      URL.revokeObjectURL(item.previewUrl);
-    });
-
-    /*
-     * Full NEW POST reset.
-     *
-     * Keep only account/setup context:
-     *   - connected Facebook Pages
-     *   - subscription/environment reference data
-     *
-     * Clear every seller-entered auction value.
-     */
-    setPostType(
-      postTypes.length
-        ? String(postTypes[0].post_type_code).toUpperCase()
-        : ""
+  if (pageControl?.is_enabled === false) {
+    throw new Error(
+      pageControl?.reason
+        ? `Facebook Page automation is suspended: ${pageControl.reason}`
+        : "Facebook Page automation is suspended.",
     );
-    setSellerCaption("");
-    setSingleItem("");
-    setSharedRules({
-      minBid: "",
-      increment: "",
-      minimumBidders: "1",
-      buyout: "",
-      buyoutUntil: "",
-      auctionEnds: "",
-      bidCutoff: "60",
-      antiSniper: "0",
-    });
-    setItems([]);
-    itemsRef.current = [];
-    setDraggingId(null);
-    setShowPreview(true);
-    setFieldErrors({});
-    setErrorMessage("");
-    setMessage("");
-
-    if (!keepSuccessPopup) {
-      setSuccessPopup(null);
-    }
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-
-    /*
-     * Page and operating mode are setup context, not auction input.
-     * Keep them selected for convenience when creating another post.
-     */
-    if (pages.length) {
-      setSelectedPageId(String(pages[0].fb_page_id));
-    }
-
-    if (selectableEnvironments.length) {
-      const preferred =
-        selectableEnvironments.find(
-          (row) =>
-            String(row.environment_code).toUpperCase() ===
-            allowedEnvironmentCode
-        ) ||
-        selectableEnvironments[selectableEnvironments.length - 1];
-
-      setEnvironment(String(preferred.environment_code).toUpperCase());
-    }
   }
 
-  async function publishAuction() {
-    const errors = validate();
-
-    if (Object.keys(errors).length) {
-      setFieldErrors(errors);
-      setErrorMessage(
-        "Please complete the highlighted required field(s)."
-      );
-      setMessage("");
-      focusFirstError(errors);
-      return;
-    }
-
-    setFieldErrors({});
-
-    const confirmed = window.confirm(
-      `Publish this ${
-        selectedPostType?.display_name ||
-        "Auction"
-      } to Facebook?\n\n` +
-      `Page: ${
-        pages.find(
-          (page) => String(page.fb_page_id) === selectedPageId
-        )?.page_name || "Facebook Page"
-      }\n` +
-      `Mode: ${environment}\n` +
-      `Images: ${items.length}`
+  if (!requestedEnvironmentRow) {
+    throw new Error(
+      `${requestedEnvironment} is not configured in eo2mate_environments.`,
     );
-
-    if (!confirmed) return;
-
-    setPublishing(true);
-    setMessage("");
-    setErrorMessage("");
-
-    try {
-      const payload = {
-        client_id: client.client_id,
-        fb_page_id: selectedPageId,
-        environment,
-        post_type: postType,
-        main_caption: mainCaption,
-        photo_captions:
-          isMultiple
-            ? photoCaptions
-            : items.map(() => ""),
-      };
-
-      const formData = new FormData();
-      formData.append("payload", JSON.stringify(payload));
-
-      items.forEach((item, index) => {
-        formData.append(
-          `image_${index}`,
-          item.file,
-          item.file.name
-        );
-      });
-
-      const { data, error } = await supabase.functions.invoke(
-        "facebook-auction-publish",
-        {
-          body: formData,
-        }
-      );
-
-      if (error) throw error;
-
-      if (!data?.success) {
-        throw new Error(
-          data?.message ||
-          "Facebook publishing failed."
-        );
-      }
-
-      const successData = {
-        ...data,
-        page_name:
-          pages.find(
-            (page) =>
-              String(page.fb_page_id) === selectedPageId
-          )?.page_name || "Facebook Page",
-      };
-
-      /*
-       * Reset immediately after a confirmed successful publish,
-       * so the screen is ready for a new auction.
-       */
-      resetFormForNewPost({ keepSuccessPopup: true });
-
-      setSuccessPopup(successData);
-    } catch (error) {
-      setErrorMessage(
-        error?.message ||
-        "Unable to publish the auction to Facebook."
-      );
-    } finally {
-      setPublishing(false);
-    }
   }
 
-  return (
-    <>
-      <style>{`
-        .eo2-required {
-          color: #dc2626;
-          font-weight: 700;
-        }
-
-        .eo2-field-error input,
-        .eo2-field-error select,
-        input.eo2-field-error,
-        select.eo2-field-error,
-        textarea.eo2-field-error {
-          border-color: #dc2626 !important;
-          box-shadow: 0 0 0 3px rgba(220, 38, 38, .12) !important;
-          background: rgba(254, 242, 242, .8);
-        }
-
-        .eo2-field-error-text {
-          display: block;
-          color: #b91c1c;
-          font-size: .78rem;
-          margin-top: .28rem;
-          font-weight: 600;
-        }
-
-        .eo2-upload-error {
-          border: 2px solid #dc2626 !important;
-          box-shadow: 0 0 0 3px rgba(220, 38, 38, .12);
-        }
-
-        .eo2-publish-overlay {
-          position: fixed;
-          inset: 0;
-          z-index: 9999;
-          display: grid;
-          place-items: center;
-          background: rgba(15, 23, 42, .58);
-          backdrop-filter: blur(3px);
-          padding: 20px;
-        }
-
-        .eo2-publish-card,
-        .eo2-success-card {
-          width: min(460px, 94vw);
-          background: var(--panel-bg, #fff);
-          color: var(--text-color, #111827);
-          border-radius: 18px;
-          padding: 28px;
-          box-shadow: 0 24px 70px rgba(0,0,0,.28);
-          text-align: center;
-        }
-
-        .eo2-spinner {
-          width: 44px;
-          height: 44px;
-          margin: 0 auto 16px;
-          border-radius: 50%;
-          border: 4px solid rgba(148, 163, 184, .35);
-          border-top-color: currentColor;
-          animation: eo2Spin .8s linear infinite;
-        }
-
-        @keyframes eo2Spin {
-          to { transform: rotate(360deg); }
-        }
-
-        .eo2-progress-track {
-          height: 8px;
-          overflow: hidden;
-          border-radius: 999px;
-          background: rgba(148, 163, 184, .25);
-          margin: 18px 0 10px;
-        }
-
-        .eo2-progress-bar {
-          width: 38%;
-          height: 100%;
-          border-radius: inherit;
-          background: currentColor;
-          animation: eo2Progress 1.15s ease-in-out infinite;
-        }
-
-        @keyframes eo2Progress {
-          0% { transform: translateX(-120%); }
-          100% { transform: translateX(360%); }
-        }
-
-        .eo2-success-icon {
-          width: 58px;
-          height: 58px;
-          margin: 0 auto 14px;
-          display: grid;
-          place-items: center;
-          border-radius: 50%;
-          background: #dcfce7;
-          color: #166534;
-          font-size: 30px;
-          font-weight: 800;
-        }
-
-        .eo2-success-card h2,
-        .eo2-publish-card h2 {
-          margin: 0 0 8px;
-        }
-
-        .eo2-success-card p,
-        .eo2-publish-card p {
-          margin: 6px 0;
-          opacity: .82;
-        }
-
-        .eo2-success-actions {
-          display: flex;
-          gap: 10px;
-          justify-content: center;
-          margin-top: 20px;
-          flex-wrap: wrap;
-        }
-
-
-        .fb-posting-panel {
-          border: 1px solid rgba(148, 163, 184, .18);
-          border-radius: 20px;
-          background:
-            linear-gradient(
-              180deg,
-              rgba(255,255,255,.035),
-              rgba(255,255,255,0)
-            );
-          overflow: visible;
-        }
-
-        .fb-posting-panel .panel-header {
-          margin-bottom: 18px;
-        }
-
-        .fb-posting-panel .panel-header h2 {
-          letter-spacing: -.02em;
-        }
-
-        .fb-posting-panel label {
-          display: flex;
-          flex-direction: column;
-          gap: 7px;
-          font-size: .82rem;
-          font-weight: 700;
-          letter-spacing: .01em;
-          color: var(--text-color, #111827);
-          min-width: 0;
-        }
-
-        .fb-posting-panel label > small:not(.eo2-field-error-text) {
-          font-weight: 500;
-          line-height: 1.45;
-          opacity: .64;
-        }
-
-        .fb-posting-panel input,
-        .fb-posting-panel select,
-        .fb-posting-panel textarea {
-          width: 100%;
-          min-height: 46px;
-          border: 1px solid rgba(148, 163, 184, .42);
-          border-radius: 12px;
-          padding: 11px 13px;
-          background: rgba(255, 255, 255, .96);
-          color: #111827;
-          font: inherit;
-          font-size: .94rem;
-          font-weight: 500;
-          outline: none;
-          transition:
-            border-color .18s ease,
-            box-shadow .18s ease,
-            background .18s ease,
-            transform .18s ease;
-          box-sizing: border-box;
-        }
-
-        .fb-posting-panel textarea {
-          min-height: 118px;
-          resize: vertical;
-          line-height: 1.55;
-        }
-
-        .fb-posting-panel select {
-          appearance: none;
-          -webkit-appearance: none;
-          padding-right: 42px;
-          background-image:
-            linear-gradient(45deg, transparent 50%, currentColor 50%),
-            linear-gradient(135deg, currentColor 50%, transparent 50%);
-          background-position:
-            calc(100% - 18px) calc(50% - 2px),
-            calc(100% - 13px) calc(50% - 2px);
-          background-size: 5px 5px, 5px 5px;
-          background-repeat: no-repeat;
-        }
-
-        .fb-posting-panel input:hover:not(:disabled),
-        .fb-posting-panel select:hover:not(:disabled),
-        .fb-posting-panel textarea:hover:not(:disabled) {
-          border-color: rgba(100, 116, 139, .72);
-        }
-
-        .fb-posting-panel input:focus,
-        .fb-posting-panel select:focus,
-        .fb-posting-panel textarea:focus {
-          border-color: var(--accent-color, #2563eb);
-          box-shadow:
-            0 0 0 3px color-mix(
-              in srgb,
-              var(--accent-color, #2563eb) 16%,
-              transparent
-            );
-          background: #fff;
-        }
-
-        .fb-posting-panel input:disabled,
-        .fb-posting-panel select:disabled,
-        .fb-posting-panel textarea:disabled {
-          cursor: not-allowed;
-          opacity: .62;
-          background: rgba(148, 163, 184, .10);
-        }
-
-        .fb-posting-panel input[type="number"] {
-          font-variant-numeric: tabular-nums;
-        }
-
-        .fb-posting-panel input[type="datetime-local"] {
-          position: relative;
-          min-width: 0;
-          padding-right: 12px;
-          font-variant-numeric: tabular-nums;
-          color-scheme: light;
-        }
-
-        .fb-posting-panel input[type="datetime-local"]::-webkit-calendar-picker-indicator {
-          width: 22px;
-          height: 22px;
-          padding: 4px;
-          margin-left: 6px;
-          border-radius: 8px;
-          cursor: pointer;
-          opacity: .72;
-          transition:
-            opacity .15s ease,
-            background .15s ease;
-        }
-
-        .fb-posting-panel input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover {
-          opacity: 1;
-          background: rgba(148, 163, 184, .16);
-        }
-
-        .fb-post-setup-grid,
-        .fb-rule-grid {
-          gap: 16px !important;
-          align-items: start;
-        }
-
-        .fb-post-setup-grid {
-          grid-template-columns:
-            repeat(auto-fit, minmax(220px, 1fr)) !important;
-        }
-
-        .fb-rule-grid {
-          grid-template-columns:
-            repeat(auto-fit, minmax(200px, 1fr)) !important;
-        }
-
-        .fb-item-editor {
-          padding: 15px;
-          border-top: 1px solid rgba(148, 163, 184, .18);
-          background: rgba(148, 163, 184, .035);
-        }
-
-        .fb-item-editor details {
-          margin-top: 14px;
-          border: 1px solid rgba(148, 163, 184, .22);
-          border-radius: 12px;
-          overflow: hidden;
-        }
-
-        .fb-item-editor summary {
-          cursor: pointer;
-          padding: 12px 14px;
-          font-weight: 700;
-          user-select: none;
-        }
-
-        .fb-item-editor details[open] summary {
-          border-bottom: 1px solid rgba(148, 163, 184, .18);
-        }
-
-        .fb-item-editor details .fb-rule-grid {
-          padding: 14px;
-        }
-
-        .fb-upload-empty {
-          min-height: 180px;
-          border: 1.5px dashed rgba(100, 116, 139, .45);
-          border-radius: 18px;
-          background:
-            linear-gradient(
-              180deg,
-              rgba(148, 163, 184, .055),
-              rgba(148, 163, 184, .015)
-            );
-          transition:
-            border-color .18s ease,
-            background .18s ease,
-            transform .18s ease,
-            box-shadow .18s ease;
-        }
-
-        .fb-upload-empty:hover:not(:disabled) {
-          border-color: var(--accent-color, #2563eb);
-          background:
-            color-mix(
-              in srgb,
-              var(--accent-color, #2563eb) 5%,
-              transparent
-            );
-          transform: translateY(-1px);
-          box-shadow: 0 8px 28px rgba(15, 23, 42, .08);
-        }
-
-        .fb-photo-card {
-          border-radius: 16px;
-          overflow: hidden;
-          border: 1px solid rgba(148, 163, 184, .20);
-          background: rgba(255,255,255,.025);
-        }
-
-        .primary-button,
-        .secondary-button,
-        .icon-button {
-          min-height: 42px;
-          border-radius: 11px !important;
-          font-weight: 700;
-          letter-spacing: -.01em;
-        }
-
-        .fb-publish-actions {
-          padding-top: 8px;
-        }
-
-        @media (prefers-color-scheme: dark) {
-          .fb-posting-panel input,
-          .fb-posting-panel select,
-          .fb-posting-panel textarea {
-            background: rgba(15, 23, 42, .58);
-            color: #f8fafc;
-            border-color: rgba(148, 163, 184, .30);
-          }
-
-          .fb-posting-panel input:focus,
-          .fb-posting-panel select:focus,
-          .fb-posting-panel textarea:focus {
-            background: rgba(15, 23, 42, .82);
-          }
-
-          .fb-posting-panel input[type="datetime-local"] {
-            color-scheme: dark;
-          }
-        }
-
-
-        .eo2-datetime-picker {
-          display: grid;
-          grid-template-columns: minmax(150px, 1fr) minmax(220px, 1.25fr);
-          gap: 12px;
-          padding: 10px;
-          border: 1px solid rgba(148, 163, 184, .30);
-          border-radius: 14px;
-          background: rgba(148, 163, 184, .035);
-          min-width: 0;
-        }
-
-        .eo2-datetime-picker:focus-within {
-          border-color: var(--accent-color, #2563eb);
-          box-shadow:
-            0 0 0 3px color-mix(
-              in srgb,
-              var(--accent-color, #2563eb) 12%,
-              transparent
-            );
-        }
-
-        .eo2-datetime-error {
-          border-color: #dc2626 !important;
-          box-shadow: 0 0 0 3px rgba(220, 38, 38, .10);
-          background: rgba(254, 242, 242, .35);
-        }
-
-        .eo2-date-part,
-        .eo2-time-part {
-          min-width: 0;
-        }
-
-        .eo2-datetime-label {
-          display: block;
-          margin: 0 0 6px 2px;
-          font-size: .72rem;
-          font-weight: 800;
-          letter-spacing: .05em;
-          text-transform: uppercase;
-          opacity: .56;
-        }
-
-        .eo2-date-part input[type="date"] {
-          min-height: 48px;
-        }
-
-        .eo2-time-wheel-group {
-          display: grid;
-          grid-template-columns: minmax(64px, 1fr) auto minmax(64px, 1fr) minmax(68px, .8fr);
-          align-items: center;
-          gap: 7px;
-          min-width: 0;
-        }
-
-        .eo2-time-wheel,
-        .eo2-time-period {
-          appearance: auto !important;
-          -webkit-appearance: auto !important;
-          background-image: none !important;
-          padding: 0 !important;
-          min-height: 92px !important;
-          height: 92px;
-          overflow-y: auto;
-          scroll-behavior: smooth;
-          text-align: center;
-          font-variant-numeric: tabular-nums;
-          border-radius: 12px !important;
-        }
-
-        .eo2-time-period {
-          min-width: 68px;
-        }
-
-        .eo2-time-wheel option,
-        .eo2-time-period option {
-          min-height: 30px;
-          padding: 7px 5px;
-          text-align: center;
-          font-size: .95rem;
-        }
-
-        .eo2-time-separator {
-          font-size: 1.25rem;
-          font-weight: 800;
-          opacity: .62;
-        }
-
-        @media (max-width: 720px) {
-          .fb-post-setup-grid,
-          .fb-rule-grid,
-          .fb-post-preview-layout {
-            grid-template-columns: 1fr !important;
-          }
-
-          .fb-photo-grid {
-            grid-template-columns: 1fr !important;
-          }
-
-          .dashboard-header.fb-posting-header {
-            gap: 12px;
-            align-items: flex-start;
-          }
-
-          .eo2-publish-card,
-          .eo2-success-card {
-            padding: 22px 18px;
-          }
-
-          .fb-posting-panel input,
-          .fb-posting-panel select,
-          .fb-posting-panel textarea {
-            font-size: 16px;
-          }
-
-          .eo2-datetime-picker {
-            grid-template-columns: 1fr;
-          }
-
-          .eo2-time-wheel-group {
-            grid-template-columns: minmax(68px, 1fr) auto minmax(68px, 1fr) minmax(72px, .8fr);
-          }
-
-          .eo2-time-wheel,
-          .eo2-time-period {
-            min-height: 100px !important;
-            height: 100px;
-            font-size: 16px;
-          }
-        }
-      `}</style>
-
-      <header className="dashboard-header fb-posting-header">
-        <div>
-          <p className="eyebrow">FACEBOOK · AUCTION POSTING</p>
-          <h1>Create Auction Post</h1>
-          <p>
-            Build a valid EO2MATE auction caption, organize photos,
-            preview the post, and publish directly to your connected Page.
-          </p>
-        </div>
-
-        <button
-          type="button"
-          className="icon-button refresh-icon-button"
-          onClick={loadPostingSetup}
-          disabled={loading || publishing || processingFiles}
-          title="Refresh Facebook Pages and Operating Modes"
-          aria-label="Refresh Facebook Pages and Operating Modes"
-        >
-          ↻
-        </button>
-      </header>
-
-      {message && (
-        <div className="success-message global-error">
-          {message}
-        </div>
-      )}
-
-      {errorMessage && (
-        <div className="dashboard-error global-error" role="alert">
-          {errorMessage}
-        </div>
-      )}
-
-      <section className="dashboard-panel fb-posting-panel">
-        <div className="panel-header">
-          <div>
-            <h2>1. Post setup</h2>
-            <p>Choose the Page, operating mode and auction type.</p>
-          </div>
-        </div>
-
-        <div className="fb-post-setup-grid">
-          <label className={fieldClass(fieldErrors, "page")}>
-            Facebook Page <span className="eo2-required">*</span>
-            <select
-              ref={registerField("page")}
-              value={selectedPageId}
-              onChange={(e) => {
-                setSelectedPageId(e.target.value);
-                clearFieldError("page");
-              }}
-              disabled={loading || publishing || processingFiles}
-              aria-invalid={Boolean(fieldErrors.page)}
-            >
-              {!pages.length && (
-                <option value="">No active Page connected</option>
-              )}
-
-              {pages.map((page) => (
-                <option
-                  key={page.fb_page_id}
-                  value={page.fb_page_id}
-                >
-                  {page.page_name || "Facebook Page"}
-                </option>
-              ))}
-            </select>
-            {fieldErrors.page && (
-              <small className="eo2-field-error-text">
-                {fieldErrors.page}
-              </small>
-            )}
-          </label>
-
-          <label className={fieldClass(fieldErrors, "environment")}>
-            Operating Mode <span className="eo2-required">*</span>
-            <select
-              ref={registerField("environment")}
-              value={environment}
-              onChange={(e) => {
-                setEnvironment(e.target.value);
-                clearFieldError("environment");
-              }}
-              disabled={loading || publishing || processingFiles}
-              aria-invalid={Boolean(fieldErrors.environment)}
-            >
-              {!selectableEnvironments.length && (
-                <option value="">
-                  No active operating mode available
-                </option>
-              )}
-
-              {selectableEnvironments.map((row) => (
-                <option
-                  key={row.environment_code}
-                  value={String(row.environment_code).toUpperCase()}
-                >
-                  EO2MATE-{String(row.environment_code).toUpperCase()}
-                  {" · "}
-                  {row.environment_name}
-                </option>
-              ))}
-            </select>
-
-            <small>
-              Modes come from the EO2MATE environment reference table
-              and are limited by this client's subscription.
-            </small>
-
-            {fieldErrors.environment && (
-              <small className="eo2-field-error-text">
-                {fieldErrors.environment}
-              </small>
-            )}
-          </label>
-
-          <label>
-            Auction Type
-            <select
-              value={postType}
-              onChange={(e) => changePostType(e.target.value)}
-              disabled={publishing || processingFiles || loading}
-            >
-              {!postTypes.length && (
-                <option value="">
-                  No active Auction post type available
-                </option>
-              )}
-
-              {postTypes.map((row) => (
-                <option
-                  key={row.post_type_code}
-                  value={String(row.post_type_code).toUpperCase()}
-                >
-                  {row.display_name}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-      </section>
-
-      <section className="dashboard-panel fb-posting-panel">
-        <div className="panel-header">
-          <div>
-            <h2>2. Auction details</h2>
-            <p>
-              Enter the seller caption and EO2MATE auction rules.
-            </p>
-          </div>
-        </div>
-
-        <label>
-          Seller Caption
-          <textarea
-            rows="5"
-            value={sellerCaption}
-            onChange={(e) => setSellerCaption(e.target.value)}
-            placeholder="Optional seller caption shown before the EO2MATE auction rules."
-            disabled={publishing}
-          />
-        </label>
-
-        {!isMultiple && (
-          <label className={fieldClass(fieldErrors, "singleItem")}>
-            Item Name <span className="eo2-required">*</span>
-            <input
-              ref={registerField("singleItem")}
-              value={singleItem}
-              onChange={(e) => {
-                setSingleItem(e.target.value);
-                clearFieldError("singleItem");
-              }}
-              placeholder="Auction item"
-              disabled={publishing}
-              aria-invalid={Boolean(fieldErrors.singleItem)}
-            />
-            {fieldErrors.singleItem && (
-              <small className="eo2-field-error-text">
-                {fieldErrors.singleItem}
-              </small>
-            )}
-          </label>
-        )}
-
-        <h3>
-          {isMultiple
-            ? "Shared / default rules"
-            : "Auction rules"}
-        </h3>
-
-        <RuleFields
-          value={sharedRules}
-          onChange={(next) => {
-            setSharedRules(next);
-            setFieldErrors((current) => {
-              const cleaned = { ...current };
-              Object.keys(cleaned)
-                .filter((key) => key.startsWith("shared."))
-                .forEach((key) => delete cleaned[key]);
-              return cleaned;
-            });
-          }}
-          shared
-          disabled={publishing}
-          fieldPrefix="shared"
-          fieldErrors={fieldErrors}
-          registerField={registerField}
-        />
-      </section>
-
-      <section className="dashboard-panel fb-posting-panel">
-        <div className="panel-header">
-          <div>
-            <h2>3. Auction photos</h2>
-            <p>
-              Upload up to {MAX_IMAGES} JPG/PNG images. Drag to reorder.
-            </p>
-          </div>
-
-          {items.length > 0 && (
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={publishing || processingFiles || items.length >= MAX_IMAGES}
-            >
-              Add photos
-            </button>
-          )}
-        </div>
-
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/jpeg,image/png"
-          multiple
-          hidden
-          onChange={(e) => addFiles(e.target.files)}
-        />
-
-        {!items.length ? (
-          <button
-            ref={uploadButtonRef}
-            type="button"
-            className={`fb-upload-empty ${
-              fieldErrors.images ? "eo2-upload-error" : ""
-            }`}
-            onClick={() => fileInputRef.current?.click()}
-            disabled={publishing || processingFiles}
-          >
-            <span className="fb-upload-icon">+</span>
-            <strong>
-              Upload auction photos <span className="eo2-required">*</span>
-            </strong>
-            <span>JPG or PNG · maximum 10 MB each</span>
-            {fieldErrors.images && (
-              <span className="eo2-field-error-text">
-                {fieldErrors.images}
-              </span>
-            )}
-          </button>
-        ) : (
-          <div
-            className={`fb-photo-grid ${
-              isMultiple ? "multiple" : "single"
-            }`}
-          >
-            {items.map((item, index) => {
-              const prefix = `item.${item.id}`;
-
-              return (
-                <article
-                  key={item.id}
-                  className={`fb-photo-card ${
-                    draggingId === item.id ? "dragging" : ""
-                  }`}
-                  draggable={!publishing}
-                  onDragStart={() => setDraggingId(item.id)}
-                  onDragEnd={() => setDraggingId(null)}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={() => {
-                    moveItem(draggingId, item.id);
-                    setDraggingId(null);
-                  }}
-                >
-                  <div className="fb-photo-preview-wrap">
-                    <img
-                      src={item.previewUrl}
-                      alt={`Auction ${index + 1}`}
-                    />
-                    <span className="fb-photo-number">
-                      {isMultiple
-                        ? `Item ${index + 1}`
-                        : `Photo ${index + 1}`}
-                    </span>
-                    <span
-                      className="fb-drag-handle"
-                      title="Drag to reorder"
-                    >
-                      ⋮⋮
-                    </span>
-                    <button
-                      type="button"
-                      className="fb-photo-remove"
-                      onClick={() => removeItem(item.id)}
-                      disabled={publishing}
-                      title="Remove photo"
-                    >
-                      ×
-                    </button>
-                  </div>
-
-                  {isMultiple && (
-                    <div className="fb-item-editor">
-                      <label
-                        className={fieldClass(
-                          fieldErrors,
-                          `${prefix}.item`
-                        )}
-                      >
-                        Item Name <span className="eo2-required">*</span>
-                        <input
-                          ref={registerField(`${prefix}.item`)}
-                          value={item.item}
-                          onChange={(e) => {
-                            updateItem(item.id, {
-                              item: e.target.value,
-                            });
-                            clearFieldError(`${prefix}.item`);
-                          }}
-                          placeholder={`Item ${index + 1}`}
-                          disabled={publishing}
-                          aria-invalid={Boolean(
-                            fieldErrors[`${prefix}.item`]
-                          )}
-                        />
-                        {fieldErrors[`${prefix}.item`] && (
-                          <small className="eo2-field-error-text">
-                            {fieldErrors[`${prefix}.item`]}
-                          </small>
-                        )}
-                      </label>
-
-                      <details>
-                        <summary>Override shared rules</summary>
-
-                        <RuleFields
-                          value={item}
-                          onChange={(next) => {
-                            updateItem(item.id, next);
-                            setFieldErrors((current) => {
-                              const cleaned = { ...current };
-                              Object.keys(cleaned)
-                                .filter((key) =>
-                                  key.startsWith(`${prefix}.`)
-                                )
-                                .forEach(
-                                  (key) => delete cleaned[key]
-                                );
-                              return cleaned;
-                            });
-                          }}
-                          disabled={publishing}
-                          fieldPrefix={prefix}
-                          fieldErrors={fieldErrors}
-                          registerField={registerField}
-                        />
-                      </details>
-                    </div>
-                  )}
-                </article>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      <section className="dashboard-panel fb-posting-panel">
-        <div className="panel-header">
-          <div>
-            <h2>4. Preview & publish</h2>
-            <p>Review the exact EO2MATE caption before publishing.</p>
-          </div>
-
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={() => setShowPreview((current) => !current)}
-            disabled={publishing}
-          >
-            {showPreview ? "Hide Preview" : "Show Preview"}
-          </button>
-        </div>
-
-        {showPreview && (
-          <div className="fb-post-preview-layout">
-            <div className="fb-facebook-preview">
-              <div className="fb-preview-page">
-                <div className="fb-preview-avatar">f</div>
-                <div>
-                  <strong>
-                    {getPageLabel(
-                      pages.find(
-                        (page) =>
-                          String(page.fb_page_id) === selectedPageId
-                      )
-                    )}
-                  </strong>
-                  <span>Just now · 🌐</span>
-                </div>
-              </div>
-
-              <pre>
-                {mainCaption ||
-                  "Your generated Facebook caption will appear here."}
-              </pre>
-            </div>
-
-            {isMultiple && (
-              <div>
-                <h3>Per-photo captions</h3>
-                {photoCaptions.map((caption, index) => (
-                  <details key={items[index]?.id || index}>
-                    <summary>Item {index + 1}</summary>
-                    <pre>{caption}</pre>
-                  </details>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        <div className="fb-publish-actions">
-          <button
-            type="button"
-            className="primary-button"
-            onClick={publishAuction}
-            disabled={loading || publishing || processingFiles}
-          >
-            {publishing ? "Publishing…" : "Publish to Facebook"}
-          </button>
-        </div>
-      </section>
-
-      {(loading || processingFiles || publishing) && (
-        <div
-          className="eo2-publish-overlay"
-          role="dialog"
-          aria-modal="true"
-          aria-label={
-            publishing
-              ? "Publishing auction"
-              : processingFiles
-                ? "Processing images"
-                : "Loading posting setup"
-          }
-        >
-          <div className="eo2-publish-card">
-            <div className="eo2-spinner" />
-
-            <h2>
-              {publishing
-                ? "Publishing auction…"
-                : processingFiles
-                  ? "Processing images…"
-                  : "Loading posting setup…"}
-            </h2>
-
-            <p>
-              {publishing
-                ? "Uploading images, creating the Facebook post and activating EO2MATE automation."
-                : processingFiles
-                  ? "Checking the selected images and preparing previews."
-                  : "Loading Facebook Pages, operating modes and client posting setup."}
-            </p>
-
-            <div className="eo2-progress-track">
-              <div className="eo2-progress-bar" />
-            </div>
-
-            <small>
-              {publishing
-                ? "Please keep this page open until publishing completes."
-                : "This will close automatically when processing is complete."}
-            </small>
-          </div>
-        </div>
-      )}
-
-      {successPopup && (
-        <div
-          className="eo2-publish-overlay"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="eo2-success-title"
-        >
-          <div className="eo2-success-card">
-            <div className="eo2-success-icon">✓</div>
-            <h2 id="eo2-success-title">Auction published</h2>
-            <p>
-              The Facebook post was created successfully. Click Create New Post to start with a clean auction form.
-            </p>
-            <p>
-              <strong>Page:</strong> {successPopup.page_name}
-            </p>
-            <p>
-              <strong>Mode:</strong> {successPopup.environment}
-            </p>
-
-            <div className="eo2-success-actions">
-              {successPopup.permalink_url && (
-                <a
-                  className="secondary-button"
-                  href={successPopup.permalink_url}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  View Facebook Post
-                </a>
-              )}
-
-              <button
-                type="button"
-                className="primary-button"
-                onClick={() => resetFormForNewPost()}
-              >
-                Create New Post
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  );
+  if (requestedEnvironmentRow.is_active !== true) {
+    throw new Error(
+      `${requestedEnvironment} is currently disabled in EO2MATE setup.`,
+    );
+  }
+
+  if (!subscription) {
+    // Backward compatibility for legacy clients.
+    return;
+  }
+
+  const subscriptionStatus = String(
+    subscription.subscription_status || "",
+  ).toUpperCase();
+
+  if (!["TRIAL", "ACTIVE"].includes(subscriptionStatus)) {
+    throw new Error(
+      `Subscription status is ${subscriptionStatus || "UNKNOWN"}.`,
+    );
+  }
+
+  const allowedEnvironment = String(
+    subscription.allowed_environment || "CLNT",
+  ).toUpperCase();
+
+  const allowedEnvironmentRow =
+    await getEnvironment(allowedEnvironment);
+
+  if (!allowedEnvironmentRow) {
+    throw new Error(
+      `Allowed mode ${allowedEnvironment} is not configured in eo2mate_environments.`,
+    );
+  }
+
+  if (
+    Number(requestedEnvironmentRow.environment_rank) >
+    Number(allowedEnvironmentRow.environment_rank)
+  ) {
+    throw new Error(
+      `${requestedEnvironment} is not enabled for this client. Allowed mode: ${allowedEnvironment}.`,
+    );
+  }
 }
+
+async function graphJson(
+  path: string,
+  init: RequestInit,
+) {
+  const response = await fetch(
+    `https://graph.facebook.com/${GRAPH_VERSION}/${path}`,
+    init,
+  );
+
+  const text = await response.text();
+
+  let result: any = {};
+
+  try {
+    result = text ? JSON.parse(text) : {};
+  } catch {
+    result = { raw: text };
+  }
+
+  if (!response.ok || result?.error) {
+    throw new Error(
+      `Meta API error ${response.status}: ${JSON.stringify(result)}`,
+    );
+  }
+
+  return result;
+}
+
+async function uploadUnpublishedPhoto(
+  fbPageId: string,
+  accessToken: string,
+  file: File,
+  caption: string,
+) {
+  const form = new FormData();
+
+  form.append("source", file, file.name || "auction-photo.jpg");
+  form.append("published", "false");
+  form.append("access_token", accessToken);
+
+  if (caption.trim()) {
+    /*
+     * Page Photo objects expose their text via the "name" field.
+     * The upload endpoint uses caption for the Photo description.
+     */
+    form.append("caption", caption.trim());
+  }
+
+  const result = await graphJson(
+    `${encodeURIComponent(fbPageId)}/photos`,
+    {
+      method: "POST",
+      body: form,
+    },
+  );
+
+  const id = getString(result?.id);
+
+  if (!id) {
+    throw new Error("Facebook photo upload returned no photo ID.");
+  }
+
+  return id;
+}
+
+async function publishFeedPost(
+  fbPageId: string,
+  accessToken: string,
+  message: string,
+  photoIds: string[],
+) {
+  const body = new URLSearchParams();
+
+  body.set("access_token", accessToken);
+  body.set("message", message);
+
+  photoIds.forEach((photoId, index) => {
+    body.set(
+      `attached_media[${index}]`,
+      JSON.stringify({
+        media_fbid: photoId,
+      }),
+    );
+  });
+
+  const result = await graphJson(
+    `${encodeURIComponent(fbPageId)}/feed`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body,
+    },
+  );
+
+  const postId = getString(result?.id);
+
+  if (!postId) {
+    throw new Error("Facebook feed publish returned no post ID.");
+  }
+
+  return postId;
+}
+
+/* =========================================================
+   REGISTER UI-CREATED AUCTION WITH EO2MATE
+   ========================================================= */
+
+async function registerPublishedAuction(
+  fbPageId: string,
+  fbPostId: string,
+  mainCaption: string,
+  inventoryItems: any[] = [],
+) {
+  if (!AUCTION_FINALIZER_SECRET) {
+    throw new Error(
+      "AUCTION_FINALIZER_SECRET is not configured in auction-publish.",
+    );
+  }
+
+  const response = await fetch(
+    `${META_WEBHOOK_URL}?action=register-published-auction`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${AUCTION_FINALIZER_SECRET}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        fb_page_id: fbPageId,
+        fb_post_id: fbPostId,
+        message: mainCaption,
+        inventory_items: inventoryItems,
+      }),
+    },
+  );
+
+  const text = await response.text();
+
+  let result: any = {};
+
+  try {
+    result = text ? JSON.parse(text) : {};
+  } catch {
+    result = { raw: text };
+  }
+
+  if (!response.ok || result?.success !== true) {
+    throw new Error(
+      `EO2MATE auction registration failed (${response.status}): ${JSON.stringify(result)}`,
+    );
+  }
+
+  if (result?.registered !== true) {
+    throw new Error(
+      `EO2MATE auction registration was not confirmed: ${JSON.stringify(result)}`,
+    );
+  }
+
+  return result;
+}
+
+async function getPermalink(
+  postId: string,
+  accessToken: string,
+) {
+  try {
+    const result = await graphJson(
+      `${encodeURIComponent(postId)}?fields=permalink_url&access_token=${encodeURIComponent(accessToken)}`,
+      {
+        method: "GET",
+      },
+    );
+
+    return getString(result?.permalink_url);
+  } catch (error) {
+    console.warn(
+      "Unable to read Facebook permalink:",
+      error instanceof Error ? error.message : String(error),
+    );
+
+    return null;
+  }
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(
+      "ok",
+      {
+        status: 200,
+        headers: corsHeaders,
+      },
+    );
+  }
+
+  try {
+    if (req.method !== "POST") {
+      return json(
+        {
+          success: false,
+          error: "METHOD_NOT_ALLOWED",
+        },
+        405,
+      );
+    }
+
+    const user = await getUser(req);
+
+    if (!user) {
+      return json(
+        {
+          success: false,
+          error: "UNAUTHORIZED",
+        },
+        401,
+      );
+    }
+
+    const contentType =
+      String(
+        req.headers.get("content-type") || "",
+      )
+        .toLowerCase();
+
+    /*
+     * JSON request = posting screen setup/read.
+     * Multipart form = publish action.
+     */
+    if (
+      contentType.includes(
+        "application/json",
+      )
+    ) {
+      let body: any = {};
+
+      try {
+        body =
+          await req.json();
+      } catch {
+        body = {};
+      }
+
+      const action =
+        String(
+          body?.action ||
+          "",
+        )
+          .trim()
+          .toUpperCase();
+
+      const clientId =
+        getString(
+          body?.client_id,
+        );
+
+      if (
+        action !==
+        "LIST_SETUP"
+      ) {
+        return json(
+          {
+            success: false,
+            error: "UNSUPPORTED_ACTION",
+          },
+          400,
+        );
+      }
+
+      if (
+        !clientId
+      ) {
+        return json(
+          {
+            success: false,
+            error: "CLIENT_ID_REQUIRED",
+          },
+          400,
+        );
+      }
+
+      const membership =
+        await getMembership(
+          user.id,
+          clientId,
+        );
+
+      if (
+        !membership
+      ) {
+        return json(
+          {
+            success: false,
+            error: "FORBIDDEN",
+          },
+          403,
+        );
+      }
+
+      const [
+        pages,
+        subscription,
+        environments,
+        auctionPostTypes,
+      ] =
+        await Promise.all(
+          [
+            listClientPages(
+              clientId,
+            ),
+            getSubscription(
+              clientId,
+            ),
+            listActiveEnvironments(),
+            listActiveAuctionPostTypes(),
+          ],
+        );
+
+      return json(
+        {
+          success: true,
+          action: "LIST_SETUP",
+          pages,
+          subscription,
+          environments,
+          auction_post_types:
+            auctionPostTypes,
+        },
+      );
+    }
+
+    if (
+      !contentType.includes(
+        "multipart/form-data",
+      )
+    ) {
+      return json(
+        {
+          success: false,
+          error: "UNSUPPORTED_CONTENT_TYPE",
+        },
+        415,
+      );
+    }
+
+    const form =
+      await req.formData();
+
+    const payloadRaw =
+      getString(
+        form.get(
+          "payload",
+        ),
+      );
+
+    if (
+      !payloadRaw
+    ) {
+      return json(
+        {
+          success: false,
+          error: "PAYLOAD_REQUIRED",
+        },
+        400,
+      );
+    }
+
+    let payload: any;
+
+    try {
+      payload =
+        JSON.parse(
+          payloadRaw,
+        );
+    } catch {
+      return json(
+        {
+          success: false,
+          error: "INVALID_PAYLOAD_JSON",
+        },
+        400,
+      );
+    }
+
+    const clientId = getString(payload?.client_id);
+    const fbPageId = getString(payload?.fb_page_id);
+    const environment = String(payload?.environment || "")
+      .trim()
+      .toUpperCase();
+    const postType = String(payload?.post_type || "")
+      .trim()
+      .toUpperCase();
+    const mainCaption = getString(payload?.main_caption);
+    const inventoryItems = Array.isArray(payload?.inventory_items)
+      ? payload.inventory_items
+      : [];
+    const photoCaptions = Array.isArray(payload?.photo_captions)
+      ? payload.photo_captions.map((value: unknown) => String(value ?? ""))
+      : [];
+
+    if (!clientId || !fbPageId || !mainCaption) {
+      return json(
+        {
+          success: false,
+          error: "REQUIRED_FIELDS_MISSING",
+        },
+        400,
+      );
+    }
+
+    const environmentRow =
+      await getEnvironment(environment);
+
+    if (!environmentRow || environmentRow.is_active !== true) {
+      return json(
+        {
+          success: false,
+          error: "INVALID_ENVIRONMENT",
+          message:
+            environment
+              ? `${environment} is not an active EO2MATE operating mode.`
+              : "Operating mode is required.",
+        },
+        400,
+      );
+    }
+
+    const postTypeConfig =
+      await getAuctionPostType(
+        postType,
+      );
+
+    if (!postTypeConfig) {
+      return json(
+        {
+          success: false,
+          error: "INVALID_POST_TYPE",
+          message:
+            postType
+              ? `${postType} is not an active Auction post type.`
+              : "Auction post type is required.",
+        },
+        400,
+      );
+    }
+
+    const isMultiple =
+      postTypeConfig.is_multiple ===
+      true;
+
+    const minimumImages =
+      Math.max(
+        1,
+        Number(
+          postTypeConfig.min_images ||
+          1,
+        ),
+      );
+
+    const membership = await getMembership(
+      user.id,
+      clientId,
+    );
+
+    if (!membership) {
+      return json(
+        {
+          success: false,
+          error: "FORBIDDEN",
+        },
+        403,
+      );
+    }
+
+    const page = await getPage(
+      clientId,
+      fbPageId,
+    );
+
+    if (!page) {
+      return json(
+        {
+          success: false,
+          error: "PAGE_NOT_FOUND",
+        },
+        404,
+      );
+    }
+
+    await assertPostingAllowed(
+      clientId,
+      fbPageId,
+      environment,
+    );
+
+    const accessToken = getString(page?.access_token);
+
+    if (!accessToken) {
+      throw new Error(
+        "The connected Facebook Page has no stored access token.",
+      );
+    }
+
+    const files: File[] = [];
+
+    for (let index = 0; index < 10; index++) {
+      const value = form.get(`image_${index}`);
+
+      if (!value) continue;
+
+      if (!(value instanceof File)) {
+        throw new Error(`image_${index} is not a file.`);
+      }
+
+      if (!["image/jpeg", "image/png"].includes(value.type)) {
+        throw new Error(
+          `${value.name}: only JPG and PNG are supported.`,
+        );
+      }
+
+      if (value.size > 10 * 1024 * 1024) {
+        throw new Error(
+          `${value.name}: maximum image size is 10 MB.`,
+        );
+      }
+
+      files.push(value);
+    }
+
+    if (files.length === 0) {
+      return json(
+        {
+          success: false,
+          error: "IMAGE_REQUIRED",
+        },
+        400,
+      );
+    }
+
+    if (
+      files.length <
+      minimumImages
+    ) {
+      return json(
+        {
+          success: false,
+          error: "POST_TYPE_MINIMUM_IMAGES_NOT_MET",
+          message:
+            `${postTypeConfig.display_name} requires at least ${minimumImages} image(s).`,
+        },
+        400,
+      );
+    }
+
+    if (
+      isMultiple &&
+      photoCaptions.length !== files.length
+    ) {
+      return json(
+        {
+          success: false,
+          error: "PHOTO_CAPTION_COUNT_MISMATCH",
+        },
+        400,
+      );
+    }
+
+    const uploadedPhotoIds: string[] = [];
+
+    /*
+     * Upload sequentially. This preserves the exact order the
+     * seller arranged in the UI and avoids hammering the Page
+     * photos endpoint with a burst of multipart uploads.
+     */
+    for (let index = 0; index < files.length; index++) {
+      const caption =
+        isMultiple
+          ? String(photoCaptions[index] || "")
+          : "";
+
+      const photoId = await uploadUnpublishedPhoto(
+        fbPageId,
+        accessToken,
+        files[index],
+        caption,
+      );
+
+      uploadedPhotoIds.push(photoId);
+    }
+
+    const fbPostId = await publishFeedPost(
+      fbPageId,
+      accessToken,
+      mainCaption,
+      uploadedPhotoIds,
+    );
+
+    /*
+     * Critical EO2MATE fix:
+     *
+     * Register the UI-created Facebook auction immediately
+     * instead of depending only on Meta to echo the Page-created
+     * post back through the normal feed webhook.
+     */
+    const registration = await registerPublishedAuction(
+      fbPageId,
+      fbPostId,
+      mainCaption,
+      inventoryItems,
+    );
+
+    const permalinkUrl = await getPermalink(
+      fbPostId,
+      accessToken,
+    );
+
+    return json({
+      success: true,
+      fb_post_id: fbPostId,
+      permalink_url: permalinkUrl,
+      fb_page_id: fbPageId,
+      environment,
+      post_type: postType,
+      post_type_display_name:
+        postTypeConfig.display_name,
+      image_count: files.length,
+      uploaded_photo_ids: uploadedPhotoIds,
+      automation_registered: true,
+      auction_post_id:
+        registration?.auction_post_id || null,
+      message:
+        "Facebook auction post published and EO2MATE automation activated successfully.",
+    });
+  } catch (error) {
+    console.error(error);
+
+    return json(
+      {
+        success: false,
+        error: "FACEBOOK_AUCTION_PUBLISH_FAILED",
+        message:
+          error instanceof Error
+            ? error.message
+            : String(error),
+      },
+      500,
+    );
+  }
+});
