@@ -44,6 +44,27 @@ function normalizeMoney(value) {
   return Math.round(parsed * multiplier);
 }
 
+
+function isPositiveMoney(value) {
+  const amount = normalizeMoney(value);
+  return amount !== null && amount > 0;
+}
+
+function getBuyoutAmount(value) {
+  const raw = String(value ?? "").trim();
+
+  if (raw === "") return 0;
+
+  const amount = normalizeMoney(raw);
+
+  return amount;
+}
+
+function isBuyoutEnabled(value) {
+  const amount = getBuyoutAmount(value);
+  return amount !== null && amount > 0;
+}
+
 function formatMoneyForCaption(value) {
   const parsed = normalizeMoney(value);
   if (parsed === null) return "";
@@ -274,7 +295,7 @@ function buildRuleLines(rules, { includeItem = false, item = "" } = {}) {
 
   const minBid = formatMoneyForCaption(rules.minBid);
   const increment = formatMoneyForCaption(rules.increment);
-  const buyoutAmount = normalizeMoney(rules.buyout);
+  const buyoutAmount = getBuyoutAmount(rules.buyout);
   const buyout = buyoutAmount !== null ? formatMoneyForCaption(rules.buyout) : "";
 
   if (minBid) lines.push(`Minimum Bid: ${minBid}`);
@@ -376,6 +397,7 @@ function RuleFields({
         Minimum Bid <span className="eo2-required">*</span>
         <input
           ref={registerField(key("minBid"))}
+          inputMode="decimal"
           value={value.minBid}
           onChange={(e) => set("minBid", e.target.value)}
           placeholder={shared ? "500 or 5h" : "Inherit"}
@@ -391,6 +413,7 @@ function RuleFields({
         Increment <span className="eo2-required">*</span>
         <input
           ref={registerField(key("increment"))}
+          inputMode="decimal"
           value={value.increment}
           onChange={(e) => set("increment", e.target.value)}
           placeholder={shared ? "100 or 1h" : "Inherit"}
@@ -419,13 +442,12 @@ function RuleFields({
         Buyout
         <input
           ref={registerField(key("buyout"))}
+          inputMode="decimal"
           value={value.buyout}
           onChange={(e) => {
             const nextBuyout = e.target.value;
             const parsedBuyout =
-              nextBuyout.trim() === ""
-                ? 0
-                : normalizeMoney(nextBuyout);
+              getBuyoutAmount(nextBuyout);
 
             const buyoutEnabled =
               parsedBuyout !== null &&
@@ -458,9 +480,7 @@ function RuleFields({
 
       {(() => {
         const buyoutAmount =
-          value.buyout === ""
-            ? 0
-            : normalizeMoney(value.buyout);
+          getBuyoutAmount(value.buyout);
 
         if (
           buyoutAmount === null ||
@@ -983,12 +1003,20 @@ export default function FacebookPostPage({ client }) {
         errors.singleItem = "Item name is required.";
       }
 
-      if (normalizeMoney(sharedRules.minBid) === null) {
+      const sharedMinBid = normalizeMoney(sharedRules.minBid);
+
+      if (sharedMinBid === null) {
         errors["shared.minBid"] = "Minimum Bid is required.";
+      } else if (sharedMinBid <= 0) {
+        errors["shared.minBid"] = "Minimum Bid must be greater than 0.";
       }
 
-      if (normalizeMoney(sharedRules.increment) === null) {
+      const sharedIncrement = normalizeMoney(sharedRules.increment);
+
+      if (sharedIncrement === null) {
         errors["shared.increment"] = "Increment is required.";
+      } else if (sharedIncrement <= 0) {
+        errors["shared.increment"] = "Increment must be greater than 0.";
       }
 
       const sharedEnd = phDateFromLocalInput(sharedRules.auctionEnds);
@@ -1000,9 +1028,7 @@ export default function FacebookPostPage({ client }) {
       }
 
       const buyoutAmount =
-        sharedRules.buyout === ""
-          ? 0
-          : normalizeMoney(sharedRules.buyout);
+        getBuyoutAmount(sharedRules.buyout);
 
       if (buyoutAmount === null) {
         errors["shared.buyout"] = "Buyout amount is invalid.";
@@ -1012,6 +1038,9 @@ export default function FacebookPostPage({ client }) {
         if (!buyoutUntil) {
           errors["shared.buyoutUntil"] =
             "Buyout Until is required when Buyout is enabled.";
+        } else if (buyoutUntil.getTime() <= Date.now()) {
+          errors["shared.buyoutUntil"] =
+            "Buyout Until must be later than the current date/time.";
         } else if (
           sharedEnd &&
           buyoutUntil.getTime() > sharedEnd.getTime()
@@ -1034,14 +1063,23 @@ export default function FacebookPostPage({ client }) {
         const effective = mergeRules(sharedRules, item);
         const end = phDateFromLocalInput(effective.auctionEnds);
 
-        if (normalizeMoney(effective.minBid) === null) {
+        const effectiveMinBid = normalizeMoney(effective.minBid);
+        const effectiveIncrement = normalizeMoney(effective.increment);
+
+        if (effectiveMinBid === null) {
           errors[`${prefix}.minBid`] =
             `Item ${index + 1}: Minimum Bid is required.`;
+        } else if (effectiveMinBid <= 0) {
+          errors[`${prefix}.minBid`] =
+            `Item ${index + 1}: Minimum Bid must be greater than 0.`;
         }
 
-        if (normalizeMoney(effective.increment) === null) {
+        if (effectiveIncrement === null) {
           errors[`${prefix}.increment`] =
             `Item ${index + 1}: Increment is required.`;
+        } else if (effectiveIncrement <= 0) {
+          errors[`${prefix}.increment`] =
+            `Item ${index + 1}: Increment must be greater than 0.`;
         }
 
         if (!end) {
@@ -1053,9 +1091,7 @@ export default function FacebookPostPage({ client }) {
         }
 
         const buyoutAmount =
-          effective.buyout === ""
-            ? 0
-            : normalizeMoney(effective.buyout);
+          getBuyoutAmount(effective.buyout);
 
         if (buyoutAmount === null) {
           errors[`${prefix}.buyout`] =
@@ -1066,6 +1102,9 @@ export default function FacebookPostPage({ client }) {
           if (!buyoutUntil) {
             errors[`${prefix}.buyoutUntil`] =
               `Item ${index + 1}: Buyout Until is required when Buyout is enabled.`;
+          } else if (buyoutUntil.getTime() <= Date.now()) {
+            errors[`${prefix}.buyoutUntil`] =
+              `Item ${index + 1}: Buyout Until must be later than the current date/time.`;
           } else if (
             end &&
             buyoutUntil.getTime() > end.getTime()
@@ -2549,3 +2588,4 @@ export default function FacebookPostPage({ client }) {
       )}
     </>
   );
+}
