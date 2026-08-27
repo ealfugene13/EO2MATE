@@ -86,15 +86,6 @@ function formatMoneyForCaption(value) {
   }).format(parsed);
 }
 
-/*
- * The UI stores dates as:
- *
- * YYYY-MM-DDTHH:mm
- *
- * without a browser timezone attached.
- *
- * EO2MATE interprets those values as Philippine time.
- */
 function phDateFromLocalInput(value) {
   if (!value) return null;
 
@@ -204,9 +195,7 @@ function DateTimePicker({
   }
 
   function updateTime(nextTime) {
-    if (!parts.date) {
-      return;
-    }
+    if (!parts.date) return;
 
     onChange(
       combineDateTimeLocal(
@@ -233,9 +222,7 @@ function DateTimePicker({
           type="date"
           min={minDate}
           value={parts.date}
-          onChange={(e) =>
-            updateDate(e.target.value)
-          }
+          onChange={(e) => updateDate(e.target.value)}
           disabled={disabled}
         />
       </div>
@@ -248,9 +235,7 @@ function DateTimePicker({
         <input
           type="time"
           value={parts.time}
-          onChange={(e) =>
-            updateTime(e.target.value)
-          }
+          onChange={(e) => updateTime(e.target.value)}
           disabled={disabled || !parts.date}
           step="60"
         />
@@ -280,17 +265,14 @@ function normalizeEnvironmentRows(rows) {
   return REQUIRED_ENVIRONMENTS.map((required) => {
     const existing = source.find(
       (row) =>
-        String(
-          row?.environment_code || ""
-        ).toUpperCase() ===
+        String(row?.environment_code || "").toUpperCase() ===
         required.environment_code
     );
 
     return {
       ...required,
       ...(existing || {}),
-      environment_code:
-        required.environment_code,
+      environment_code: required.environment_code,
       environment_name:
         existing?.environment_name ||
         required.environment_name,
@@ -312,14 +294,10 @@ function buildRuleLines(
     lines.push(`Item: ${item.trim()}`);
   }
 
-  const minBid =
-    formatMoneyForCaption(rules.minBid);
+  const minBid = formatMoneyForCaption(rules.minBid);
+  const increment = formatMoneyForCaption(rules.increment);
 
-  const increment =
-    formatMoneyForCaption(rules.increment);
-
-  const buyoutAmount =
-    getBuyoutAmount(rules.buyout);
+  const buyoutAmount = getBuyoutAmount(rules.buyout);
 
   const buyout =
     buyoutAmount !== null
@@ -334,17 +312,14 @@ function buildRuleLines(
     lines.push(`Increment: ${increment}`);
   }
 
-  const minimumBidders =
-    Number(rules.minimumBidders || 1);
+  const minimumBidders = Number(rules.minimumBidders || 1);
 
   if (
     Number.isFinite(minimumBidders) &&
     minimumBidders > 0
   ) {
     lines.push(
-      `Minimum Bidders: ${Math.trunc(
-        minimumBidders
-      )}`
+      `Minimum Bidders: ${Math.trunc(minimumBidders)}`
     );
   }
 
@@ -372,8 +347,7 @@ function buildRuleLines(
     );
   }
 
-  const bidCutoff =
-    Number(rules.bidCutoff);
+  const bidCutoff = Number(rules.bidCutoff);
 
   if (
     Number.isFinite(bidCutoff) &&
@@ -384,8 +358,7 @@ function buildRuleLines(
     );
   }
 
-  const antiSniper =
-    Number(rules.antiSniper);
+  const antiSniper = Number(rules.antiSniper);
 
   if (
     Number.isFinite(antiSniper) &&
@@ -402,21 +375,17 @@ function buildRuleLines(
 function mergeRules(shared, item) {
   return {
     minBid: item.minBid || shared.minBid,
-    increment:
-      item.increment || shared.increment,
+    increment: item.increment || shared.increment,
     minimumBidders:
-      item.minimumBidders ||
-      shared.minimumBidders,
+      item.minimumBidders || shared.minimumBidders,
     buyout:
       item.buyout !== ""
         ? item.buyout
         : shared.buyout,
     buyoutUntil:
-      item.buyoutUntil ||
-      shared.buyoutUntil,
+      item.buyoutUntil || shared.buyoutUntil,
     auctionEnds:
-      item.auctionEnds ||
-      shared.auctionEnds,
+      item.auctionEnds || shared.auctionEnds,
     bidCutoff:
       item.bidCutoff !== ""
         ? item.bidCutoff
@@ -433,10 +402,8 @@ function createItem(file, index) {
     id: `${Date.now()}-${index}-${Math.random()
       .toString(36)
       .slice(2)}`,
-
     file,
     previewUrl: URL.createObjectURL(file),
-
     item: "",
     minBid: "",
     increment: "",
@@ -446,7 +413,6 @@ function createItem(file, index) {
     auctionEnds: "",
     bidCutoff: "",
     antiSniper: "",
-
     itemSource: "MANUAL",
     inventoryItemId: "",
   };
@@ -480,9 +446,7 @@ function RuleFields({
   return (
     <div
       className={`fb-rule-grid ${
-        shared
-          ? "shared"
-          : "item-rules"
+        shared ? "shared" : "item-rules"
       }`}
     >
       <label
@@ -492,24 +456,17 @@ function RuleFields({
         )}
       >
         Minimum Bid{" "}
-        <span className="eo2-required">
-          *
-        </span>
+        <span className="eo2-required">*</span>
 
         <input
           ref={registerField(key("minBid"))}
           inputMode="decimal"
           value={value.minBid}
           onChange={(e) =>
-            set(
-              "minBid",
-              e.target.value
-            )
+            set("minBid", e.target.value)
           }
           placeholder={
-            shared
-              ? "500 or 5h"
-              : "Inherit"
+            shared ? "500 or 5h" : "Inherit"
           }
           disabled={disabled}
           aria-invalid={Boolean(
@@ -519,11 +476,7 @@ function RuleFields({
 
         {fieldErrors[key("minBid")] && (
           <small className="eo2-field-error-text">
-            {
-              fieldErrors[
-                key("minBid")
-              ]
-            }
+            {fieldErrors[key("minBid")]}
           </small>
         )}
       </label>
@@ -535,44 +488,27 @@ function RuleFields({
         )}
       >
         Increment{" "}
-        <span className="eo2-required">
-          *
-        </span>
+        <span className="eo2-required">*</span>
 
         <input
-          ref={registerField(
-            key("increment")
-          )}
+          ref={registerField(key("increment"))}
           inputMode="decimal"
           value={value.increment}
           onChange={(e) =>
-            set(
-              "increment",
-              e.target.value
-            )
+            set("increment", e.target.value)
           }
           placeholder={
-            shared
-              ? "100 or 1h"
-              : "Inherit"
+            shared ? "100 or 1h" : "Inherit"
           }
           disabled={disabled}
           aria-invalid={Boolean(
-            fieldErrors[
-              key("increment")
-            ]
+            fieldErrors[key("increment")]
           )}
         />
 
-        {fieldErrors[
-          key("increment")
-        ] && (
+        {fieldErrors[key("increment")] && (
           <small className="eo2-field-error-text">
-            {
-              fieldErrors[
-                key("increment")
-              ]
-            }
+            {fieldErrors[key("increment")]}
           </small>
         )}
       </label>
@@ -586,14 +522,9 @@ function RuleFields({
           step="1"
           value={value.minimumBidders}
           onChange={(e) =>
-            set(
-              "minimumBidders",
-              e.target.value
-            )
+            set("minimumBidders", e.target.value)
           }
-          placeholder={
-            shared ? "1" : "Inherit"
-          }
+          placeholder={shared ? "1" : "Inherit"}
           disabled={disabled}
         />
       </label>
@@ -610,19 +541,14 @@ function RuleFields({
         </small>
 
         <input
-          ref={registerField(
-            key("buyout")
-          )}
+          ref={registerField(key("buyout"))}
           inputMode="decimal"
           value={value.buyout}
           onChange={(e) => {
-            const nextBuyout =
-              e.target.value;
+            const nextBuyout = e.target.value;
 
             const parsedBuyout =
-              getBuyoutAmount(
-                nextBuyout
-              );
+              getBuyoutAmount(nextBuyout);
 
             const buyoutEnabled =
               parsedBuyout !== null &&
@@ -644,35 +570,24 @@ function RuleFields({
           }
           disabled={disabled}
           aria-invalid={Boolean(
-            fieldErrors[
-              key("buyout")
-            ]
+            fieldErrors[key("buyout")]
           )}
         />
 
-        {fieldErrors[
-          key("buyout")
-        ] ? (
+        {fieldErrors[key("buyout")] ? (
           <small className="eo2-field-error-text">
-            {
-              fieldErrors[
-                key("buyout")
-              ]
-            }
+            {fieldErrors[key("buyout")]}
           </small>
         ) : (
           <small>
-            Leave blank or enter 0
-            to disable Buyout.
+            Leave blank or enter 0 to disable Buyout.
           </small>
         )}
       </label>
 
       {(() => {
         const buyoutAmount =
-          getBuyoutAmount(
-            value.buyout
-          );
+          getBuyoutAmount(value.buyout);
 
         if (
           buyoutAmount === null ||
@@ -689,46 +604,25 @@ function RuleFields({
             )}
           >
             Buyout Until{" "}
-            <span className="eo2-required">
-              *
-            </span>
+            <span className="eo2-required">*</span>
 
             <DateTimePicker
               inputRef={registerField(
                 key("buyoutUntil")
               )}
-              value={
-                value.buyoutUntil
-              }
-              onChange={(
-                nextValue
-              ) =>
-                set(
-                  "buyoutUntil",
-                  nextValue
-                )
+              value={value.buyoutUntil}
+              onChange={(nextValue) =>
+                set("buyoutUntil", nextValue)
               }
               disabled={disabled}
               hasError={Boolean(
-                fieldErrors[
-                  key(
-                    "buyoutUntil"
-                  )
-                ]
+                fieldErrors[key("buyoutUntil")]
               )}
             />
 
-            {fieldErrors[
-              key("buyoutUntil")
-            ] && (
+            {fieldErrors[key("buyoutUntil")] && (
               <small className="eo2-field-error-text">
-                {
-                  fieldErrors[
-                    key(
-                      "buyoutUntil"
-                    )
-                  ]
-                }
+                {fieldErrors[key("buyoutUntil")]}
               </small>
             )}
           </label>
@@ -742,9 +636,7 @@ function RuleFields({
         )}
       >
         Auction Ends{" "}
-        <span className="eo2-required">
-          *
-        </span>
+        <span className="eo2-required">*</span>
 
         <DateTimePicker
           inputRef={registerField(
@@ -752,28 +644,17 @@ function RuleFields({
           )}
           value={value.auctionEnds}
           onChange={(nextValue) =>
-            set(
-              "auctionEnds",
-              nextValue
-            )
+            set("auctionEnds", nextValue)
           }
           disabled={disabled}
           hasError={Boolean(
-            fieldErrors[
-              key("auctionEnds")
-            ]
+            fieldErrors[key("auctionEnds")]
           )}
         />
 
-        {fieldErrors[
-          key("auctionEnds")
-        ] && (
+        {fieldErrors[key("auctionEnds")] && (
           <small className="eo2-field-error-text">
-            {
-              fieldErrors[
-                key("auctionEnds")
-              ]
-            }
+            {fieldErrors[key("auctionEnds")]}
           </small>
         )}
       </label>
@@ -787,16 +668,9 @@ function RuleFields({
           step="1"
           value={value.bidCutoff}
           onChange={(e) =>
-            set(
-              "bidCutoff",
-              e.target.value
-            )
+            set("bidCutoff", e.target.value)
           }
-          placeholder={
-            shared
-              ? "60"
-              : "Inherit"
-          }
+          placeholder={shared ? "60" : "Inherit"}
           disabled={disabled}
         />
       </label>
@@ -810,16 +684,9 @@ function RuleFields({
           step="1"
           value={value.antiSniper}
           onChange={(e) =>
-            set(
-              "antiSniper",
-              e.target.value
-            )
+            set("antiSniper", e.target.value)
           }
-          placeholder={
-            shared
-              ? "0"
-              : "Inherit"
-          }
+          placeholder={shared ? "0" : "Inherit"}
           disabled={disabled}
         />
       </label>
@@ -827,12 +694,8 @@ function RuleFields({
   );
 }
 
-function getFacebookPostUrl(
-  fbPostId
-) {
-  const raw = String(
-    fbPostId || ""
-  ).trim();
+function getFacebookPostUrl(fbPostId) {
+  const raw = String(fbPostId || "").trim();
 
   if (!raw) {
     return null;
@@ -847,12 +710,8 @@ function getFacebookPostUrl(
   ) {
     return (
       `https://www.facebook.com/` +
-      `${encodeURIComponent(
-        parts[0]
-      )}/posts/` +
-      `${encodeURIComponent(
-        parts[1]
-      )}`
+      `${encodeURIComponent(parts[0])}/posts/` +
+      `${encodeURIComponent(parts[1])}`
     );
   }
 
@@ -861,12 +720,8 @@ function getFacebookPostUrl(
   )}`;
 }
 
-function extractFacebookPostId(
-  value
-) {
-  const text = String(
-    value || ""
-  );
+function extractFacebookPostId(value) {
+  const text = String(value || "");
 
   const directMatch =
     text.match(
@@ -878,16 +733,12 @@ function extractFacebookPostId(
   }
 
   const looseMatch =
-    text.match(
-      /\b(\d+_\d+)\b/
-    );
+    text.match(/\b(\d+_\d+)\b/);
 
   return looseMatch?.[1] || null;
 }
 
-async function getFunctionErrorMessage(
-  error
-) {
+async function getFunctionErrorMessage(error) {
   let message =
     error?.message ||
     "Unable to publish the auction to Facebook.";
@@ -896,24 +747,16 @@ async function getFunctionErrorMessage(
 
   if (
     context &&
-    typeof context.clone ===
-      "function"
+    typeof context.clone === "function"
   ) {
     try {
-      const response =
-        context.clone();
-
-      const body =
-        await response.json();
+      const response = context.clone();
+      const body = await response.json();
 
       if (body?.message) {
-        message = String(
-          body.message
-        );
+        message = String(body.message);
       } else if (body?.error) {
-        message = String(
-          body.error
-        );
+        message = String(body.error);
       }
     } catch {
       // Preserve original error.
@@ -926,140 +769,38 @@ async function getFunctionErrorMessage(
 export default function FacebookPostPage({
   client,
 }) {
-  const fileInputRef =
-    useRef(null);
+  const fileInputRef = useRef(null);
+  const uploadButtonRef = useRef(null);
+  const fieldRefs = useRef({});
+  const itemsRef = useRef([]);
 
-  const uploadButtonRef =
-    useRef(null);
-
-  const fieldRefs =
-    useRef({});
-
-  const itemsRef =
-    useRef([]);
-
-  const [pages, setPages] =
-    useState([]);
-
-  const [
-    subscription,
-    setSubscription,
-  ] = useState(null);
-
-  const [
-    environments,
-    setEnvironments,
-  ] = useState([]);
-
-  const [
-    postTypes,
-    setPostTypes,
-  ] = useState([]);
-
-  const [
-    selectedPageId,
-    setSelectedPageId,
-  ] = useState("");
-
-  const [
-    environment,
-    setEnvironment,
-  ] = useState("");
-
-  const [
-    postType,
-    setPostType,
-  ] = useState("");
-
-  const [
-    sellerCaption,
-    setSellerCaption,
-  ] = useState("");
-
-  const [
-    singleItem,
-    setSingleItem,
-  ] = useState("");
-
-  const [
-    singleItemSource,
-    setSingleItemSource,
-  ] = useState("MANUAL");
-
-  const [
-    singleInventoryItemId,
-    setSingleInventoryItemId,
-  ] = useState("");
-
-  const [
-    inventoryItems,
-    setInventoryItems,
-  ] = useState([]);
-
-  const [
-    sharedRules,
-    setSharedRules,
-  ] = useState({
+  const [pages, setPages] = useState([]);
+  const [subscription, setSubscription] = useState(null);
+  const [environments, setEnvironments] = useState([]);
+  const [postTypes, setPostTypes] = useState([]);
+  const [selectedPageId, setSelectedPageId] = useState("");
+  const [environment, setEnvironment] = useState("");
+  const [postType, setPostType] = useState("");
+  const [sellerCaption, setSellerCaption] = useState("");
+  const [singleItem, setSingleItem] = useState("");
+  const [singleItemSource, setSingleItemSource] = useState("MANUAL");
+  const [singleInventoryItemId, setSingleInventoryItemId] = useState("");
+  const [inventoryItems, setInventoryItems] = useState([]);
+  const [sharedRules, setSharedRules] = useState({
     ...DEFAULT_RULES,
   });
-
-  const [items, setItems] =
-    useState([]);
-
-  const [
-    draggingId,
-    setDraggingId,
-  ] = useState(null);
-
-  const [
-    showPreview,
-    setShowPreview,
-  ] = useState(true);
-
-  const [
-    publishing,
-    setPublishing,
-  ] = useState(false);
-
-  const [
-    processingFiles,
-    setProcessingFiles,
-  ] = useState(false);
-
-  const [
-    loading,
-    setLoading,
-  ] = useState(true);
-
-  const [
-    message,
-    setMessage,
-  ] = useState("");
-
-  const [
-    errorMessage,
-    setErrorMessage,
-  ] = useState("");
-
-  const [
-    fieldErrors,
-    setFieldErrors,
-  ] = useState({});
-
-  const [
-    successPopup,
-    setSuccessPopup,
-  ] = useState(null);
-
-  const [
-    failurePopup,
-    setFailurePopup,
-  ] = useState(null);
-
-  const [
-    fileInputKey,
-    setFileInputKey,
-  ] = useState(0);
+  const [items, setItems] = useState([]);
+  const [draggingId, setDraggingId] = useState(null);
+  const [showPreview, setShowPreview] = useState(true);
+  const [publishing, setPublishing] = useState(false);
+  const [processingFiles, setProcessingFiles] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [successPopup, setSuccessPopup] = useState(null);
+  const [failurePopup, setFailurePopup] = useState(null);
+  const [fileInputKey, setFileInputKey] = useState(0);
 
   itemsRef.current = items;
 
@@ -1067,54 +808,28 @@ export default function FacebookPostPage({
     loadPostingSetup();
 
     return () => {
-      itemsRef.current.forEach(
-        (item) =>
-          URL.revokeObjectURL(
-            item.previewUrl
-          )
+      itemsRef.current.forEach((item) =>
+        URL.revokeObjectURL(item.previewUrl)
       );
     };
   }, [client?.client_id]);
 
-  /*
-   * Important:
-   *
-   * The posting UI deliberately does not filter
-   * CLNT / TEST / PROD by allowed_environment.
-   *
-   * They are operational modes, so all three must
-   * remain selectable in the posting interface.
-   */
-  const selectableEnvironments =
-    useMemo(
-      () =>
-        normalizeEnvironmentRows(
-          environments
-        ),
-      [environments]
-    );
+  const selectableEnvironments = useMemo(
+    () => normalizeEnvironmentRows(environments),
+    [environments]
+  );
 
   useEffect(() => {
-    if (
-      !selectableEnvironments.length
-    ) {
-      return;
-    }
+    if (!selectableEnvironments.length) return;
 
     const currentValid =
       selectableEnvironments.some(
         (row) =>
-          String(
-            row.environment_code
-          ).toUpperCase() ===
-          String(
-            environment
-          ).toUpperCase()
+          String(row.environment_code).toUpperCase() ===
+          String(environment).toUpperCase()
       );
 
-    if (currentValid) {
-      return;
-    }
+    if (currentValid) return;
 
     const preferredCode =
       String(
@@ -1126,24 +841,18 @@ export default function FacebookPostPage({
     const preferred =
       selectableEnvironments.find(
         (row) =>
-          String(
-            row.environment_code
-          ).toUpperCase() ===
+          String(row.environment_code).toUpperCase() ===
           preferredCode
       ) ||
       selectableEnvironments.find(
         (row) =>
-          String(
-            row.environment_code
-          ).toUpperCase() ===
+          String(row.environment_code).toUpperCase() ===
           "CLNT"
       ) ||
       selectableEnvironments[0];
 
     setEnvironment(
-      String(
-        preferred.environment_code
-      ).toUpperCase()
+      String(preferred.environment_code).toUpperCase()
     );
   }, [
     selectableEnvironments,
@@ -1152,71 +861,49 @@ export default function FacebookPostPage({
     subscription?.allowed_environment,
   ]);
 
-  function registerField(
-    fieldKey
-  ) {
+  function registerField(fieldKey) {
     return (node) => {
       if (node) {
-        fieldRefs.current[
-          fieldKey
-        ] = node;
+        fieldRefs.current[fieldKey] = node;
       } else {
-        delete fieldRefs.current[
-          fieldKey
-        ];
+        delete fieldRefs.current[fieldKey];
       }
     };
   }
 
-  function clearFieldError(
-    fieldKey
-  ) {
-    setFieldErrors(
-      (current) => {
-        if (!current[fieldKey]) {
-          return current;
-        }
-
-        const next = {
-          ...current,
-        };
-
-        delete next[fieldKey];
-
-        return next;
+  function clearFieldError(fieldKey) {
+    setFieldErrors((current) => {
+      if (!current[fieldKey]) {
+        return current;
       }
-    );
+
+      const next = { ...current };
+      delete next[fieldKey];
+
+      return next;
+    });
   }
 
   async function loadPostingSetup() {
-    if (!client?.client_id) {
-      return;
-    }
+    if (!client?.client_id) return;
 
     setLoading(true);
     setErrorMessage("");
 
     try {
-      const {
-        data,
-        error,
-      } =
+      const { data, error } =
         await supabase.functions.invoke(
           "facebook-auction-publish",
           {
             method: "POST",
             body: {
-              action:
-                "LIST_SETUP",
-              client_id:
-                client.client_id,
+              action: "LIST_SETUP",
+              client_id: client.client_id,
             },
           }
         );
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       if (!data?.success) {
         throw new Error(
@@ -1225,29 +912,14 @@ export default function FacebookPostPage({
         );
       }
 
-      const pageRows =
-        data.pages || [];
-
-      const environmentRows =
-        data.environments || [];
-
-      const postTypeRows =
-        data.auction_post_types ||
-        [];
+      const pageRows = data.pages || [];
+      const environmentRows = data.environments || [];
+      const postTypeRows = data.auction_post_types || [];
 
       setPages(pageRows);
-
-      setSubscription(
-        data.subscription || null
-      );
-
-      setEnvironments(
-        environmentRows
-      );
-
-      setPostTypes(
-        postTypeRows
-      );
+      setSubscription(data.subscription || null);
+      setEnvironments(environmentRows);
+      setPostTypes(postTypeRows);
 
       try {
         const {
@@ -1259,85 +931,63 @@ export default function FacebookPostPage({
             {
               method: "POST",
               body: {
-                action:
-                  "LIST_ITEMS",
-                client_id:
-                  client.client_id,
+                action: "LIST_ITEMS",
+                client_id: client.client_id,
                 status: "ACTIVE",
                 search: "",
               },
             }
           );
 
-        if (inventoryError) {
-          throw inventoryError;
-        }
+        if (inventoryError) throw inventoryError;
 
         setInventoryItems(
           inventoryData?.success
-            ? inventoryData.items ||
-                []
+            ? inventoryData.items || []
             : []
         );
-      } catch (
-        inventoryError
-      ) {
+      } catch (inventoryError) {
         console.warn(
           "Inventory list unavailable; manual posting remains enabled.",
           inventoryError
         );
-
         setInventoryItems([]);
       }
 
-      setPostType(
-        (current) => {
-          if (
-            current &&
-            postTypeRows.some(
-              (row) =>
-                String(
-                  row.post_type_code
-                ).toUpperCase() ===
-                String(
-                  current
-                ).toUpperCase()
-            )
-          ) {
-            return current;
-          }
-
-          return postTypeRows.length
-            ? String(
-                postTypeRows[0]
-                  .post_type_code
-              ).toUpperCase()
-            : "";
+      setPostType((current) => {
+        if (
+          current &&
+          postTypeRows.some(
+            (row) =>
+              String(row.post_type_code).toUpperCase() ===
+              String(current).toUpperCase()
+          )
+        ) {
+          return current;
         }
-      );
 
-      setSelectedPageId(
-        (current) => {
-          if (
-            current &&
-            pageRows.some(
-              (page) =>
-                String(
-                  page.fb_page_id
-                ) === current
-            )
-          ) {
-            return current;
-          }
+        return postTypeRows.length
+          ? String(
+              postTypeRows[0].post_type_code
+            ).toUpperCase()
+          : "";
+      });
 
-          return pageRows.length
-            ? String(
-                pageRows[0]
-                  .fb_page_id
-              )
-            : "";
+      setSelectedPageId((current) => {
+        if (
+          current &&
+          pageRows.some(
+            (page) =>
+              String(page.fb_page_id) === current
+          )
+        ) {
+          return current;
         }
-      );
+
+        return pageRows.length
+          ? String(pageRows[0].fb_page_id)
+          : "";
+      });
     } catch (error) {
       setErrorMessage(
         error?.message ||
@@ -1348,230 +998,166 @@ export default function FacebookPostPage({
     }
   }
 
-  const selectedPostType =
-    useMemo(
-      () =>
-        postTypes.find(
-          (row) =>
-            String(
-              row.post_type_code
-            ).toUpperCase() ===
-            String(
-              postType
-            ).toUpperCase()
-        ) || null,
-      [postTypes, postType]
-    );
+  const selectedPostType = useMemo(
+    () =>
+      postTypes.find(
+        (row) =>
+          String(row.post_type_code).toUpperCase() ===
+          String(postType).toUpperCase()
+      ) || null,
+    [postTypes, postType]
+  );
 
   const isMultiple =
-    selectedPostType?.is_multiple ===
-    true;
+    selectedPostType?.is_multiple === true;
 
-  const selectedPage =
-    useMemo(
-      () =>
-        pages.find(
-          (page) =>
-            String(
-              page.fb_page_id
-            ) ===
-            selectedPageId
-        ) || null,
-      [
-        pages,
-        selectedPageId,
-      ]
-    );
+  const selectedPage = useMemo(
+    () =>
+      pages.find(
+        (page) =>
+          String(page.fb_page_id) ===
+          selectedPageId
+      ) || null,
+    [pages, selectedPageId]
+  );
 
-  const mainCaption =
-    useMemo(() => {
-      const lines = [];
+  const mainCaption = useMemo(() => {
+    const lines = [];
 
-      if (
-        sellerCaption.trim()
-      ) {
-        lines.push(
-          sellerCaption.trim(),
-          ""
-        );
-      }
+    if (sellerCaption.trim()) {
+      lines.push(sellerCaption.trim(), "");
+    }
 
-      if (environment) {
-        lines.push(
-          `EO2MATE-${environment}`
-        );
+    if (environment) {
+      lines.push(`EO2MATE-${environment}`);
+      lines.push("");
+    }
 
-        lines.push("");
-      }
-
-      if (
-        selectedPostType?.caption_marker
-      ) {
-        lines.push(
-          selectedPostType.caption_marker
-        );
-      }
-
-      if (!isMultiple) {
-        lines.push(
-          ...buildRuleLines(
-            sharedRules,
-            {
-              includeItem: true,
-              item: singleItem,
-            }
-          )
-        );
-      } else {
-        lines.push(
-          ...buildRuleLines(
-            sharedRules
-          )
-        );
-      }
-
-      return lines
-        .join("\n")
-        .trim();
-    }, [
-      sellerCaption,
-      environment,
-      selectedPostType,
-      isMultiple,
-      sharedRules,
-      singleItem,
-    ]);
-
-  const photoCaptions =
-    useMemo(() => {
-      if (!isMultiple) {
-        return [];
-      }
-
-      return items.map(
-        (item) => {
-          const effective =
-            mergeRules(
-              sharedRules,
-              item
-            );
-
-          return buildRuleLines(
-            effective,
-            {
-              includeItem: true,
-              item: item.item,
-            }
-          ).join("\n");
-        }
+    if (selectedPostType?.caption_marker) {
+      lines.push(
+        selectedPostType.caption_marker
       );
-    }, [
-      isMultiple,
-      items,
-      sharedRules,
-    ]);
+    }
 
-  function changePostType(
-    nextType
-  ) {
+    if (!isMultiple) {
+      lines.push(
+        ...buildRuleLines(sharedRules, {
+          includeItem: true,
+          item: singleItem,
+        })
+      );
+    } else {
+      lines.push(
+        ...buildRuleLines(sharedRules)
+      );
+    }
+
+    return lines.join("\n").trim();
+  }, [
+    sellerCaption,
+    environment,
+    selectedPostType,
+    isMultiple,
+    sharedRules,
+    singleItem,
+  ]);
+
+  const photoCaptions = useMemo(() => {
+    if (!isMultiple) {
+      return [];
+    }
+
+    return items.map((item) => {
+      const effective =
+        mergeRules(sharedRules, item);
+
+      return buildRuleLines(
+        effective,
+        {
+          includeItem: true,
+          item: item.item,
+        }
+      ).join("\n");
+    });
+  }, [
+    isMultiple,
+    items,
+    sharedRules,
+  ]);
+
+  function changePostType(nextType) {
     setPostType(nextType);
     setMessage("");
     setErrorMessage("");
     setFieldErrors({});
   }
 
-  async function addFiles(
-    fileList
-  ) {
-    const files =
-      Array.from(
-        fileList || []
-      );
+  async function addFiles(fileList) {
+    const files = Array.from(fileList || []);
 
-    if (!files.length) {
-      return;
-    }
+    if (!files.length) return;
 
     setProcessingFiles(true);
     setErrorMessage("");
     clearFieldError("images");
 
     try {
-      await new Promise(
-        (resolve) =>
-          window.setTimeout(
-            resolve,
-            0
-          )
+      await new Promise((resolve) =>
+        window.setTimeout(resolve, 0)
       );
 
       const remaining =
-        MAX_IMAGES -
-        items.length;
+        MAX_IMAGES - items.length;
 
       const selected =
-        files.slice(
-          0,
-          remaining
-        );
+        files.slice(0, remaining);
 
       const errors = [];
 
       const accepted =
-        selected.filter(
-          (file) => {
-            if (
-              ![
-                "image/jpeg",
-                "image/png",
-              ].includes(
-                file.type
-              )
-            ) {
-              errors.push(
-                `${file.name}: use JPG or PNG.`
-              );
-
-              return false;
-            }
-
-            if (
-              file.size >
-              MAX_IMAGE_BYTES
-            ) {
-              errors.push(
-                `${file.name}: maximum size is 10 MB.`
-              );
-
-              return false;
-            }
-
-            return true;
+        selected.filter((file) => {
+          if (
+            ![
+              "image/jpeg",
+              "image/png",
+            ].includes(file.type)
+          ) {
+            errors.push(
+              `${file.name}: use JPG or PNG.`
+            );
+            return false;
           }
-        );
+
+          if (
+            file.size > MAX_IMAGE_BYTES
+          ) {
+            errors.push(
+              `${file.name}: maximum size is 10 MB.`
+            );
+            return false;
+          }
+
+          return true;
+        });
 
       if (
-        files.length >
-        remaining
+        files.length > remaining
       ) {
         errors.push(
           `Maximum ${MAX_IMAGES} images per Facebook post.`
         );
       }
 
-      setItems(
-        (current) => [
-          ...current,
-          ...accepted.map(
-            (file, index) =>
-              createItem(
-                file,
-                current.length +
-                  index
-              )
-          ),
-        ]
-      );
+      setItems((current) => [
+        ...current,
+        ...accepted.map(
+          (file, index) =>
+            createItem(
+              file,
+              current.length + index
+            )
+        ),
+      ]);
 
       if (errors.length) {
         setErrorMessage(
@@ -1579,11 +1165,8 @@ export default function FacebookPostPage({
         );
       }
     } finally {
-      if (
-        fileInputRef.current
-      ) {
-        fileInputRef.current.value =
-          "";
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
       }
 
       setProcessingFiles(false);
@@ -1591,43 +1174,34 @@ export default function FacebookPostPage({
   }
 
   function removeItem(id) {
-    setItems(
-      (current) => {
-        const target =
-          current.find(
-            (item) =>
-              item.id === id
-          );
+    setItems((current) => {
+      const target =
+        current.find(
+          (item) => item.id === id
+        );
 
-        if (target) {
-          URL.revokeObjectURL(
-            target.previewUrl
-          );
-        }
-
-        return current.filter(
-          (item) =>
-            item.id !== id
+      if (target) {
+        URL.revokeObjectURL(
+          target.previewUrl
         );
       }
-    );
+
+      return current.filter(
+        (item) => item.id !== id
+      );
+    });
   }
 
-  function updateItem(
-    id,
-    patch
-  ) {
-    setItems(
-      (current) =>
-        current.map(
-          (item) =>
-            item.id === id
-              ? {
-                  ...item,
-                  ...patch,
-                }
-              : item
-        )
+  function updateItem(id, patch) {
+    setItems((current) =>
+      current.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              ...patch,
+            }
+          : item
+      )
     );
   }
 
@@ -1643,48 +1217,39 @@ export default function FacebookPostPage({
       return;
     }
 
-    setItems(
-      (current) => {
-        const next = [
-          ...current,
-        ];
+    setItems((current) => {
+      const next = [...current];
 
-        const fromIndex =
-          next.findIndex(
-            (item) =>
-              item.id ===
-              draggedId
-          );
-
-        const toIndex =
-          next.findIndex(
-            (item) =>
-              item.id ===
-              targetId
-          );
-
-        if (
-          fromIndex < 0 ||
-          toIndex < 0
-        ) {
-          return current;
-        }
-
-        const [moved] =
-          next.splice(
-            fromIndex,
-            1
-          );
-
-        next.splice(
-          toIndex,
-          0,
-          moved
+      const fromIndex =
+        next.findIndex(
+          (item) =>
+            item.id === draggedId
         );
 
-        return next;
+      const toIndex =
+        next.findIndex(
+          (item) =>
+            item.id === targetId
+        );
+
+      if (
+        fromIndex < 0 ||
+        toIndex < 0
+      ) {
+        return current;
       }
-    );
+
+      const [moved] =
+        next.splice(fromIndex, 1);
+
+      next.splice(
+        toIndex,
+        0,
+        moved
+      );
+
+      return next;
+    });
   }
 
   function validate() {
@@ -1707,8 +1272,7 @@ export default function FacebookPostPage({
 
     if (!isMultiple) {
       if (
-        singleItemSource ===
-          "INVENTORY" &&
+        singleItemSource === "INVENTORY" &&
         !singleInventoryItemId
       ) {
         errors.singleItem =
@@ -1728,16 +1292,12 @@ export default function FacebookPostPage({
       if (
         sharedMinBid === null
       ) {
-        errors[
-          "shared.minBid"
-        ] =
+        errors["shared.minBid"] =
           "Minimum Bid is required.";
       } else if (
         sharedMinBid <= 0
       ) {
-        errors[
-          "shared.minBid"
-        ] =
+        errors["shared.minBid"] =
           "Minimum Bid must be greater than 0.";
       }
 
@@ -1747,19 +1307,14 @@ export default function FacebookPostPage({
         );
 
       if (
-        sharedIncrement ===
-        null
+        sharedIncrement === null
       ) {
-        errors[
-          "shared.increment"
-        ] =
+        errors["shared.increment"] =
           "Increment is required.";
       } else if (
         sharedIncrement <= 0
       ) {
-        errors[
-          "shared.increment"
-        ] =
+        errors["shared.increment"] =
           "Increment must be greater than 0.";
       }
 
@@ -1769,17 +1324,13 @@ export default function FacebookPostPage({
         );
 
       if (!sharedEnd) {
-        errors[
-          "shared.auctionEnds"
-        ] =
+        errors["shared.auctionEnds"] =
           "Auction Ends is required.";
       } else if (
         sharedEnd.getTime() <=
         Date.now()
       ) {
-        errors[
-          "shared.auctionEnds"
-        ] =
+        errors["shared.auctionEnds"] =
           "Auction Ends must be in the future.";
       }
 
@@ -1791,9 +1342,7 @@ export default function FacebookPostPage({
       if (
         buyoutAmount === null
       ) {
-        errors[
-          "shared.buyout"
-        ] =
+        errors["shared.buyout"] =
           "Buyout amount is invalid.";
       } else if (
         buyoutAmount > 0
@@ -1878,8 +1427,7 @@ export default function FacebookPostPage({
             );
 
           if (
-            effectiveMinBid ===
-            null
+            effectiveMinBid === null
           ) {
             errors[
               `${prefix}.minBid`
@@ -1909,8 +1457,7 @@ export default function FacebookPostPage({
                 index + 1
               }: Increment is required.`;
           } else if (
-            effectiveIncrement <=
-            0
+            effectiveIncrement <= 0
           ) {
             errors[
               `${prefix}.increment`
@@ -1998,55 +1545,41 @@ export default function FacebookPostPage({
     return errors;
   }
 
-  function focusFirstError(
-    errors
-  ) {
+  function focusFirstError(errors) {
     const firstKey =
       Object.keys(errors)[0];
 
-    if (!firstKey) {
-      return;
-    }
+    if (!firstKey) return;
 
-    window.requestAnimationFrame(
-      () => {
-        let node =
-          fieldRefs.current[
-            firstKey
-          ];
+    window.requestAnimationFrame(() => {
+      let node =
+        fieldRefs.current[firstKey];
 
-        if (
-          firstKey === "images"
-        ) {
-          node =
-            uploadButtonRef.current;
-        }
-
-        if (!node) {
-          return;
-        }
-
-        node.scrollIntoView({
-          behavior: "smooth",
-          block: "center",
-        });
-
-        window.setTimeout(
-          () => {
-            if (
-              typeof node.focus ===
-              "function"
-            ) {
-              node.focus({
-                preventScroll:
-                  true,
-              });
-            }
-          },
-          350
-        );
+      if (
+        firstKey === "images"
+      ) {
+        node =
+          uploadButtonRef.current;
       }
-    );
+
+      if (!node) return;
+
+      node.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+
+      window.setTimeout(() => {
+        if (
+          typeof node.focus ===
+          "function"
+        ) {
+          node.focus({
+            preventScroll: true,
+          });
+        }
+      }, 350);
+    });
   }
 
   function resetFormForNewPost({
@@ -2071,9 +1604,7 @@ export default function FacebookPostPage({
 
     setSellerCaption("");
     setSingleItem("");
-    setSingleItemSource(
-      "MANUAL"
-    );
+    setSingleItemSource("MANUAL");
     setSingleInventoryItemId("");
 
     setSharedRules({
@@ -2102,15 +1633,11 @@ export default function FacebookPostPage({
     }
 
     setFileInputKey(
-      (current) =>
-        current + 1
+      (current) => current + 1
     );
 
-    if (
-      fileInputRef.current
-    ) {
-      fileInputRef.current.value =
-        "";
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
     }
 
     if (pages.length) {
@@ -2120,20 +1647,13 @@ export default function FacebookPostPage({
         )
       );
     }
-
-    /*
-     * Keep the user's selected operating mode.
-     * Do NOT force it back to CLNT after every post.
-     */
   }
 
   async function publishAuction() {
-    const errors =
-      validate();
+    const errors = validate();
 
     if (
-      Object.keys(errors)
-        .length
+      Object.keys(errors).length
     ) {
       setFieldErrors(errors);
 
@@ -2142,11 +1662,7 @@ export default function FacebookPostPage({
       );
 
       setMessage("");
-
-      focusFirstError(
-        errors
-      );
-
+      focusFirstError(errors);
       return;
     }
 
@@ -2165,9 +1681,7 @@ export default function FacebookPostPage({
           `Images: ${items.length}`
       );
 
-    if (!confirmed) {
-      return;
-    }
+    if (!confirmed) return;
 
     setPublishing(true);
     setMessage("");
@@ -2214,8 +1728,7 @@ export default function FacebookPostPage({
                       "INVENTORY"
                     ? {
                         item_no:
-                          index +
-                          1,
+                          index + 1,
 
                         item_source:
                           "INVENTORY",
@@ -2246,8 +1759,7 @@ export default function FacebookPostPage({
                       }
                     : {
                         item_no:
-                          index +
-                          1,
+                          index + 1,
 
                         item_source:
                           "MANUAL",
@@ -2275,9 +1787,7 @@ export default function FacebookPostPage({
                   singleItemSource ===
                     "INVENTORY"
                     ? {
-                        item_no:
-                          1,
-
+                        item_no: 1,
                         item_source:
                           "INVENTORY",
 
@@ -2306,12 +1816,9 @@ export default function FacebookPostPage({
                           1,
                       }
                     : {
-                        item_no:
-                          1,
-
+                        item_no: 1,
                         item_source:
                           "MANUAL",
-
                         quantity_committed:
                           1,
                       },
@@ -2321,9 +1828,7 @@ export default function FacebookPostPage({
         photo_captions:
           isMultiple
             ? photoCaptions
-            : items.map(
-                () => ""
-              ),
+            : items.map(() => ""),
       };
 
       const formData =
@@ -2331,9 +1836,7 @@ export default function FacebookPostPage({
 
       formData.append(
         "payload",
-        JSON.stringify(
-          payload
-        )
+        JSON.stringify(payload)
       );
 
       items.forEach(
@@ -2346,10 +1849,7 @@ export default function FacebookPostPage({
         }
       );
 
-      const {
-        data,
-        error,
-      } =
+      const { data, error } =
         await supabase.functions.invoke(
           "facebook-auction-publish",
           {
@@ -2357,9 +1857,7 @@ export default function FacebookPostPage({
           }
         );
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       if (!data?.success) {
         throw new Error(
@@ -2593,6 +2091,10 @@ export default function FacebookPostPage({
           flex-wrap: wrap;
         }
 
+        .eo2-exit-button {
+          flex-basis: 100%;
+        }
+
         .fb-posting-panel {
           border: 1px solid rgba(148, 163, 184, .18);
           border-radius: 20px;
@@ -2609,17 +2111,12 @@ export default function FacebookPostPage({
           margin-bottom: 18px;
         }
 
-        .fb-posting-panel .panel-header h2 {
-          letter-spacing: -.02em;
-        }
-
         .fb-posting-panel label {
           display: flex;
           flex-direction: column;
           gap: 7px;
           font-size: .82rem;
           font-weight: 700;
-          letter-spacing: .01em;
           color: var(--text-color, #111827);
           min-width: 0;
         }
@@ -2645,10 +2142,6 @@ export default function FacebookPostPage({
           font-weight: 500;
           outline: none;
           box-sizing: border-box;
-          transition:
-            border-color .18s ease,
-            box-shadow .18s ease,
-            background .18s ease;
         }
 
         .fb-posting-panel textarea {
@@ -2661,14 +2154,6 @@ export default function FacebookPostPage({
           appearance: none;
           -webkit-appearance: none;
           padding-right: 42px;
-          background-image:
-            linear-gradient(45deg, transparent 50%, currentColor 50%),
-            linear-gradient(135deg, currentColor 50%, transparent 50%);
-          background-position:
-            calc(100% - 18px) calc(50% - 2px),
-            calc(100% - 13px) calc(50% - 2px);
-          background-size: 5px 5px, 5px 5px;
-          background-repeat: no-repeat;
         }
 
         .fb-posting-panel input:focus,
@@ -2677,18 +2162,6 @@ export default function FacebookPostPage({
           border-color: var(--accent-color, #2563eb);
           box-shadow: 0 0 0 3px rgba(37, 99, 235, .12);
           background: #fff;
-        }
-
-        .fb-posting-panel input:disabled,
-        .fb-posting-panel select:disabled,
-        .fb-posting-panel textarea:disabled {
-          cursor: not-allowed;
-          opacity: .62;
-          background: rgba(148, 163, 184, .10);
-        }
-
-        .fb-posting-panel input[type="number"] {
-          font-variant-numeric: tabular-nums;
         }
 
         .fb-post-setup-grid,
@@ -2727,8 +2200,6 @@ export default function FacebookPostPage({
 
         .eo2-datetime-error {
           border-color: #dc2626 !important;
-          box-shadow: 0 0 0 3px rgba(220, 38, 38, .10);
-          background: rgba(254, 242, 242, .35);
         }
 
         .eo2-datetime-part {
@@ -2740,7 +2211,6 @@ export default function FacebookPostPage({
           margin: 0 0 6px 2px;
           font-size: .70rem;
           font-weight: 800;
-          letter-spacing: .05em;
           text-transform: uppercase;
           opacity: .60;
         }
@@ -2749,24 +2219,19 @@ export default function FacebookPostPage({
         .eo2-datetime-picker input[type="time"] {
           min-height: 50px;
           height: 50px;
-          padding: 10px 12px;
           font-size: 16px;
-          font-variant-numeric: tabular-nums;
-          color-scheme: light;
         }
 
         .eo2-datetime-hint {
           grid-column: 1 / -1;
           margin: 0 2px;
           font-size: .72rem;
-          font-weight: 500;
           opacity: .60;
         }
 
         .fb-item-editor {
           padding: 15px;
           border-top: 1px solid rgba(148, 163, 184, .18);
-          background: rgba(148, 163, 184, .035);
         }
 
         .fb-item-editor details {
@@ -2780,34 +2245,18 @@ export default function FacebookPostPage({
           cursor: pointer;
           padding: 12px 14px;
           font-weight: 700;
-          user-select: none;
-        }
-
-        .fb-item-editor details[open] summary {
-          border-bottom: 1px solid rgba(148, 163, 184, .18);
-        }
-
-        .fb-item-editor details .fb-rule-grid {
-          padding: 14px;
         }
 
         .fb-upload-empty {
           min-height: 180px;
           border: 1.5px dashed rgba(100, 116, 139, .45);
           border-radius: 18px;
-          background:
-            linear-gradient(
-              180deg,
-              rgba(148, 163, 184, .055),
-              rgba(148, 163, 184, .015)
-            );
         }
 
         .fb-photo-card {
           border-radius: 16px;
           overflow: hidden;
           border: 1px solid rgba(148, 163, 184, .20);
-          background: rgba(255,255,255,.025);
         }
 
         .primary-button,
@@ -2816,32 +2265,10 @@ export default function FacebookPostPage({
           min-height: 42px;
           border-radius: 11px !important;
           font-weight: 700;
-          letter-spacing: -.01em;
         }
 
         .fb-publish-actions {
           padding-top: 8px;
-        }
-
-        @media (prefers-color-scheme: dark) {
-          .fb-posting-panel input,
-          .fb-posting-panel select,
-          .fb-posting-panel textarea {
-            background: rgba(15, 23, 42, .58);
-            color: #f8fafc;
-            border-color: rgba(148, 163, 184, .30);
-          }
-
-          .fb-posting-panel input:focus,
-          .fb-posting-panel select:focus,
-          .fb-posting-panel textarea:focus {
-            background: rgba(15, 23, 42, .82);
-          }
-
-          .eo2-datetime-picker input[type="date"],
-          .eo2-datetime-picker input[type="time"] {
-            color-scheme: dark;
-          }
         }
 
         @media (max-width: 720px) {
@@ -2855,30 +2282,23 @@ export default function FacebookPostPage({
             grid-template-columns: 1fr !important;
           }
 
-          .dashboard-header.fb-posting-header {
-            gap: 12px;
-            align-items: flex-start;
-          }
-
-          .eo2-publish-card,
-          .eo2-success-card {
-            padding: 22px 18px;
-          }
-
-          .fb-posting-panel input,
-          .fb-posting-panel select,
-          .fb-posting-panel textarea {
-            font-size: 16px;
-          }
-
           .eo2-datetime-picker {
             grid-template-columns: 1fr 1fr;
           }
 
-          .eo2-datetime-picker input[type="date"],
-          .eo2-datetime-picker input[type="time"] {
-            font-size: 16px;
-            min-height: 52px;
+          .eo2-success-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+          }
+
+          .eo2-success-actions > * {
+            width: 100%;
+            box-sizing: border-box;
+          }
+
+          .eo2-exit-button {
+            grid-column: 1 / -1;
           }
         }
 
@@ -2899,14 +2319,11 @@ export default function FacebookPostPage({
             FACEBOOK · AUCTION POSTING
           </p>
 
-          <h1>
-            Create Auction Post
-          </h1>
+          <h1>Create Auction Post</h1>
 
           <p>
-            Build a valid EO2MATE auction caption,
-            organize photos, preview the post, and
-            publish directly to your connected Page.
+            Build a valid EO2MATE auction caption, organize photos,
+            preview the post, and publish directly to your connected Page.
           </p>
         </div>
 
@@ -2919,18 +2336,10 @@ export default function FacebookPostPage({
             publishing ||
             processingFiles
           }
-          title="Refresh Facebook Pages and Operating Modes"
-          aria-label="Refresh Facebook Pages and Operating Modes"
         >
           ↻
         </button>
       </header>
-
-      {message && (
-        <div className="success-message global-error">
-          {message}
-        </div>
-      )}
 
       {errorMessage && (
         <div
@@ -2944,10 +2353,7 @@ export default function FacebookPostPage({
       <section className="dashboard-panel fb-posting-panel">
         <div className="panel-header">
           <div>
-            <h2>
-              1. Post setup
-            </h2>
-
+            <h2>1. Post setup</h2>
             <p>
               Choose the Page, operating mode and auction type.
             </p>
@@ -2955,142 +2361,46 @@ export default function FacebookPostPage({
         </div>
 
         <div className="fb-post-setup-grid">
-          <label
-            className={fieldClass(
-              fieldErrors,
-              "page"
-            )}
-          >
-            Facebook Page{" "}
-            <span className="eo2-required">
-              *
-            </span>
+          <label>
+            Facebook Page *
 
             <select
-              ref={registerField(
-                "page"
-              )}
-              value={
-                selectedPageId
+              value={selectedPageId}
+              onChange={(e) =>
+                setSelectedPageId(e.target.value)
               }
-              onChange={(e) => {
-                setSelectedPageId(
-                  e.target.value
-                );
-
-                clearFieldError(
-                  "page"
-                );
-              }}
-              disabled={
-                loading ||
-                publishing ||
-                processingFiles
-              }
-              aria-invalid={Boolean(
-                fieldErrors.page
-              )}
+              disabled={loading || publishing}
             >
-              {!pages.length && (
-                <option value="">
-                  No active Page connected
+              {pages.map((page) => (
+                <option
+                  key={page.fb_page_id}
+                  value={page.fb_page_id}
+                >
+                  {getPageLabel(page)}
                 </option>
-              )}
-
-              {pages.map(
-                (page) => (
-                  <option
-                    key={
-                      page.fb_page_id
-                    }
-                    value={
-                      page.fb_page_id
-                    }
-                  >
-                    {getPageLabel(
-                      page
-                    )}
-                  </option>
-                )
-              )}
+              ))}
             </select>
-
-            {fieldErrors.page && (
-              <small className="eo2-field-error-text">
-                {
-                  fieldErrors.page
-                }
-              </small>
-            )}
           </label>
 
-          <label
-            className={fieldClass(
-              fieldErrors,
-              "environment"
-            )}
-          >
-            Operating Mode{" "}
-            <span className="eo2-required">
-              *
-            </span>
+          <label>
+            Operating Mode *
 
             <select
-              ref={registerField(
-                "environment"
-              )}
               value={environment}
-              onChange={(e) => {
-                setEnvironment(
-                  e.target.value
-                );
-
-                clearFieldError(
-                  "environment"
-                );
-              }}
-              disabled={
-                loading ||
-                publishing ||
-                processingFiles
+              onChange={(e) =>
+                setEnvironment(e.target.value)
               }
-              aria-invalid={Boolean(
-                fieldErrors.environment
-              )}
+              disabled={loading || publishing}
             >
-              {selectableEnvironments.map(
-                (row) => (
-                  <option
-                    key={
-                      row.environment_code
-                    }
-                    value={String(
-                      row.environment_code
-                    ).toUpperCase()}
-                  >
-                    {String(
-                      row.environment_code
-                    ).toUpperCase()}
-                    {" · "}
-                    {
-                      row.environment_name
-                    }
-                  </option>
-                )
-              )}
+              {selectableEnvironments.map((row) => (
+                <option
+                  key={row.environment_code}
+                  value={row.environment_code}
+                >
+                  {row.environment_code} · {row.environment_name}
+                </option>
+              ))}
             </select>
-
-            <small>
-              CLNT, TEST and PROD are available for EO2MATE posting.
-            </small>
-
-            {fieldErrors.environment && (
-              <small className="eo2-field-error-text">
-                {
-                  fieldErrors.environment
-                }
-              </small>
-            )}
           </label>
 
           <label>
@@ -3099,36 +2409,20 @@ export default function FacebookPostPage({
             <select
               value={postType}
               onChange={(e) =>
-                changePostType(
-                  e.target.value
-                )
+                changePostType(e.target.value)
               }
-              disabled={
-                publishing ||
-                processingFiles ||
-                loading
-              }
+              disabled={loading || publishing}
             >
-              {!postTypes.length && (
-                <option value="">
-                  No active Auction post type available
+              {postTypes.map((row) => (
+                <option
+                  key={row.post_type_code}
+                  value={String(
+                    row.post_type_code
+                  ).toUpperCase()}
+                >
+                  {row.display_name}
                 </option>
-              )}
-
-              {postTypes.map(
-                (row) => (
-                  <option
-                    key={
-                      row.post_type_code
-                    }
-                    value={String(
-                      row.post_type_code
-                    ).toUpperCase()}
-                  >
-                    {row.display_name}
-                  </option>
-                )
-              )}
+              ))}
             </select>
           </label>
         </div>
@@ -3137,17 +2431,7 @@ export default function FacebookPostPage({
       <section className="dashboard-panel fb-posting-panel">
         <div className="panel-header">
           <div>
-            <h2>
-              2. Auction details
-            </h2>
-
-            <p>
-              Enter the seller caption and EO2MATE auction rules.
-            </p>
-
-            <small className="eo2-ui-version">
-              Posting UI · 2026-08-27 · rev 2
-            </small>
+            <h2>2. Auction details</h2>
           </div>
         </div>
 
@@ -3156,200 +2440,26 @@ export default function FacebookPostPage({
 
           <textarea
             rows="5"
-            value={
-              sellerCaption
-            }
+            value={sellerCaption}
             onChange={(e) =>
-              setSellerCaption(
-                e.target.value
-              )
+              setSellerCaption(e.target.value)
             }
-            placeholder="Optional seller caption shown before the EO2MATE auction rules."
             disabled={publishing}
           />
         </label>
 
         {!isMultiple && (
           <>
-            <div
-              className="fb-post-setup-grid"
-              style={{
-                marginBottom: 16,
-              }}
-            >
-              <label>
-                Item Source
-
-                <select
-                  value={
-                    singleItemSource
-                  }
-                  onChange={(e) => {
-                    const source =
-                      e.target.value;
-
-                    setSingleItemSource(
-                      source
-                    );
-
-                    if (
-                      source ===
-                      "MANUAL"
-                    ) {
-                      setSingleInventoryItemId(
-                        ""
-                      );
-                    }
-                  }}
-                  disabled={
-                    publishing
-                  }
-                >
-                  <option value="MANUAL">
-                    Manual Item
-                  </option>
-
-                  <option value="INVENTORY">
-                    Inventory Item
-                  </option>
-                </select>
-              </label>
-
-              {singleItemSource ===
-                "INVENTORY" && (
-                <label>
-                  Inventory Item
-
-                  <select
-                    value={
-                      singleInventoryItemId
-                    }
-                    onChange={(
-                      e
-                    ) => {
-                      const id =
-                        e.target
-                          .value;
-
-                      setSingleInventoryItemId(
-                        id
-                      );
-
-                      const selected =
-                        inventoryItems.find(
-                          (
-                            row
-                          ) =>
-                            String(
-                              row.inventory_item_id
-                            ) ===
-                            String(
-                              id
-                            )
-                        );
-
-                      if (
-                        selected
-                      ) {
-                        setSingleItem(
-                          selected.item_name ||
-                            ""
-                        );
-                      }
-                    }}
-                    disabled={
-                      publishing
-                    }
-                  >
-                    <option value="">
-                      Select inventory item
-                    </option>
-
-                    {inventoryItems
-                      .filter(
-                        (
-                          row
-                        ) =>
-                          Number(
-                            row.qty_available ||
-                              0
-                          ) > 0
-                      )
-                      .map(
-                        (
-                          row
-                        ) => (
-                          <option
-                            key={
-                              row.inventory_item_id
-                            }
-                            value={
-                              row.inventory_item_id
-                            }
-                          >
-                            {
-                              row.item_code
-                            }{" "}
-                            ·{" "}
-                            {
-                              row.item_name
-                            }{" "}
-                            ·
-                            Available{" "}
-                            {
-                              row.qty_available
-                            }
-                          </option>
-                        )
-                      )}
-                  </select>
-                </label>
-              )}
-            </div>
-
-            <label
-              className={fieldClass(
-                fieldErrors,
-                "singleItem"
-              )}
-            >
-              Item Name{" "}
-              <span className="eo2-required">
-                *
-              </span>
+            <label>
+              Item Name *
 
               <input
-                ref={registerField(
-                  "singleItem"
-                )}
-                value={
-                  singleItem
+                value={singleItem}
+                onChange={(e) =>
+                  setSingleItem(e.target.value)
                 }
-                onChange={(e) => {
-                  setSingleItem(
-                    e.target.value
-                  );
-
-                  clearFieldError(
-                    "singleItem"
-                  );
-                }}
-                placeholder="Auction item"
-                disabled={
-                  publishing
-                }
-                aria-invalid={Boolean(
-                  fieldErrors.singleItem
-                )}
+                disabled={publishing}
               />
-
-              {fieldErrors.singleItem && (
-                <small className="eo2-field-error-text">
-                  {
-                    fieldErrors.singleItem
-                  }
-                </small>
-              )}
             </label>
           </>
         )}
@@ -3362,77 +2472,24 @@ export default function FacebookPostPage({
 
         <RuleFields
           value={sharedRules}
-          onChange={(next) => {
-            setSharedRules(
-              next
-            );
-
-            setFieldErrors(
-              (current) => {
-                const cleaned = {
-                  ...current,
-                };
-
-                Object.keys(
-                  cleaned
-                )
-                  .filter(
-                    (key) =>
-                      key.startsWith(
-                        "shared."
-                      )
-                  )
-                  .forEach(
-                    (key) =>
-                      delete cleaned[
-                        key
-                      ]
-                  );
-
-                return cleaned;
-              }
-            );
-          }}
+          onChange={setSharedRules}
           shared
           disabled={publishing}
           fieldPrefix="shared"
           fieldErrors={fieldErrors}
-          registerField={
-            registerField
-          }
+          registerField={registerField}
         />
       </section>
 
       <section className="dashboard-panel fb-posting-panel">
         <div className="panel-header">
           <div>
-            <h2>
-              3. Auction photos
-            </h2>
+            <h2>3. Auction photos</h2>
 
             <p>
-              Upload up to {MAX_IMAGES} JPG/PNG images. Drag to reorder.
+              Upload up to {MAX_IMAGES} JPG/PNG images.
             </p>
           </div>
-
-          {items.length >
-            0 && (
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={() =>
-                fileInputRef.current?.click()
-              }
-              disabled={
-                publishing ||
-                processingFiles ||
-                items.length >=
-                  MAX_IMAGES
-              }
-            >
-              Add photos
-            </button>
-          )}
         </div>
 
         <input
@@ -3443,427 +2500,45 @@ export default function FacebookPostPage({
           multiple
           hidden
           onChange={(e) =>
-            addFiles(
-              e.target.files
-            )
+            addFiles(e.target.files)
           }
         />
 
         {!items.length ? (
           <button
-            ref={
-              uploadButtonRef
-            }
+            ref={uploadButtonRef}
             type="button"
-            className={`fb-upload-empty ${
-              fieldErrors.images
-                ? "eo2-upload-error"
-                : ""
-            }`}
+            className="fb-upload-empty"
             onClick={() =>
               fileInputRef.current?.click()
             }
-            disabled={
-              publishing ||
-              processingFiles
-            }
           >
-            <span className="fb-upload-icon">
-              +
-            </span>
-
             <strong>
-              Upload auction photos{" "}
-              <span className="eo2-required">
-                *
-              </span>
+              Upload auction photos
             </strong>
-
-            <span>
-              JPG or PNG · maximum 10 MB each
-            </span>
-
-            {fieldErrors.images && (
-              <span className="eo2-field-error-text">
-                {
-                  fieldErrors.images
-                }
-              </span>
-            )}
           </button>
         ) : (
-          <div
-            className={`fb-photo-grid ${
-              isMultiple
-                ? "multiple"
-                : "single"
-            }`}
-          >
-            {items.map(
-              (
-                item,
-                index
-              ) => {
-                const prefix =
-                  `item.${item.id}`;
+          <div className="fb-photo-grid">
+            {items.map((item, index) => (
+              <article
+                key={item.id}
+                className="fb-photo-card"
+              >
+                <img
+                  src={item.previewUrl}
+                  alt={`Auction ${index + 1}`}
+                />
 
-                return (
-                  <article
-                    key={
-                      item.id
-                    }
-                    className={`fb-photo-card ${
-                      draggingId ===
-                      item.id
-                        ? "dragging"
-                        : ""
-                    }`}
-                    draggable={
-                      !publishing
-                    }
-                    onDragStart={() =>
-                      setDraggingId(
-                        item.id
-                      )
-                    }
-                    onDragEnd={() =>
-                      setDraggingId(
-                        null
-                      )
-                    }
-                    onDragOver={(
-                      e
-                    ) =>
-                      e.preventDefault()
-                    }
-                    onDrop={() => {
-                      moveItem(
-                        draggingId,
-                        item.id
-                      );
-
-                      setDraggingId(
-                        null
-                      );
-                    }}
-                  >
-                    <div className="fb-photo-preview-wrap">
-                      <img
-                        src={
-                          item.previewUrl
-                        }
-                        alt={`Auction ${
-                          index +
-                          1
-                        }`}
-                      />
-
-                      <span className="fb-photo-number">
-                        {isMultiple
-                          ? `Item ${
-                              index +
-                              1
-                            }`
-                          : `Photo ${
-                              index +
-                              1
-                            }`}
-                      </span>
-
-                      <span
-                        className="fb-drag-handle"
-                        title="Drag to reorder"
-                      >
-                        ⋮⋮
-                      </span>
-
-                      <button
-                        type="button"
-                        className="fb-photo-remove"
-                        onClick={() =>
-                          removeItem(
-                            item.id
-                          )
-                        }
-                        disabled={
-                          publishing
-                        }
-                        title="Remove photo"
-                      >
-                        ×
-                      </button>
-                    </div>
-
-                    {isMultiple && (
-                      <div className="fb-item-editor">
-                        <div
-                          className="fb-post-setup-grid"
-                          style={{
-                            marginBottom:
-                              12,
-                          }}
-                        >
-                          <label>
-                            Item Source
-
-                            <select
-                              value={
-                                item.itemSource ||
-                                "MANUAL"
-                              }
-                              onChange={(
-                                e
-                              ) =>
-                                updateItem(
-                                  item.id,
-                                  {
-                                    itemSource:
-                                      e.target.value,
-                                    inventoryItemId:
-                                      "",
-                                  }
-                                )
-                              }
-                              disabled={
-                                publishing
-                              }
-                            >
-                              <option value="MANUAL">
-                                Manual Item
-                              </option>
-
-                              <option value="INVENTORY">
-                                Inventory Item
-                              </option>
-                            </select>
-                          </label>
-
-                          {(item.itemSource ||
-                            "MANUAL") ===
-                            "INVENTORY" && (
-                            <label>
-                              Inventory Item
-
-                              <select
-                                value={
-                                  item.inventoryItemId ||
-                                  ""
-                                }
-                                onChange={(
-                                  e
-                                ) => {
-                                  const id =
-                                    e
-                                      .target
-                                      .value;
-
-                                  const inv =
-                                    inventoryItems.find(
-                                      (
-                                        row
-                                      ) =>
-                                        String(
-                                          row.inventory_item_id
-                                        ) ===
-                                        String(
-                                          id
-                                        )
-                                    );
-
-                                  updateItem(
-                                    item.id,
-                                    {
-                                      inventoryItemId:
-                                        id,
-                                      item:
-                                        inv?.item_name ||
-                                        item.item,
-                                    }
-                                  );
-                                }}
-                                disabled={
-                                  publishing
-                                }
-                              >
-                                <option value="">
-                                  Select inventory item
-                                </option>
-
-                                {inventoryItems
-                                  .filter(
-                                    (
-                                      row
-                                    ) =>
-                                      Number(
-                                        row.qty_available ||
-                                          0
-                                      ) >
-                                      0
-                                  )
-                                  .map(
-                                    (
-                                      row
-                                    ) => (
-                                      <option
-                                        key={
-                                          row.inventory_item_id
-                                        }
-                                        value={
-                                          row.inventory_item_id
-                                        }
-                                      >
-                                        {
-                                          row.item_code
-                                        }{" "}
-                                        ·{" "}
-                                        {
-                                          row.item_name
-                                        }{" "}
-                                        ·
-                                        Available{" "}
-                                        {
-                                          row.qty_available
-                                        }
-                                      </option>
-                                    )
-                                  )}
-                              </select>
-                            </label>
-                          )}
-                        </div>
-
-                        <label
-                          className={fieldClass(
-                            fieldErrors,
-                            `${prefix}.item`
-                          )}
-                        >
-                          Item Name{" "}
-                          <span className="eo2-required">
-                            *
-                          </span>
-
-                          <input
-                            ref={registerField(
-                              `${prefix}.item`
-                            )}
-                            value={
-                              item.item
-                            }
-                            onChange={(
-                              e
-                            ) => {
-                              updateItem(
-                                item.id,
-                                {
-                                  item:
-                                    e
-                                      .target
-                                      .value,
-                                }
-                              );
-
-                              clearFieldError(
-                                `${prefix}.item`
-                              );
-                            }}
-                            placeholder={`Item ${
-                              index +
-                              1
-                            }`}
-                            disabled={
-                              publishing
-                            }
-                            aria-invalid={Boolean(
-                              fieldErrors[
-                                `${prefix}.item`
-                              ]
-                            )}
-                          />
-
-                          {fieldErrors[
-                            `${prefix}.item`
-                          ] && (
-                            <small className="eo2-field-error-text">
-                              {
-                                fieldErrors[
-                                  `${prefix}.item`
-                                ]
-                              }
-                            </small>
-                          )}
-                        </label>
-
-                        <details>
-                          <summary>
-                            Override shared rules
-                          </summary>
-
-                          <RuleFields
-                            value={
-                              item
-                            }
-                            onChange={(
-                              next
-                            ) => {
-                              updateItem(
-                                item.id,
-                                next
-                              );
-
-                              setFieldErrors(
-                                (
-                                  current
-                                ) => {
-                                  const cleaned =
-                                    {
-                                      ...current,
-                                    };
-
-                                  Object.keys(
-                                    cleaned
-                                  )
-                                    .filter(
-                                      (
-                                        key
-                                      ) =>
-                                        key.startsWith(
-                                          `${prefix}.`
-                                        )
-                                    )
-                                    .forEach(
-                                      (
-                                        key
-                                      ) =>
-                                        delete cleaned[
-                                          key
-                                        ]
-                                    );
-
-                                  return cleaned;
-                                }
-                              );
-                            }}
-                            disabled={
-                              publishing
-                            }
-                            fieldPrefix={
-                              prefix
-                            }
-                            fieldErrors={
-                              fieldErrors
-                            }
-                            registerField={
-                              registerField
-                            }
-                          />
-                        </details>
-                      </div>
-                    )}
-                  </article>
-                );
-              }
-            )}
+                <button
+                  type="button"
+                  onClick={() =>
+                    removeItem(item.id)
+                  }
+                >
+                  Remove
+                </button>
+              </article>
+            ))}
           </div>
         )}
       </section>
@@ -3871,13 +2546,7 @@ export default function FacebookPostPage({
       <section className="dashboard-panel fb-posting-panel">
         <div className="panel-header">
           <div>
-            <h2>
-              4. Preview & publish
-            </h2>
-
-            <p>
-              Review the exact EO2MATE caption before publishing.
-            </p>
+            <h2>4. Preview & publish</h2>
           </div>
 
           <button
@@ -3885,12 +2554,8 @@ export default function FacebookPostPage({
             className="secondary-button"
             onClick={() =>
               setShowPreview(
-                (current) =>
-                  !current
+                (current) => !current
               )
-            }
-            disabled={
-              publishing
             }
           >
             {showPreview
@@ -3900,66 +2565,15 @@ export default function FacebookPostPage({
         </div>
 
         {showPreview && (
-          <div className="fb-post-preview-layout">
-            <div className="fb-facebook-preview">
-              <div className="fb-preview-page">
-                <div className="fb-preview-avatar">
-                  f
-                </div>
+          <div className="fb-facebook-preview">
+            <strong>
+              {getPageLabel(selectedPage)}
+            </strong>
 
-                <div>
-                  <strong>
-                    {getPageLabel(
-                      selectedPage
-                    )}
-                  </strong>
-
-                  <span>
-                    Just now · 🌐
-                  </span>
-                </div>
-              </div>
-
-              <pre>
-                {mainCaption ||
-                  "Your generated Facebook caption will appear here."}
-              </pre>
-            </div>
-
-            {isMultiple && (
-              <div>
-                <h3>
-                  Per-photo captions
-                </h3>
-
-                {photoCaptions.map(
-                  (
-                    caption,
-                    index
-                  ) => (
-                    <details
-                      key={
-                        items[index]
-                          ?.id ||
-                        index
-                      }
-                    >
-                      <summary>
-                        Item{" "}
-                        {index +
-                          1}
-                      </summary>
-
-                      <pre>
-                        {
-                          caption
-                        }
-                      </pre>
-                    </details>
-                  )
-                )}
-              </div>
-            )}
+            <pre>
+              {mainCaption ||
+                "Your generated Facebook caption will appear here."}
+            </pre>
           </div>
         )}
 
@@ -3967,16 +2581,12 @@ export default function FacebookPostPage({
           <button
             type="button"
             className="primary-button"
-            onClick={
-              publishAuction
-            }
+            onClick={publishAuction}
             disabled={
               loading ||
               publishing ||
               processingFiles ||
-              Boolean(
-                successPopup
-              )
+              Boolean(successPopup)
             }
           >
             {publishing
@@ -3989,18 +2599,7 @@ export default function FacebookPostPage({
       {(loading ||
         processingFiles ||
         publishing) && (
-        <div
-          className="eo2-publish-overlay"
-          role="dialog"
-          aria-modal="true"
-          aria-label={
-            publishing
-              ? "Publishing auction"
-              : processingFiles
-                ? "Processing images"
-                : "Loading posting setup"
-          }
-        >
+        <div className="eo2-publish-overlay">
           <div className="eo2-publish-card">
             <div className="eo2-spinner" />
 
@@ -4011,24 +2610,6 @@ export default function FacebookPostPage({
                   ? "Processing images…"
                   : "Loading posting setup…"}
             </h2>
-
-            <p>
-              {publishing
-                ? "Uploading images, creating the Facebook post and activating EO2MATE automation."
-                : processingFiles
-                  ? "Checking the selected images and preparing previews."
-                  : "Loading Facebook Pages, operating modes and client posting setup."}
-            </p>
-
-            <div className="eo2-progress-track">
-              <div className="eo2-progress-bar" />
-            </div>
-
-            <small>
-              {publishing
-                ? "Please keep this page open until publishing completes."
-                : "This will close automatically when processing is complete."}
-            </small>
           </div>
         </div>
       )}
@@ -4050,31 +2631,22 @@ export default function FacebookPostPage({
             </h2>
 
             <p>
-              The Facebook post was created and EO2MATE automation was activated successfully.
+              The Facebook post was created and EO2MATE automation
+              was activated successfully.
             </p>
 
             <p>
-              <strong>
-                Page:
-              </strong>{" "}
-              {
-                successPopup.page_name
-              }
+              <strong>Page:</strong>{" "}
+              {successPopup.page_name}
             </p>
 
             <p>
-              <strong>
-                Mode:
-              </strong>{" "}
-              {
-                successPopup.environment
-              }
+              <strong>Mode:</strong>{" "}
+              {successPopup.environment}
             </p>
 
             <p>
-              <strong>
-                Type:
-              </strong>{" "}
+              <strong>Type:</strong>{" "}
               {successPopup.post_type_display_name ||
                 "Auction"}
             </p>
@@ -4083,9 +2655,7 @@ export default function FacebookPostPage({
               {successPopup.permalink_url && (
                 <a
                   className="secondary-button"
-                  href={
-                    successPopup.permalink_url
-                  }
+                  href={successPopup.permalink_url}
                   target="_blank"
                   rel="noreferrer"
                 >
@@ -4102,70 +2672,41 @@ export default function FacebookPostPage({
               >
                 Create New Post
               </button>
+
+              <button
+                type="button"
+                className="secondary-button eo2-exit-button"
+                onClick={() =>
+                  setSuccessPopup(null)
+                }
+              >
+                Exit
+              </button>
             </div>
           </div>
         </div>
       )}
 
       {failurePopup && (
-        <div
-          className="eo2-publish-overlay"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="eo2-failure-title"
-        >
+        <div className="eo2-publish-overlay">
           <div className="eo2-success-card">
             <div className="eo2-failure-icon">
               !
             </div>
 
-            <h2 id="eo2-failure-title">
+            <h2>
               Auction posting failed
             </h2>
 
-            <p>
-              EO2MATE could not complete the posting process.
-            </p>
-
-            <p>
-              <strong>
-                Page:
-              </strong>{" "}
-              {
-                failurePopup.page_name
-              }
-            </p>
-
-            <p>
-              <strong>
-                Mode:
-              </strong>{" "}
-              {
-                failurePopup.environment
-              }
-            </p>
-
-            <p>
-              <strong>
-                Type:
-              </strong>{" "}
-              {failurePopup.post_type_display_name ||
-                "Auction"}
-            </p>
-
             <p className="eo2-failure-message">
-              {
-                failurePopup.message
-              }
+              {failurePopup.message}
             </p>
 
             <div className="eo2-success-actions">
               {failurePopup.permalink_url && (
                 <a
                   className="secondary-button"
-                  href={
-                    failurePopup.permalink_url
-                  }
+                  href={failurePopup.permalink_url}
                   target="_blank"
                   rel="noreferrer"
                 >
@@ -4177,9 +2718,7 @@ export default function FacebookPostPage({
                 type="button"
                 className="primary-button"
                 onClick={() =>
-                  setFailurePopup(
-                    null
-                  )
+                  setFailurePopup(null)
                 }
               >
                 Close / Try Again
