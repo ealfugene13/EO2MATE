@@ -104,6 +104,26 @@ function formatFacebookAuctionDate(value) {
 }
 
 
+
+function getPhilippineTodayInput() {
+  const now = new Date();
+
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Manila",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+
+  const values = {};
+
+  parts.forEach((part) => {
+    values[part.type] = part.value;
+  });
+
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
 function splitDateTimeLocal(value) {
   const raw = String(value || "").trim();
 
@@ -168,6 +188,7 @@ function ScrollDateTimePicker({
   disabled = false,
   hasError = false,
   inputRef,
+  minDate = getPhilippineTodayInput(),
 }) {
   const parts = splitDateTimeLocal(value);
 
@@ -200,6 +221,7 @@ function ScrollDateTimePicker({
         <span className="eo2-datetime-label">Date</span>
         <input
           type="date"
+          min={minDate}
           value={parts.date}
           onChange={(e) =>
             update({
@@ -439,7 +461,7 @@ function RuleFields({
       </label>
 
       <label className={fieldClass(fieldErrors, key("buyout"))}>
-        Buyout
+        Buyout (Optional · 0 = No Buyout)
         <input
           ref={registerField(key("buyout"))}
           inputMode="decimal"
@@ -471,9 +493,13 @@ function RuleFields({
           disabled={disabled}
           aria-invalid={Boolean(fieldErrors[key("buyout")])}
         />
-        {fieldErrors[key("buyout")] && (
+        {fieldErrors[key("buyout")] ? (
           <small className="eo2-field-error-text">
             {fieldErrors[key("buyout")]}
+          </small>
+        ) : (
+          <small>
+            Leave blank or enter 0 to disable Buyout.
           </small>
         )}
       </label>
@@ -491,7 +517,7 @@ function RuleFields({
 
         return (
           <label className={fieldClass(fieldErrors, key("buyoutUntil"))}>
-            Buyout Until <span className="eo2-required">*</span>
+            Buyout Until (Future only) <span className="eo2-required">*</span>
             <ScrollDateTimePicker
               inputRef={registerField(key("buyoutUntil"))}
               value={value.buyoutUntil}
@@ -509,7 +535,7 @@ function RuleFields({
       })()}
 
       <label className={fieldClass(fieldErrors, key("auctionEnds"))}>
-        Auction Ends <span className="eo2-required">*</span>
+        Auction Ends (Future only) <span className="eo2-required">*</span>
         <ScrollDateTimePicker
           inputRef={registerField(key("auctionEnds"))}
           value={value.auctionEnds}
@@ -1232,7 +1258,7 @@ export default function FacebookPostPage({ client }) {
     if (Object.keys(errors).length) {
       setFieldErrors(errors);
       setErrorMessage(
-        "Please complete the highlighted required field(s)."
+        "Please correct the highlighted field(s) below."
       );
       setMessage("");
       focusFirstError(errors);
@@ -1395,6 +1421,14 @@ export default function FacebookPostPage({ client }) {
         .eo2-required {
           color: #dc2626;
           font-weight: 700;
+        }
+
+        .eo2-ui-version {
+          display: inline-block;
+          margin-top: 4px;
+          font-size: .72rem;
+          font-weight: 700;
+          opacity: .55;
         }
 
         .eo2-field-error input,
@@ -2065,6 +2099,9 @@ export default function FacebookPostPage({ client }) {
             <p>
               Enter the seller caption and EO2MATE auction rules.
             </p>
+            <small className="eo2-ui-version">
+              UI validation fix · 2026-08-27
+            </small>
           </div>
         </div>
 
