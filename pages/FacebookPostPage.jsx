@@ -44,7 +44,6 @@ function normalizeMoney(value) {
   return Math.round(parsed * multiplier);
 }
 
-
 function isPositiveMoney(value) {
   const amount = normalizeMoney(value);
   return amount !== null && amount > 0;
