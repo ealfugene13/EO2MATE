@@ -7,3 +7,4 @@ dist/
 
 .DS_Store
 *.logsupabase/prod_schema_snapshot.sql
+supabase/prod_schema_snapshot.sql
