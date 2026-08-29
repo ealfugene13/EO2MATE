@@ -411,3 +411,90 @@ enabled = true
 # declarative_schema_path = "./schemas"
 # JSON string passed through to pg-delta SQL formatting.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":80,\"commaStyle\":\"trailing\"}"
+
+# ============================================================
+# EO2MATE Edge Function deployment configuration
+# Captured from existing production deployment baseline.
+#
+# JWT gateway verification is disabled because the existing
+# EO2MATE functions use their own application-level
+# authentication/validation where required.
+# ============================================================
+
+[functions.meta-webhook]
+verify_jwt = false
+
+[functions.privacy-policy]
+verify_jwt = false
+
+[functions.facebook-oauth-start]
+verify_jwt = false
+
+[functions.facebook-oauth-callback]
+verify_jwt = false
+
+[functions.facebook-page-test]
+verify_jwt = false
+
+[functions.client-onboarding]
+verify_jwt = false
+
+[functions.create-payment]
+verify_jwt = false
+
+[functions.send-payment-messenger]
+verify_jwt = false
+
+[functions.client-pages]
+verify_jwt = false
+
+[functions.paymongo-webhook]
+verify_jwt = false
+
+[functions.create-delivery-booking]
+verify_jwt = false
+
+[functions.confirm-manual-delivery-booking]
+verify_jwt = false
+
+[functions.update-delivery-status]
+verify_jwt = false
+
+[functions.facebook-connection-status]
+verify_jwt = false
+
+[functions.client-payment-status]
+verify_jwt = false
+
+[functions.mark-paymongo-account-created]
+verify_jwt = false
+
+[functions.buyer-checkout]
+verify_jwt = false
+
+[functions.buyer-checkout-action]
+verify_jwt = false
+
+[functions.buyer-shipping-details]
+verify_jwt = false
+
+[functions.buyer-create-payment]
+verify_jwt = false
+
+[functions.payment-lifecycle]
+verify_jwt = false
+
+[functions.payment-admin]
+verify_jwt = false
+
+[functions.automation-admin]
+verify_jwt = false
+
+[functions.admin-clients]
+verify_jwt = false
+
+[functions.facebook-auction-publish]
+verify_jwt = false
+
+[functions.inventory-admin]
+verify_jwt = false
