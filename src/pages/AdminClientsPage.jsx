@@ -59,7 +59,7 @@ export default function AdminClientsPage() {
     const q = search.trim().toLowerCase();
     if (!q) return clients;
     return clients.filter((client) =>
-      [client.name, client.contact_email, client.client_id, client.subscription?.subscription_status, client.subscription?.allowed_environment]
+      [client.name, client.contact_email, client.client_id, client.subscription?.subscription_status, client.subscription?.payment_mode]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(q))
     );
@@ -71,7 +71,7 @@ export default function AdminClientsPage() {
       name: client.name || "",
       status: client.status || "ACTIVE",
       subscription_status: client.subscription?.subscription_status || "TRIAL",
-      allowed_environment: client.subscription?.allowed_environment || "CLNT",
+      payment_mode: client.subscription?.payment_mode || "MANUAL",
       subscription_ends_at: client.subscription?.ends_at ? new Date(client.subscription.ends_at).toISOString().slice(0, 10) : "",
       subscription_notes: client.subscription?.notes || "",
     });
@@ -93,8 +93,7 @@ export default function AdminClientsPage() {
         name: form.name,
         status: form.status,
         subscription_status: form.subscription_status,
-        allowed_environment: form.allowed_environment,
-        default_environment: form.allowed_environment,
+        payment_mode: form.payment_mode,
         subscription_ends_at: form.subscription_ends_at ? `${form.subscription_ends_at}T23:59:59+08:00` : null,
         subscription_notes: form.subscription_notes || null,
       });
@@ -125,7 +124,7 @@ export default function AdminClientsPage() {
 
       <section className="admin-security-banner">
         <div className="admin-security-icon">A</div>
-        <div><strong>Platform access · {adminRole || "ADMIN"}</strong><span>Subscription, environment and cross-client controls are handled through platform-admin APIs.</span></div>
+        <div><strong>Platform access · {adminRole || "ADMIN"}</strong><span>Subscription, payment and cross-client controls are handled through platform-admin APIs.</span></div>
       </section>
 
       {message && <div className="success-message global-error">{message}</div>}
@@ -138,7 +137,7 @@ export default function AdminClientsPage() {
             <label>Client name<input value={form.name} onChange={(e) => setForm((c) => ({ ...c, name: e.target.value }))} required /></label>
             <label>Account<select value={form.status} onChange={(e) => setForm((c) => ({ ...c, status: e.target.value }))}><option value="ACTIVE">Active</option><option value="INACTIVE">Inactive</option></select></label>
             <label>Subscription<select value={form.subscription_status} onChange={(e) => setForm((c) => ({ ...c, subscription_status: e.target.value }))}><option value="TRIAL">Trial</option><option value="ACTIVE">Active</option><option value="PAST_DUE">Past Due</option><option value="SUSPENDED">Suspended</option><option value="CANCELLED">Cancelled</option><option value="EXPIRED">Expired</option></select></label>
-            <label>Allowed mode<select value={form.allowed_environment} onChange={(e) => setForm((c) => ({ ...c, allowed_environment: e.target.value }))}><option value="CLNT">CLNT · Manual</option><option value="TEST">TEST · PayMongo test</option><option value="PROD">PROD · Live PayMongo</option></select></label>
+            <label>Manual payment<select value={form.payment_mode} onChange={(e) => setForm((c) => ({ ...c, payment_mode: e.target.value }))}><option value="MANUAL">Yes · Manual payment</option><option value="PAYMONGO">No · PayMongo</option></select></label>
             <label>Subscription ends<input type="date" value={form.subscription_ends_at} onChange={(e) => setForm((c) => ({ ...c, subscription_ends_at: e.target.value }))} /></label>
             <label className="admin-client-notes">Admin notes<input value={form.subscription_notes} onChange={(e) => setForm((c) => ({ ...c, subscription_notes: e.target.value }))} placeholder="Internal notes" /></label>
             <div className="admin-client-form-actions">
@@ -152,18 +151,18 @@ export default function AdminClientsPage() {
       <section className="dashboard-panel">
         <div className="panel-header">
           <div><h2>Client accounts</h2><p>{filtered.length} of {clients.length} clients</p></div>
-          <input className="admin-client-search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search client, email, mode..." />
+          <input className="admin-client-search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search client, email, payment..." />
         </div>
         <div className="table-wrapper">
           <table>
-            <thead><tr><th>Client</th><th>Onboarding</th><th>Subscription</th><th>Mode</th><th>Automation</th><th>Pages</th><th>End</th><th>Admin</th></tr></thead>
+            <thead><tr><th>Client</th><th>Onboarding</th><th>Subscription</th><th>Manual Payment</th><th>Automation</th><th>Pages</th><th>End</th><th>Admin</th></tr></thead>
             <tbody>
               {filtered.map((client) => (
                 <tr key={client.client_id}>
                   <td><strong>{client.name}</strong><div className="table-muted">{client.contact_email || client.client_id}</div></td>
                   <td><Badge value={client.onboarding_status} /></td>
                   <td><Badge value={client.subscription?.subscription_status || "-"} /></td>
-                  <td><strong>{client.subscription?.allowed_environment || client.default_environment || "CLNT"}</strong></td>
+                  <td><strong>{String(client.subscription?.payment_mode || "MANUAL").toUpperCase() === "MANUAL" ? "Yes" : "No"}</strong></td>
                   <td><Badge value={client.automation_enabled ? "ACTIVE" : "SUSPENDED"} />{!client.automation_enabled && client.automation_reason && <div className="table-muted">{client.automation_reason}</div>}</td>
                   <td>{client.active_page_count || 0} / {client.page_count || 0}</td>
                   <td>{dt(client.subscription?.ends_at || client.trial_ends_at)}</td>

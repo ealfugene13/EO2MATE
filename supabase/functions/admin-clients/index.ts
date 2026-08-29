@@ -120,17 +120,6 @@ async function updateClient(clientId, body, adminUserId) {
     }
     clientPatch.status = status;
   }
-  if (body?.default_environment !== undefined) {
-    const environment = String(body.default_environment).trim().toUpperCase();
-    if (![
-      "CLNT",
-      "TEST",
-      "PROD"
-    ].includes(environment)) {
-      throw new Error("Invalid default environment.");
-    }
-    clientPatch.default_environment = environment;
-  }
   if (body?.onboarding_status !== undefined) {
     clientPatch.onboarding_status = String(body.onboarding_status).trim().toUpperCase();
   }
@@ -150,17 +139,15 @@ async function updateClient(clientId, body, adminUserId) {
     subscriptionPatch.plan_code = String(body.plan_code).trim().toUpperCase();
     changeSubscription = true;
   }
-  if (body?.allowed_environment !== undefined) {
-    const environment = String(body.allowed_environment).trim().toUpperCase();
+  if (body?.payment_mode !== undefined) {
+    const paymentMode = String(body.payment_mode).trim().toUpperCase();
     if (![
-      "CLNT",
-      "TEST",
-      "PROD"
-    ].includes(environment)) {
-      throw new Error("Invalid allowed environment.");
+      "MANUAL",
+      "PAYMONGO"
+    ].includes(paymentMode)) {
+      throw new Error("Invalid payment mode.");
     }
-    subscriptionPatch.allowed_environment = environment;
-    subscriptionPatch.payment_mode = environment === "CLNT" ? "MANUAL" : "PAYMONGO";
+    subscriptionPatch.payment_mode = paymentMode;
     changeSubscription = true;
   }
   if (body?.subscription_ends_at !== undefined) {
