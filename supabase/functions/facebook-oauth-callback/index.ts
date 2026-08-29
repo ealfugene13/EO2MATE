@@ -4,7 +4,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 const META_APP_ID = Deno.env.get("META_APP_ID");
 const META_APP_SECRET = Deno.env.get("META_APP_SECRET");
-const FRONTEND_URL = "https://ealfugene13.github.io/auctomation-web/";
+const FRONTEND_URL = "https://ealfugene13.github.io/EO2MATE/";
 const CALLBACK_URL = `${SUPABASE_URL}/functions/v1/facebook-oauth-callback`;
 /* =========================================================
    ENVIRONMENT VALIDATION
