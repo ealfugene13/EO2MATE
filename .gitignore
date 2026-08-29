@@ -6,4 +6,4 @@ dist/
 !.env.example
 
 .DS_Store
-*.log
+*.logsupabase/prod_schema_snapshot.sql
