@@ -204,12 +204,20 @@ function DateTimePicker({
   minDateTime = getPhilippineNowInput(),
 }) {
   const pickerRef = useRef(null);
-  const hourScrollRef = useRef(null);
-  const minuteScrollRef = useRef(null);
-  const periodScrollRef = useRef(null);
+  const hourRef = useRef(null);
+  const minuteRef = useRef(null);
+  const periodRef = useRef(null);
+  const scrollingRef = useRef({
+    hour: false,
+    minute: false,
+    period: false,
+  });
   const [open, setOpen] = useState(false);
 
+  const ITEM_HEIGHT = 40;
   const parts = splitDateTimeLocal(value);
+  const minParts = splitDateTimeLocal(minDateTime);
+  const minDate = minParts.date || "";
 
   const parseTime = (time) => {
     const [hourText = "00", minuteText = "00"] =
@@ -231,8 +239,18 @@ function DateTimePicker({
   };
 
   const selectedTime = parseTime(parts.time);
-  const minParts = splitDateTimeLocal(minDateTime);
-  const minDate = minParts.date || "";
+
+  const hours = Array.from(
+    { length: 12 },
+    (_, index) => index + 1
+  );
+
+  const minutes = Array.from(
+    { length: 60 },
+    (_, index) => index
+  );
+
+  const periods = ["AM", "PM"];
 
   const displayValue = (() => {
     if (!value) {
@@ -298,23 +316,48 @@ function DateTimePicker({
     );
   };
 
-  const scrollSelectedIntoView = (
-    container,
-    selector
+  const scrollToIndex = (
+    element,
+    index,
+    behavior = "auto"
   ) => {
-    if (!container) {
+    if (!element) {
       return;
     }
 
-    const selected =
-      container.querySelector(selector);
+    element.scrollTo({
+      top: index * ITEM_HEIGHT,
+      behavior,
+    });
+  };
 
-    if (selected) {
-      selected.scrollIntoView({
-        block: "center",
-        behavior: "instant",
-      });
-    }
+  const syncWheels = (behavior = "auto") => {
+    scrollToIndex(
+      hourRef.current,
+      Math.max(
+        0,
+        hours.indexOf(selectedTime.hour12)
+      ),
+      behavior
+    );
+
+    scrollToIndex(
+      minuteRef.current,
+      Math.max(
+        0,
+        minutes.indexOf(selectedTime.minute)
+      ),
+      behavior
+    );
+
+    scrollToIndex(
+      periodRef.current,
+      Math.max(
+        0,
+        periods.indexOf(selectedTime.period)
+      ),
+      behavior
+    );
   };
 
   useEffect(() => {
@@ -322,22 +365,12 @@ function DateTimePicker({
       return undefined;
     }
 
-    const timer = window.setTimeout(() => {
-      scrollSelectedIntoView(
-        hourScrollRef.current,
-        ".selected"
-      );
-      scrollSelectedIntoView(
-        minuteScrollRef.current,
-        ".selected"
-      );
-      scrollSelectedIntoView(
-        periodScrollRef.current,
-        ".selected"
-      );
-    }, 0);
+    const timer = window.setTimeout(
+      () => syncWheels("auto"),
+      30
+    );
 
-    const onOutside = (event) => {
+    const handleOutside = (event) => {
       if (
         pickerRef.current &&
         !pickerRef.current.contains(event.target)
@@ -346,51 +379,90 @@ function DateTimePicker({
       }
     };
 
-    document.addEventListener("mousedown", onOutside);
+    document.addEventListener(
+      "mousedown",
+      handleOutside
+    );
 
     return () => {
       window.clearTimeout(timer);
       document.removeEventListener(
         "mousedown",
-        onOutside
+        handleOutside
       );
     };
   }, [open]);
 
-  const hours = Array.from(
-    { length: 12 },
-    (_, index) => index + 1
-  );
-
-  const minutes = Array.from(
-    { length: 60 },
-    (_, index) => index
-  );
-
-  const wheelHandler = (
+  const handleWheelScroll = (
+    type,
     event,
     values,
-    currentValue,
     applyValue
   ) => {
-    event.preventDefault();
-
-    const currentIndex = Math.max(
-      0,
-      values.indexOf(currentValue)
-    );
-
-    const direction =
-      event.deltaY > 0 ? 1 : -1;
-
-    const nextIndex = Math.min(
-      values.length - 1,
-      Math.max(0, currentIndex + direction)
-    );
-
-    if (nextIndex !== currentIndex) {
-      applyValue(values[nextIndex]);
+    if (scrollingRef.current[type]) {
+      return;
     }
+
+    const element = event.currentTarget;
+
+    window.clearTimeout(
+      element.__eo2ScrollTimer
+    );
+
+    element.__eo2ScrollTimer =
+      window.setTimeout(() => {
+        const index = Math.min(
+          values.length - 1,
+          Math.max(
+            0,
+            Math.round(
+              element.scrollTop / ITEM_HEIGHT
+            )
+          )
+        );
+
+        scrollingRef.current[type] = true;
+
+        scrollToIndex(
+          element,
+          index,
+          "smooth"
+        );
+
+        applyValue(values[index]);
+
+        window.setTimeout(() => {
+          scrollingRef.current[type] = false;
+        }, 180);
+      }, 80);
+  };
+
+  const chooseWheelValue = (
+    type,
+    element,
+    values,
+    valueToSelect,
+    applyValue
+  ) => {
+    const index = values.indexOf(valueToSelect);
+
+    if (index < 0) {
+      return;
+    }
+
+    scrollingRef.current[type] = true;
+
+    scrollToIndex(
+      element,
+      index,
+      "smooth"
+    );
+
+    applyValue(valueToSelect);
+
+    window.setTimeout(() => {
+      scrollingRef.current[type] = false;
+    }, 180);
   };
 
   return (
@@ -418,150 +490,208 @@ function DateTimePicker({
           className="eo2-datetime-calendar"
           aria-hidden="true"
         >
-          ▾
+          ◷
         </span>
       </button>
 
       {open && !disabled && (
-        <div className="eo2-datetime-popover">
-          <div className="eo2-picker-section">
-            <span className="eo2-picker-title">
-              Date
-            </span>
+        <div
+          className="eo2-datetime-popover"
+          role="dialog"
+          aria-label="Choose date and time"
+        >
+          <div className="eo2-picker-header">
+            <div>
+              <strong>Date & Time</strong>
+              <small>
+                Philippine Time · Asia/Manila
+              </small>
+            </div>
 
-            <input
-              type="date"
-              min={minDate}
-              value={parts.date || ""}
-              onChange={(event) =>
-                setDate(event.target.value)
-              }
-            />
+            <button
+              type="button"
+              className="eo2-picker-close"
+              onClick={() => setOpen(false)}
+              aria-label="Close date and time picker"
+            >
+              ×
+            </button>
           </div>
 
-          <div className="eo2-picker-section">
-            <span className="eo2-picker-title">
-              Time
-            </span>
+          <div className="eo2-picker-date-row">
+            <label>
+              <span>Date</span>
+              <input
+                type="date"
+                min={minDate}
+                value={parts.date || ""}
+                onChange={(event) =>
+                  setDate(event.target.value)
+                }
+              />
+            </label>
+          </div>
 
-            <div className="eo2-time-wheels">
-              <div className="eo2-time-wheel">
-                <span>Hour</span>
+          <div className="eo2-alarm-time">
+            <div className="eo2-time-separator">
+              :
+            </div>
 
-                <div
-                  ref={hourScrollRef}
-                  className="eo2-time-scroll"
-                  onWheel={(event) =>
-                    wheelHandler(
-                      event,
-                      hours,
-                      selectedTime.hour12,
-                      (hour12) =>
-                        setTimePart({ hour12 })
-                    )
-                  }
-                >
-                  {hours.map((hour) => (
-                    <button
-                      key={hour}
-                      type="button"
-                      className={
-                        selectedTime.hour12 === hour
-                          ? "selected"
-                          : ""
-                      }
-                      onClick={() =>
-                        setTimePart({
-                          hour12: hour,
-                        })
-                      }
-                    >
-                      {String(hour).padStart(2, "0")}
-                    </button>
-                  ))}
-                </div>
+            <div className="eo2-wheel-selection-band" />
+
+            <div className="eo2-alarm-wheel">
+              <span className="eo2-wheel-label">
+                Hour
+              </span>
+
+              <div
+                ref={hourRef}
+                className="eo2-wheel-scroll"
+                onScroll={(event) =>
+                  handleWheelScroll(
+                    "hour",
+                    event,
+                    hours,
+                    (hour12) =>
+                      setTimePart({ hour12 })
+                  )
+                }
+              >
+                <div className="eo2-wheel-spacer" />
+
+                {hours.map((hour) => (
+                  <button
+                    key={hour}
+                    type="button"
+                    className={
+                      selectedTime.hour12 === hour
+                        ? "selected"
+                        : ""
+                    }
+                    onClick={() =>
+                      chooseWheelValue(
+                        "hour",
+                        hourRef.current,
+                        hours,
+                        hour,
+                        (hour12) =>
+                          setTimePart({ hour12 })
+                      )
+                    }
+                  >
+                    {String(hour).padStart(2, "0")}
+                  </button>
+                ))}
+
+                <div className="eo2-wheel-spacer" />
               </div>
+            </div>
 
-              <div className="eo2-time-wheel">
-                <span>Minute</span>
+            <div className="eo2-alarm-wheel">
+              <span className="eo2-wheel-label">
+                Minute
+              </span>
 
-                <div
-                  ref={minuteScrollRef}
-                  className="eo2-time-scroll"
-                  onWheel={(event) =>
-                    wheelHandler(
-                      event,
-                      minutes,
-                      selectedTime.minute,
-                      (minute) =>
-                        setTimePart({ minute })
-                    )
-                  }
-                >
-                  {minutes.map((minute) => (
-                    <button
-                      key={minute}
-                      type="button"
-                      className={
-                        selectedTime.minute === minute
-                          ? "selected"
-                          : ""
-                      }
-                      onClick={() =>
-                        setTimePart({
-                          minute,
-                        })
-                      }
-                    >
-                      {String(minute).padStart(2, "0")}
-                    </button>
-                  ))}
-                </div>
+              <div
+                ref={minuteRef}
+                className="eo2-wheel-scroll"
+                onScroll={(event) =>
+                  handleWheelScroll(
+                    "minute",
+                    event,
+                    minutes,
+                    (minute) =>
+                      setTimePart({ minute })
+                  )
+                }
+              >
+                <div className="eo2-wheel-spacer" />
+
+                {minutes.map((minute) => (
+                  <button
+                    key={minute}
+                    type="button"
+                    className={
+                      selectedTime.minute === minute
+                        ? "selected"
+                        : ""
+                    }
+                    onClick={() =>
+                      chooseWheelValue(
+                        "minute",
+                        minuteRef.current,
+                        minutes,
+                        minute,
+                        (nextMinute) =>
+                          setTimePart({
+                            minute: nextMinute,
+                          })
+                      )
+                    }
+                  >
+                    {String(minute).padStart(2, "0")}
+                  </button>
+                ))}
+
+                <div className="eo2-wheel-spacer" />
               </div>
+            </div>
 
-              <div className="eo2-time-wheel">
-                <span>AM/PM</span>
+            <div className="eo2-alarm-wheel eo2-period-wheel">
+              <span className="eo2-wheel-label">
+                AM/PM
+              </span>
 
-                <div
-                  ref={periodScrollRef}
-                  className="eo2-time-scroll eo2-time-period"
-                  onWheel={(event) =>
-                    wheelHandler(
-                      event,
-                      ["AM", "PM"],
-                      selectedTime.period,
-                      (period) =>
-                        setTimePart({ period })
-                    )
-                  }
-                >
-                  {["AM", "PM"].map((period) => (
-                    <button
-                      key={period}
-                      type="button"
-                      className={
-                        selectedTime.period === period
-                          ? "selected"
-                          : ""
-                      }
-                      onClick={() =>
-                        setTimePart({
-                          period,
-                        })
-                      }
-                    >
-                      {period}
-                    </button>
-                  ))}
-                </div>
+              <div
+                ref={periodRef}
+                className="eo2-wheel-scroll"
+                onScroll={(event) =>
+                  handleWheelScroll(
+                    "period",
+                    event,
+                    periods,
+                    (period) =>
+                      setTimePart({ period })
+                  )
+                }
+              >
+                <div className="eo2-wheel-spacer" />
+
+                {periods.map((period) => (
+                  <button
+                    key={period}
+                    type="button"
+                    className={
+                      selectedTime.period === period
+                        ? "selected"
+                        : ""
+                    }
+                    onClick={() =>
+                      chooseWheelValue(
+                        "period",
+                        periodRef.current,
+                        periods,
+                        period,
+                        (nextPeriod) =>
+                          setTimePart({
+                            period: nextPeriod,
+                          })
+                      )
+                    }
+                  >
+                    {period}
+                  </button>
+                ))}
+
+                <div className="eo2-wheel-spacer" />
               </div>
             </div>
           </div>
 
           <div className="eo2-picker-footer">
-            <small>
-              Philippine Time · Asia/Manila
-            </small>
+            <span>
+              {displayValue}
+            </span>
 
             <button
               type="button"
@@ -771,10 +901,21 @@ function RuleFields({
   const key = (name) =>
     `${fieldPrefix}.${name}`;
 
+  const buyoutAmount =
+    getBuyoutAmount(value.buyout);
+
+  const buyoutEnabled =
+    buyoutAmount !== null &&
+    buyoutAmount > 0;
+
   return (
     <div
       className={`fb-rule-grid ${
         shared ? "shared" : "item-rules"
+      } ${
+        buyoutEnabled
+          ? "has-buyout"
+          : "no-buyout"
       }`}
     >
       <label
@@ -783,8 +924,10 @@ function RuleFields({
           key("minBid")
         )}`}
       >
-        Minimum Bid{" "}
-        <span className="eo2-required">*</span>
+        <span className="eo2-rule-heading">
+          Minimum Bid
+          <span className="eo2-required">*</span>
+        </span>
 
         <input
           ref={registerField(key("minBid"))}
@@ -802,11 +945,13 @@ function RuleFields({
           )}
         />
 
-        {fieldErrors[key("minBid")] && (
-          <small className="eo2-field-error-text">
-            {fieldErrors[key("minBid")]}
-          </small>
-        )}
+        <span className="eo2-rule-help">
+          {fieldErrors[key("minBid")] && (
+            <small className="eo2-field-error-text">
+              {fieldErrors[key("minBid")]}
+            </small>
+          )}
+        </span>
       </label>
 
       <label
@@ -815,8 +960,10 @@ function RuleFields({
           key("increment")
         )}`}
       >
-        Increment{" "}
-        <span className="eo2-required">*</span>
+        <span className="eo2-rule-heading">
+          Increment
+          <span className="eo2-required">*</span>
+        </span>
 
         <input
           ref={registerField(key("increment"))}
@@ -834,15 +981,19 @@ function RuleFields({
           )}
         />
 
-        {fieldErrors[key("increment")] && (
-          <small className="eo2-field-error-text">
-            {fieldErrors[key("increment")]}
-          </small>
-        )}
+        <span className="eo2-rule-help">
+          {fieldErrors[key("increment")] && (
+            <small className="eo2-field-error-text">
+              {fieldErrors[key("increment")]}
+            </small>
+          )}
+        </span>
       </label>
 
       <label className="eo2-rule-compact eo2-rule-bidders">
-        Minimum Bidders
+        <span className="eo2-rule-heading">
+          Minimum Bidders
+        </span>
 
         <input
           type="number"
@@ -855,6 +1006,8 @@ function RuleFields({
           placeholder={shared ? "1" : "Inherit"}
           disabled={disabled}
         />
+
+        <span className="eo2-rule-help" />
       </label>
 
       <label
@@ -863,10 +1016,9 @@ function RuleFields({
           key("buyout")
         )}`}
       >
-        Buyout
-        <small>
-          Optional · 0 = No Buyout
-        </small>
+        <span className="eo2-rule-heading">
+          Buyout
+        </span>
 
         <input
           ref={registerField(key("buyout"))}
@@ -902,37 +1054,30 @@ function RuleFields({
           )}
         />
 
-        {fieldErrors[key("buyout")] ? (
-          <small className="eo2-field-error-text">
-            {fieldErrors[key("buyout")]}
-          </small>
-        ) : (
-          <small>
-            Leave blank or enter 0 to disable Buyout.
-          </small>
-        )}
+        <span className="eo2-rule-help">
+          {fieldErrors[key("buyout")] ? (
+            <small className="eo2-field-error-text">
+              {fieldErrors[key("buyout")]}
+            </small>
+          ) : (
+            <small>
+              Optional · 0 = No Buyout
+            </small>
+          )}
+        </span>
       </label>
 
-      {(() => {
-        const buyoutAmount =
-          getBuyoutAmount(value.buyout);
-
-        if (
-          buyoutAmount === null ||
-          buyoutAmount <= 0
-        ) {
-          return null;
-        }
-
-        return (
+      {buyoutEnabled && (
           <label
             className={`eo2-rule-datetime eo2-rule-buyout-until ${fieldClass(
               fieldErrors,
               key("buyoutUntil")
             )}`}
           >
-            Buyout Until{" "}
-            <span className="eo2-required">*</span>
+            <span className="eo2-rule-heading">
+              Buyout Until
+              <span className="eo2-required">*</span>
+            </span>
 
             <DateTimePicker
               inputRef={registerField(
@@ -954,8 +1099,7 @@ function RuleFields({
               </small>
             )}
           </label>
-        );
-      })()}
+        )}
 
       <label
         className={`eo2-rule-datetime eo2-rule-auction-ends ${fieldClass(
@@ -963,8 +1107,10 @@ function RuleFields({
           key("auctionEnds")
         )}`}
       >
-        Auction Ends{" "}
-        <span className="eo2-required">*</span>
+        <span className="eo2-rule-heading">
+          Auction Ends
+          <span className="eo2-required">*</span>
+        </span>
 
         <DateTimePicker
           inputRef={registerField(
@@ -988,7 +1134,9 @@ function RuleFields({
       </label>
 
       <label className="eo2-rule-compact eo2-rule-short eo2-rule-cutoff">
-        Bid Cutoff (mins)
+        <span className="eo2-rule-heading">
+          Bid Cutoff (mins)
+        </span>
 
         <input
           type="number"
@@ -1001,10 +1149,14 @@ function RuleFields({
           placeholder={shared ? "60" : "Inherit"}
           disabled={disabled}
         />
+
+        <span className="eo2-rule-help" />
       </label>
 
       <label className="eo2-rule-compact eo2-rule-short eo2-rule-sniper">
-        Anti Sniper (mins)
+        <span className="eo2-rule-heading">
+          Anti Sniper (mins)
+        </span>
 
         <input
           type="number"
@@ -1017,6 +1169,8 @@ function RuleFields({
           placeholder={shared ? "0" : "Inherit"}
           disabled={disabled}
         />
+
+        <span className="eo2-rule-help" />
       </label>
     </div>
   );
@@ -2503,17 +2657,60 @@ export default function FacebookPostPage({
           display: grid;
           grid-template-columns:
             repeat(4, minmax(150px, 1fr)) !important;
+          gap: 12px 14px !important;
+          align-items: start;
+        }
+
+        .fb-rule-grid.has-buyout {
           grid-template-areas:
             "minbid increment bidders buyout"
             "buyoutUntil buyoutUntil ends ends"
             "cutoff sniper . .";
-          gap: 12px 14px !important;
-          align-items: start;
+        }
+
+        .fb-rule-grid.no-buyout {
+          grid-template-areas:
+            "minbid increment bidders buyout"
+            "ends ends cutoff sniper";
         }
 
         .fb-rule-grid > label {
           min-width: 0;
           margin: 0;
+          display: grid;
+          grid-template-rows:
+            20px 38px 18px;
+          gap: 4px;
+          align-content: start;
+        }
+
+        .eo2-rule-heading {
+          min-width: 0;
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          color: #111827;
+          font-size: .79rem;
+          font-weight: 800;
+          line-height: 20px;
+          white-space: nowrap;
+        }
+
+        .eo2-rule-help {
+          min-height: 18px;
+          display: block;
+          overflow: hidden;
+        }
+
+        .eo2-rule-help small,
+        .fb-rule-grid .eo2-field-error-text {
+          display: block;
+          margin: 0;
+          font-size: .66rem;
+          line-height: 16px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
         .fb-rule-grid .eo2-rule-minbid {
@@ -2548,24 +2745,20 @@ export default function FacebookPostPage({
           grid-area: sniper;
         }
 
-        .fb-rule-grid .eo2-rule-compact input,
+        .fb-rule-grid input,
         .fb-rule-grid .eo2-datetime-field {
-          min-height: 38px;
+          width: 100%;
+          min-width: 0;
           height: 38px;
+          min-height: 38px;
+          margin: 0;
           padding: 7px 10px;
           border-radius: 9px;
-        }
-
-        .fb-rule-grid .eo2-rule-compact > small {
-          display: block;
-          min-height: 0;
-          margin-top: 4px;
-          font-size: .68rem;
-          line-height: 1.25;
+          box-sizing: border-box;
         }
 
         .fb-rule-grid .eo2-rule-short {
-          max-width: 190px;
+          max-width: none;
         }
 
         .eo2-datetime-picker {
@@ -2574,24 +2767,18 @@ export default function FacebookPostPage({
         }
 
         .eo2-datetime-field {
-          width: 100%;
-          height: 40px;
-          min-height: 40px;
           display: flex;
           align-items: center;
           justify-content: space-between;
           gap: 10px;
-          padding: 8px 11px;
           border: 1px solid rgba(148, 163, 184, .45);
-          border-radius: 10px;
-          background: rgba(255, 255, 255, .96);
+          background: #fff;
           color: #6b7280;
           font: inherit;
-          font-size: .91rem;
-          font-weight: 500;
+          font-size: .88rem;
+          font-weight: 600;
           text-align: left;
           cursor: pointer;
-          box-sizing: border-box;
         }
 
         .eo2-datetime-field.has-value {
@@ -2606,141 +2793,229 @@ export default function FacebookPostPage({
 
         .eo2-datetime-calendar {
           flex: 0 0 auto;
-          font-size: .82rem;
-          opacity: .68;
+          font-size: 1rem;
+          opacity: .7;
         }
 
         .eo2-datetime-error .eo2-datetime-field {
           border-color: #dc2626 !important;
-          box-shadow: 0 0 0 3px rgba(220, 38, 38, .10) !important;
-          background: rgba(254, 242, 242, .8);
+          background: #fff7f7;
         }
 
         .eo2-datetime-popover {
           position: absolute;
-          z-index: 80;
-          top: calc(100% + 7px);
+          z-index: 90;
+          top: calc(100% + 8px);
           left: 0;
-          width: min(360px, calc(100vw - 42px));
-          padding: 12px;
-          border: 1px solid rgba(148, 163, 184, .34);
-          border-radius: 14px;
+          width: min(390px, calc(100vw - 32px));
+          padding: 14px;
+          border: 1px solid rgba(148, 163, 184, .28);
+          border-radius: 18px;
           background: #fff;
           box-shadow:
-            0 18px 45px rgba(15, 23, 42, .18),
-            0 2px 8px rgba(15, 23, 42, .08);
+            0 24px 60px rgba(15, 23, 42, .18),
+            0 4px 14px rgba(15, 23, 42, .08);
         }
 
-        .eo2-picker-section + .eo2-picker-section {
-          margin-top: 12px;
+        .eo2-picker-header {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 12px;
+          margin-bottom: 12px;
         }
 
-        .eo2-picker-title {
+        .eo2-picker-header strong {
           display: block;
-          margin-bottom: 6px;
-          color: #374151;
-          font-size: .74rem;
+          color: #111827;
+          font-size: .95rem;
+        }
+
+        .eo2-picker-header small {
+          display: block;
+          margin-top: 2px;
+          color: #6b7280;
+          font-size: .67rem;
+        }
+
+        .eo2-picker-close {
+          width: 30px;
+          height: 30px;
+          min-height: 30px;
+          padding: 0;
+          border: 0;
+          border-radius: 999px;
+          background: #f1f5f9;
+          color: #475569;
+          font-size: 1.05rem;
+          cursor: pointer;
+        }
+
+        .eo2-picker-date-row label {
+          display: grid;
+          grid-template-columns: 42px 1fr;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .eo2-picker-date-row label > span {
+          color: #64748b;
+          font-size: .72rem;
           font-weight: 800;
+          text-transform: uppercase;
+        }
+
+        .eo2-picker-date-row input[type="date"] {
+          width: 100%;
+          height: 40px;
+          min-height: 40px;
+          padding: 7px 10px;
+          border-radius: 10px;
+          box-sizing: border-box;
+        }
+
+        .eo2-alarm-time {
+          position: relative;
+          display: grid;
+          grid-template-columns: 1fr 1fr .85fr;
+          gap: 8px;
+          margin-top: 14px;
+          padding-top: 20px;
+          border-top: 1px solid rgba(148, 163, 184, .18);
+          overflow: hidden;
+        }
+
+        .eo2-time-separator {
+          position: absolute;
+          z-index: 4;
+          left: 40.5%;
+          top: 104px;
+          color: #111827;
+          font-size: 1.4rem;
+          font-weight: 900;
+          pointer-events: none;
+        }
+
+        .eo2-wheel-selection-band {
+          position: absolute;
+          z-index: 0;
+          left: 0;
+          right: 0;
+          top: 85px;
+          height: 40px;
+          border-top: 1px solid rgba(37, 99, 235, .16);
+          border-bottom: 1px solid rgba(37, 99, 235, .16);
+          border-radius: 10px;
+          background: rgba(37, 99, 235, .06);
+          pointer-events: none;
+        }
+
+        .eo2-alarm-wheel {
+          position: relative;
+          z-index: 1;
+          min-width: 0;
+        }
+
+        .eo2-wheel-label {
+          display: block;
+          margin-bottom: 4px;
+          color: #64748b;
+          font-size: .66rem;
+          font-weight: 800;
+          text-align: center;
           text-transform: uppercase;
           letter-spacing: .04em;
         }
 
-        .eo2-picker-section input[type="date"] {
-          width: 100%;
-          height: 38px;
-          min-height: 38px;
-          padding: 7px 9px;
-          border-radius: 9px;
-          box-sizing: border-box;
-        }
-
-        .eo2-time-wheels {
-          display: grid;
-          grid-template-columns: 1fr 1fr .82fr;
-          gap: 8px;
-        }
-
-        .eo2-time-wheel > span {
-          display: block;
-          margin-bottom: 4px;
-          text-align: center;
-          color: #6b7280;
-          font-size: .68rem;
-          font-weight: 700;
-        }
-
-        .eo2-time-scroll {
-          height: 144px;
-          overflow-y: scroll;
+        .eo2-wheel-scroll {
+          height: 160px;
+          overflow-y: auto;
           overscroll-behavior: contain;
-          scroll-snap-type: y proximity;
-          border: 1px solid rgba(148, 163, 184, .30);
-          border-radius: 9px;
-          background: #f8fafc;
-          padding: 4px;
-          scrollbar-width: auto;
-          scrollbar-gutter: stable;
+          scroll-snap-type: y mandatory;
+          scrollbar-width: none;
+          -ms-overflow-style: none;
           touch-action: pan-y;
+          mask-image:
+            linear-gradient(
+              to bottom,
+              transparent 0%,
+              black 24%,
+              black 76%,
+              transparent 100%
+            );
+          -webkit-mask-image:
+            linear-gradient(
+              to bottom,
+              transparent 0%,
+              black 24%,
+              black 76%,
+              transparent 100%
+            );
         }
 
-        .eo2-time-scroll::-webkit-scrollbar {
-          width: 10px;
+        .eo2-wheel-scroll::-webkit-scrollbar {
+          display: none;
         }
 
-        .eo2-time-scroll::-webkit-scrollbar-thumb {
-          border: 2px solid #f8fafc;
-          border-radius: 999px;
-          background: rgba(100, 116, 139, .48);
+        .eo2-wheel-spacer {
+          height: 60px;
+          flex: 0 0 60px;
         }
 
-        .eo2-time-scroll::-webkit-scrollbar-track {
-          background: transparent;
-        }
-
-        .eo2-time-scroll button {
+        .eo2-wheel-scroll button {
           width: 100%;
-          min-height: 31px;
+          height: 40px;
+          min-height: 40px;
           display: block;
+          padding: 0;
           border: 0;
-          border-radius: 7px;
+          border-radius: 8px;
           background: transparent;
-          color: #374151;
+          color: #94a3b8;
           font: inherit;
-          font-size: .82rem;
+          font-size: 1.02rem;
           font-weight: 700;
+          line-height: 40px;
+          text-align: center;
           cursor: pointer;
           scroll-snap-align: center;
+          transition:
+            color .12s ease,
+            font-size .12s ease,
+            font-weight .12s ease;
         }
 
-        .eo2-time-scroll button:hover {
-          background: rgba(37, 99, 235, .07);
-        }
-
-        .eo2-time-scroll button.selected {
-          background: var(--accent-color, #2563eb);
-          color: #fff;
+        .eo2-wheel-scroll button.selected {
+          color: #111827;
+          font-size: 1.18rem;
+          font-weight: 900;
         }
 
         .eo2-picker-footer {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 10px;
-          margin-top: 10px;
-          padding-top: 9px;
-          border-top: 1px solid rgba(148, 163, 184, .20);
+          gap: 12px;
+          margin-top: 12px;
+          padding-top: 11px;
+          border-top: 1px solid rgba(148, 163, 184, .18);
         }
 
-        .eo2-picker-footer small {
-          color: #6b7280;
-          font-size: .68rem;
+        .eo2-picker-footer > span {
+          min-width: 0;
+          color: #475569;
+          font-size: .72rem;
+          font-weight: 700;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
         }
 
         .eo2-picker-footer button {
-          min-height: 32px;
-          padding: 6px 13px;
+          min-height: 34px;
+          padding: 7px 15px;
           border: 0;
-          border-radius: 8px;
+          border-radius: 9px;
           background: var(--accent-color, #2563eb);
           color: #fff;
           font: inherit;
@@ -2748,6 +3023,7 @@ export default function FacebookPostPage({
           font-weight: 800;
           cursor: pointer;
         }
+
 
         .fb-item-editor {
           padding: 15px;
