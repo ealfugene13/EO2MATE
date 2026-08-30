@@ -204,60 +204,59 @@ function DateTimePicker({
   minDateTime = getPhilippineNowInput(),
 }) {
   const pickerRef = useRef(null);
-  const hourRef = useRef(null);
-  const minuteRef = useRef(null);
-  const periodRef = useRef(null);
-  const scrollingRef = useRef({
-    hour: false,
-    minute: false,
-    period: false,
-  });
   const [open, setOpen] = useState(false);
 
-  const ITEM_HEIGHT = 40;
   const parts = splitDateTimeLocal(value);
   const minParts = splitDateTimeLocal(minDateTime);
   const minDate = minParts.date || "";
 
   const parseTime = (time) => {
-    const [hourText = "00", minuteText = "00"] =
+    const [hourRaw = "0", minuteRaw = "00"] =
       String(time || "00:00").split(":");
 
-    const hour24 = Number(hourText) || 0;
-    const minute = Number(minuteText) || 0;
+    let hour24 = Number(hourRaw);
+
+    if (!Number.isFinite(hour24)) {
+      hour24 = 0;
+    }
+
+    const period =
+      hour24 >= 12 ? "PM" : "AM";
+
+    let hour12 = hour24 % 12;
+
+    if (hour12 === 0) {
+      hour12 = 12;
+    }
 
     return {
-      hour12:
-        hour24 === 0
-          ? 12
-          : hour24 > 12
-          ? hour24 - 12
-          : hour24,
-      minute,
-      period: hour24 >= 12 ? "PM" : "AM",
+      hour12: String(hour12).padStart(2, "0"),
+      minute: String(minuteRaw || "00").padStart(2, "0"),
+      period,
     };
   };
 
-  const selectedTime = parseTime(parts.time);
+  const currentTime = parseTime(parts.time);
 
   const hours = Array.from(
     { length: 12 },
-    (_, index) => index + 1
+    (_, index) =>
+      String(index + 1).padStart(2, "0")
   );
 
   const minutes = Array.from(
     { length: 60 },
-    (_, index) => index
+    (_, index) =>
+      String(index).padStart(2, "0")
   );
-
-  const periods = ["AM", "PM"];
 
   const displayValue = (() => {
     if (!value) {
       return "Select date & time";
     }
 
-    const date = philippineLocalToDate(value);
+    const date =
+      philippineLocalToDate(value);
 
     if (!date) {
       return value;
@@ -274,89 +273,58 @@ function DateTimePicker({
     }).format(date);
   })();
 
-  const setDate = (nextDate) => {
-    if (!nextDate) {
-      onChange("");
-      return;
-    }
-
-    onChange(
-      combineDateTimeLocal(
-        nextDate,
-        parts.time || "12:00"
-      )
-    );
-  };
-
-  const setTimePart = ({
-    hour12 = selectedTime.hour12,
-    minute = selectedTime.minute,
-    period = selectedTime.period,
+  const combine = ({
+    date = parts.date,
+    hour12 = currentTime.hour12,
+    minute = currentTime.minute,
+    period = currentTime.period,
   }) => {
-    const hour24 =
-      period === "AM"
-        ? hour12 === 12
-          ? 0
-          : hour12
-        : hour12 === 12
-        ? 12
-        : hour12 + 12;
-
-    const nextTime =
-      `${String(hour24).padStart(2, "0")}:` +
-      `${String(minute).padStart(2, "0")}`;
-
-    const nextDate =
-      parts.date ||
-      minDate ||
-      getPhilippineNowInput().slice(0, 10);
-
-    onChange(
-      combineDateTimeLocal(nextDate, nextTime)
-    );
-  };
-
-  const scrollToIndex = (
-    element,
-    index,
-    behavior = "auto"
-  ) => {
-    if (!element) {
-      return;
+    if (!date) {
+      return "";
     }
 
-    element.scrollTo({
-      top: index * ITEM_HEIGHT,
-      behavior,
-    });
+    let hour = Number(hour12);
+
+    if (
+      !Number.isFinite(hour) ||
+      hour < 1 ||
+      hour > 12
+    ) {
+      hour = 12;
+    }
+
+    if (
+      period === "AM" &&
+      hour === 12
+    ) {
+      hour = 0;
+    } else if (
+      period === "PM" &&
+      hour !== 12
+    ) {
+      hour += 12;
+    }
+
+    return (
+      `${date}T` +
+      `${String(hour).padStart(2, "0")}:` +
+      `${String(minute || "00").padStart(2, "0")}`
+    );
   };
 
-  const syncWheels = (behavior = "auto") => {
-    scrollToIndex(
-      hourRef.current,
-      Math.max(
-        0,
-        hours.indexOf(selectedTime.hour12)
-      ),
-      behavior
-    );
+  const update = (patch) => {
+    const nextDate =
+      patch.date !== undefined
+        ? patch.date
+        : parts.date ||
+          minDate ||
+          getPhilippineNowInput().slice(0, 10);
 
-    scrollToIndex(
-      minuteRef.current,
-      Math.max(
-        0,
-        minutes.indexOf(selectedTime.minute)
-      ),
-      behavior
-    );
-
-    scrollToIndex(
-      periodRef.current,
-      Math.max(
-        0,
-        periods.indexOf(selectedTime.period)
-      ),
-      behavior
+    onChange(
+      combine({
+        ...patch,
+        date: nextDate,
+      })
     );
   };
 
@@ -364,11 +332,6 @@ function DateTimePicker({
     if (!open) {
       return undefined;
     }
-
-    const timer = window.setTimeout(
-      () => syncWheels("auto"),
-      30
-    );
 
     const handleOutside = (event) => {
       if (
@@ -385,85 +348,12 @@ function DateTimePicker({
     );
 
     return () => {
-      window.clearTimeout(timer);
       document.removeEventListener(
         "mousedown",
         handleOutside
       );
     };
   }, [open]);
-
-  const handleWheelScroll = (
-    type,
-    event,
-    values,
-    applyValue
-  ) => {
-    if (scrollingRef.current[type]) {
-      return;
-    }
-
-    const element = event.currentTarget;
-
-    window.clearTimeout(
-      element.__eo2ScrollTimer
-    );
-
-    element.__eo2ScrollTimer =
-      window.setTimeout(() => {
-        const index = Math.min(
-          values.length - 1,
-          Math.max(
-            0,
-            Math.round(
-              element.scrollTop / ITEM_HEIGHT
-            )
-          )
-        );
-
-        scrollingRef.current[type] = true;
-
-        scrollToIndex(
-          element,
-          index,
-          "smooth"
-        );
-
-        applyValue(values[index]);
-
-        window.setTimeout(() => {
-          scrollingRef.current[type] = false;
-        }, 180);
-      }, 80);
-  };
-
-  const chooseWheelValue = (
-    type,
-    element,
-    values,
-    valueToSelect,
-    applyValue
-  ) => {
-    const index = values.indexOf(valueToSelect);
-
-    if (index < 0) {
-      return;
-    }
-
-    scrollingRef.current[type] = true;
-
-    scrollToIndex(
-      element,
-      index,
-      "smooth"
-    );
-
-    applyValue(valueToSelect);
-
-    window.setTimeout(() => {
-      scrollingRef.current[type] = false;
-    }, 180);
-  };
 
   return (
     <div
@@ -479,7 +369,8 @@ function DateTimePicker({
           value ? "has-value" : ""
         }`}
         onClick={() =>
-          !disabled && setOpen((current) => !current)
+          !disabled &&
+          setOpen((current) => !current)
         }
         disabled={disabled}
         aria-expanded={open}
@@ -490,205 +381,125 @@ function DateTimePicker({
           className="eo2-datetime-calendar"
           aria-hidden="true"
         >
-          ◷
+          ▾
         </span>
       </button>
 
       {open && !disabled && (
         <div
-          className="eo2-datetime-popover"
+          className="eo2-datetime-popover eo2-datetime-popover-simple"
           role="dialog"
           aria-label="Choose date and time"
         >
-          <div className="eo2-picker-header">
-            <div>
-              <strong>Date & Time</strong>
-              <small>
-                Philippine Time · Asia/Manila
-              </small>
-            </div>
-
-            <button
-              type="button"
-              className="eo2-picker-close"
-              onClick={() => setOpen(false)}
-              aria-label="Close date and time picker"
-            >
-              ×
-            </button>
+          <div className="eo2-picker-simple-header">
+            <strong>Date & Time</strong>
+            <small>
+              Philippine Time · Asia/Manila
+            </small>
           </div>
 
-          <div className="eo2-picker-date-row">
-            <label>
-              <span>Date</span>
-              <input
-                type="date"
-                min={minDate}
-                value={parts.date || ""}
-                onChange={(event) =>
-                  setDate(event.target.value)
-                }
-              />
-            </label>
-          </div>
+          <label className="eo2-simple-date">
+            <span>Date</span>
 
-          <div className="eo2-alarm-time">
-            <div className="eo2-time-separator">
-              :
-            </div>
+            <input
+              type="date"
+              min={minDate}
+              value={parts.date || ""}
+              onChange={(event) =>
+                update({
+                  date: event.target.value,
+                })
+              }
+            />
+          </label>
 
-            <div className="eo2-wheel-selection-band" />
+          <div className="eo2-simple-time-section">
+            <span className="eo2-simple-time-label">
+              Time
+            </span>
 
-            <div className="eo2-alarm-wheel">
-              <span className="eo2-wheel-label">
-                Hour
-              </span>
+            <div className="eo2-time-wheel-group">
+              <div className="eo2-wheel-column">
+                <small>Hour</small>
 
-              <div
-                ref={hourRef}
-                className="eo2-wheel-scroll"
-                onScroll={(event) =>
-                  handleWheelScroll(
-                    "hour",
-                    event,
-                    hours,
-                    (hour12) =>
-                      setTimePart({ hour12 })
-                  )
-                }
-              >
-                <div className="eo2-wheel-spacer" />
-
-                {hours.map((hour) => (
-                  <button
-                    key={hour}
-                    type="button"
-                    className={
-                      selectedTime.hour12 === hour
-                        ? "selected"
-                        : ""
-                    }
-                    onClick={() =>
-                      chooseWheelValue(
-                        "hour",
-                        hourRef.current,
-                        hours,
-                        hour,
-                        (hour12) =>
-                          setTimePart({ hour12 })
-                      )
-                    }
-                  >
-                    {String(hour).padStart(2, "0")}
-                  </button>
-                ))}
-
-                <div className="eo2-wheel-spacer" />
+                <select
+                  className="eo2-time-wheel"
+                  value={currentTime.hour12}
+                  onChange={(event) =>
+                    update({
+                      hour12: event.target.value,
+                    })
+                  }
+                  size="3"
+                  aria-label="Hour"
+                >
+                  {hours.map((hour) => (
+                    <option
+                      key={hour}
+                      value={hour}
+                    >
+                      {hour}
+                    </option>
+                  ))}
+                </select>
               </div>
-            </div>
 
-            <div className="eo2-alarm-wheel">
-              <span className="eo2-wheel-label">
-                Minute
+              <span className="eo2-time-separator">
+                :
               </span>
 
-              <div
-                ref={minuteRef}
-                className="eo2-wheel-scroll"
-                onScroll={(event) =>
-                  handleWheelScroll(
-                    "minute",
-                    event,
-                    minutes,
-                    (minute) =>
-                      setTimePart({ minute })
-                  )
-                }
-              >
-                <div className="eo2-wheel-spacer" />
+              <div className="eo2-wheel-column">
+                <small>Minute</small>
 
-                {minutes.map((minute) => (
-                  <button
-                    key={minute}
-                    type="button"
-                    className={
-                      selectedTime.minute === minute
-                        ? "selected"
-                        : ""
-                    }
-                    onClick={() =>
-                      chooseWheelValue(
-                        "minute",
-                        minuteRef.current,
-                        minutes,
-                        minute,
-                        (nextMinute) =>
-                          setTimePart({
-                            minute: nextMinute,
-                          })
-                      )
-                    }
-                  >
-                    {String(minute).padStart(2, "0")}
-                  </button>
-                ))}
-
-                <div className="eo2-wheel-spacer" />
+                <select
+                  className="eo2-time-wheel"
+                  value={currentTime.minute}
+                  onChange={(event) =>
+                    update({
+                      minute: event.target.value,
+                    })
+                  }
+                  size="3"
+                  aria-label="Minute"
+                >
+                  {minutes.map((minute) => (
+                    <option
+                      key={minute}
+                      value={minute}
+                    >
+                      {minute}
+                    </option>
+                  ))}
+                </select>
               </div>
-            </div>
 
-            <div className="eo2-alarm-wheel eo2-period-wheel">
-              <span className="eo2-wheel-label">
-                AM/PM
-              </span>
+              <div className="eo2-wheel-column">
+                <small>AM/PM</small>
 
-              <div
-                ref={periodRef}
-                className="eo2-wheel-scroll"
-                onScroll={(event) =>
-                  handleWheelScroll(
-                    "period",
-                    event,
-                    periods,
-                    (period) =>
-                      setTimePart({ period })
-                  )
-                }
-              >
-                <div className="eo2-wheel-spacer" />
+                <select
+                  className="eo2-time-period"
+                  value={currentTime.period}
+                  onChange={(event) =>
+                    update({
+                      period: event.target.value,
+                    })
+                  }
+                  size="2"
+                  aria-label="AM or PM"
+                >
+                  <option value="AM">
+                    AM
+                  </option>
 
-                {periods.map((period) => (
-                  <button
-                    key={period}
-                    type="button"
-                    className={
-                      selectedTime.period === period
-                        ? "selected"
-                        : ""
-                    }
-                    onClick={() =>
-                      chooseWheelValue(
-                        "period",
-                        periodRef.current,
-                        periods,
-                        period,
-                        (nextPeriod) =>
-                          setTimePart({
-                            period: nextPeriod,
-                          })
-                      )
-                    }
-                  >
-                    {period}
-                  </button>
-                ))}
-
-                <div className="eo2-wheel-spacer" />
+                  <option value="PM">
+                    PM
+                  </option>
+                </select>
               </div>
             </div>
           </div>
 
-          <div className="eo2-picker-footer">
+          <div className="eo2-picker-footer eo2-picker-footer-simple">
             <span>
               {displayValue}
             </span>
@@ -2767,11 +2578,17 @@ export default function FacebookPostPage({
         }
 
         .eo2-datetime-field {
+          width: 100%;
+          height: 38px;
+          min-height: 38px;
           display: flex;
           align-items: center;
           justify-content: space-between;
           gap: 10px;
+          margin: 0;
+          padding: 7px 10px;
           border: 1px solid rgba(148, 163, 184, .45);
+          border-radius: 9px;
           background: #fff;
           color: #6b7280;
           font: inherit;
@@ -2779,6 +2596,7 @@ export default function FacebookPostPage({
           font-weight: 600;
           text-align: left;
           cursor: pointer;
+          box-sizing: border-box;
         }
 
         .eo2-datetime-field.has-value {
@@ -2791,239 +2609,209 @@ export default function FacebookPostPage({
           outline: none;
         }
 
-        .eo2-datetime-calendar {
-          flex: 0 0 auto;
-          font-size: 1rem;
-          opacity: .7;
-        }
-
         .eo2-datetime-error .eo2-datetime-field {
           border-color: #dc2626 !important;
           background: #fff7f7;
         }
 
-        .eo2-datetime-popover {
+        .eo2-datetime-popover-simple {
           position: absolute;
-          z-index: 90;
-          top: calc(100% + 8px);
+          z-index: 100;
+          top: calc(100% + 7px);
           left: 0;
-          width: min(390px, calc(100vw - 32px));
+          width: min(350px, calc(100vw - 32px));
           padding: 14px;
-          border: 1px solid rgba(148, 163, 184, .28);
-          border-radius: 18px;
+          border: 1px solid rgba(148, 163, 184, .30);
+          border-radius: 14px;
           background: #fff;
           box-shadow:
-            0 24px 60px rgba(15, 23, 42, .18),
-            0 4px 14px rgba(15, 23, 42, .08);
+            0 18px 42px rgba(15, 23, 42, .16),
+            0 3px 10px rgba(15, 23, 42, .08);
         }
 
-        .eo2-picker-header {
-          display: flex;
-          align-items: flex-start;
-          justify-content: space-between;
-          gap: 12px;
+        .eo2-picker-simple-header {
           margin-bottom: 12px;
         }
 
-        .eo2-picker-header strong {
+        .eo2-picker-simple-header strong {
           display: block;
           color: #111827;
-          font-size: .95rem;
+          font-size: .93rem;
         }
 
-        .eo2-picker-header small {
+        .eo2-picker-simple-header small {
           display: block;
           margin-top: 2px;
-          color: #6b7280;
+          color: #64748b;
           font-size: .67rem;
         }
 
-        .eo2-picker-close {
-          width: 30px;
-          height: 30px;
-          min-height: 30px;
-          padding: 0;
-          border: 0;
-          border-radius: 999px;
-          background: #f1f5f9;
-          color: #475569;
-          font-size: 1.05rem;
-          cursor: pointer;
-        }
-
-        .eo2-picker-date-row label {
+        .eo2-simple-date {
           display: grid;
           grid-template-columns: 42px 1fr;
           align-items: center;
           gap: 10px;
         }
 
-        .eo2-picker-date-row label > span {
+        .eo2-simple-date > span,
+        .eo2-simple-time-label {
           color: #64748b;
-          font-size: .72rem;
+          font-size: .69rem;
           font-weight: 800;
           text-transform: uppercase;
+          letter-spacing: .03em;
         }
 
-        .eo2-picker-date-row input[type="date"] {
+        .eo2-simple-date input[type="date"] {
           width: 100%;
-          height: 40px;
-          min-height: 40px;
-          padding: 7px 10px;
-          border-radius: 10px;
+          height: 38px;
+          min-height: 38px;
+          margin: 0;
+          padding: 7px 9px;
+          border-radius: 9px;
           box-sizing: border-box;
         }
 
-        .eo2-alarm-time {
-          position: relative;
-          display: grid;
-          grid-template-columns: 1fr 1fr .85fr;
-          gap: 8px;
-          margin-top: 14px;
-          padding-top: 20px;
-          border-top: 1px solid rgba(148, 163, 184, .18);
-          overflow: hidden;
-        }
-
-        .eo2-time-separator {
-          position: absolute;
-          z-index: 4;
-          left: 40.5%;
-          top: 104px;
-          color: #111827;
-          font-size: 1.4rem;
-          font-weight: 900;
-          pointer-events: none;
-        }
-
-        .eo2-wheel-selection-band {
-          position: absolute;
-          z-index: 0;
-          left: 0;
-          right: 0;
-          top: 85px;
-          height: 40px;
-          border-top: 1px solid rgba(37, 99, 235, .16);
-          border-bottom: 1px solid rgba(37, 99, 235, .16);
-          border-radius: 10px;
-          background: rgba(37, 99, 235, .06);
-          pointer-events: none;
-        }
-
-        .eo2-alarm-wheel {
-          position: relative;
-          z-index: 1;
-          min-width: 0;
-        }
-
-        .eo2-wheel-label {
-          display: block;
-          margin-bottom: 4px;
-          color: #64748b;
-          font-size: .66rem;
-          font-weight: 800;
-          text-align: center;
-          text-transform: uppercase;
-          letter-spacing: .04em;
-        }
-
-        .eo2-wheel-scroll {
-          height: 160px;
-          overflow-y: auto;
-          overscroll-behavior: contain;
-          scroll-snap-type: y mandatory;
-          scrollbar-width: none;
-          -ms-overflow-style: none;
-          touch-action: pan-y;
-          mask-image:
-            linear-gradient(
-              to bottom,
-              transparent 0%,
-              black 24%,
-              black 76%,
-              transparent 100%
-            );
-          -webkit-mask-image:
-            linear-gradient(
-              to bottom,
-              transparent 0%,
-              black 24%,
-              black 76%,
-              transparent 100%
-            );
-        }
-
-        .eo2-wheel-scroll::-webkit-scrollbar {
-          display: none;
-        }
-
-        .eo2-wheel-spacer {
-          height: 60px;
-          flex: 0 0 60px;
-        }
-
-        .eo2-wheel-scroll button {
-          width: 100%;
-          height: 40px;
-          min-height: 40px;
-          display: block;
-          padding: 0;
-          border: 0;
-          border-radius: 8px;
-          background: transparent;
-          color: #94a3b8;
-          font: inherit;
-          font-size: 1.02rem;
-          font-weight: 700;
-          line-height: 40px;
-          text-align: center;
-          cursor: pointer;
-          scroll-snap-align: center;
-          transition:
-            color .12s ease,
-            font-size .12s ease,
-            font-weight .12s ease;
-        }
-
-        .eo2-wheel-scroll button.selected {
-          color: #111827;
-          font-size: 1.18rem;
-          font-weight: 900;
-        }
-
-        .eo2-picker-footer {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 12px;
-          margin-top: 12px;
+        .eo2-simple-time-section {
+          margin-top: 13px;
           padding-top: 11px;
           border-top: 1px solid rgba(148, 163, 184, .18);
         }
 
-        .eo2-picker-footer > span {
+        .eo2-simple-time-label {
+          display: block;
+          margin-bottom: 7px;
+        }
+
+        .eo2-time-wheel-group {
+          display: grid;
+          grid-template-columns:
+            minmax(74px, 1fr)
+            14px
+            minmax(74px, 1fr)
+            minmax(72px, .85fr);
+          align-items: center;
+          gap: 6px;
+        }
+
+        .eo2-wheel-column {
+          min-width: 0;
+        }
+
+        .eo2-wheel-column small {
+          display: block;
+          margin-bottom: 4px;
+          color: #64748b;
+          font-size: .65rem;
+          font-weight: 700;
+          text-align: center;
+        }
+
+        .eo2-time-wheel,
+        .eo2-time-period {
+          width: 100%;
+          min-width: 0;
+          height: 94px;
+          padding: 2px;
+          border: 1px solid rgba(148, 163, 184, .34);
+          border-radius: 9px;
+          background: #f8fafc;
+          color: #111827;
+          font: inherit;
+          font-size: .86rem;
+          font-weight: 700;
+          overflow-y: auto;
+          box-sizing: border-box;
+        }
+
+        .eo2-time-period {
+          height: 70px;
+        }
+
+        .eo2-time-wheel option,
+        .eo2-time-period option {
+          padding: 5px 7px;
+          border-radius: 6px;
+          text-align: center;
+        }
+
+        .eo2-time-separator {
+          margin-top: 18px;
+          color: #111827;
+          font-size: 1.15rem;
+          font-weight: 900;
+          text-align: center;
+        }
+
+        .eo2-picker-footer-simple {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          margin-top: 12px;
+          padding-top: 10px;
+          border-top: 1px solid rgba(148, 163, 184, .18);
+        }
+
+        .eo2-picker-footer-simple > span {
           min-width: 0;
           color: #475569;
-          font-size: .72rem;
+          font-size: .7rem;
           font-weight: 700;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
         }
 
-        .eo2-picker-footer button {
+        .eo2-picker-footer-simple button {
           min-height: 34px;
-          padding: 7px 15px;
+          padding: 7px 14px;
           border: 0;
-          border-radius: 9px;
+          border-radius: 8px;
           background: var(--accent-color, #2563eb);
           color: #fff;
           font: inherit;
-          font-size: .78rem;
+          font-size: .77rem;
           font-weight: 800;
           cursor: pointer;
         }
 
+        .fb-upload-empty-error {
+          border-color: #dc2626 !important;
+          background: rgba(254, 242, 242, .88) !important;
+          box-shadow:
+            0 0 0 3px rgba(220, 38, 38, .10);
+        }
+
+        .eo2-photo-error-text {
+          display: block;
+          margin-top: 7px;
+          color: #dc2626;
+          font-size: .76rem;
+          font-weight: 700;
+          line-height: 1.35;
+        }
+
+        @media (max-width: 680px) {
+          .eo2-datetime-popover-simple {
+            position: fixed;
+            z-index: 9999;
+            left: 12px;
+            right: 12px;
+            top: 50%;
+            width: auto;
+            transform: translateY(-50%);
+          }
+
+          .eo2-time-wheel-group {
+            grid-template-columns:
+              minmax(64px, 1fr)
+              10px
+              minmax(64px, 1fr)
+              minmax(62px, .9fr);
+            gap: 4px;
+          }
+        }
 
         .fb-item-editor {
           padding: 15px;
@@ -3326,18 +3114,33 @@ export default function FacebookPostPage({
         />
 
         {!items.length ? (
-          <button
-            ref={uploadButtonRef}
-            type="button"
-            className="fb-upload-empty"
-            onClick={() =>
-              fileInputRef.current?.click()
-            }
-          >
-            <strong>
-              Upload auction photos
-            </strong>
-          </button>
+          <>
+            <button
+              ref={uploadButtonRef}
+              type="button"
+              className={`fb-upload-empty ${
+                fieldErrors.images
+                  ? "fb-upload-empty-error"
+                  : ""
+              }`}
+              onClick={() =>
+                fileInputRef.current?.click()
+              }
+              aria-invalid={Boolean(
+                fieldErrors.images
+              )}
+            >
+              <strong>
+                Upload auction photos
+              </strong>
+            </button>
+
+            {fieldErrors.images && (
+              <small className="eo2-photo-error-text">
+                {fieldErrors.images}
+              </small>
+            )}
+          </>
         ) : (
           <div className="fb-photo-grid">
             {items.map((item, index) => (
@@ -3362,6 +3165,13 @@ export default function FacebookPostPage({
             ))}
           </div>
         )}
+
+        {items.length > 0 &&
+          fieldErrors.images && (
+            <small className="eo2-photo-error-text">
+              {fieldErrors.images}
+            </small>
+          )}
       </section>
 
       <section className="dashboard-panel fb-posting-panel">
