@@ -4,7 +4,7 @@ import SetupPage from "./SetupPage";
 import OnboardingPage from "./OnboardingPage";
 import AdminClientsPage from "./AdminClientsPage";
 import FacebookPostPage from "./FacebookPostPage";
-import EO2MateLogo from "../components/EO2MateLogo";
+import "../eo2mate-modern-ui.css";
 
 function formatCurrency(value) {
   if (value === null || value === undefined || value === "") return "-";
@@ -1184,7 +1184,11 @@ export default function PortalPage({ session }) {
       <div className="app-shell">
         <aside className="sidebar">
           <div className="sidebar-brand eo2-sidebar-brand">
-            <EO2MateLogo />
+            <img
+              className="eo2-sidebar-logo-image"
+              src={`${import.meta.env.BASE_URL}eo2mate-logo.png`}
+              alt="EO2MATE - Let's Auto, Mate."
+            />
             <span className="eo2-admin-label">Platform Admin</span>
           </div>
           <nav className="sidebar-nav">
@@ -1204,7 +1208,11 @@ export default function PortalPage({ session }) {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="sidebar-brand eo2-sidebar-brand">
-          <EO2MateLogo />
+          <img
+            className="eo2-sidebar-logo-image"
+            src={`${import.meta.env.BASE_URL}eo2mate-logo.png`}
+            alt="EO2MATE - Let's Auto, Mate."
+          />
         </div>
 
         <nav className="sidebar-nav">
@@ -1411,33 +1419,8 @@ export default function PortalPage({ session }) {
         {page === "automation-control" && (
           <>
             {automationModal && (
-              <div
-                className="control-modal-backdrop"
-                style={{
-                  position: "fixed",
-                  inset: 0,
-                  zIndex: 99999,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: "20px",
-                  background: "rgba(15, 23, 42, 0.48)",
-                }}
-              >
-                <div
-                  className="control-modal"
-                  role="dialog"
-                  aria-modal="true"
-                  style={{
-                    width: "min(520px, 100%)",
-                    maxHeight: "90vh",
-                    overflowY: "auto",
-                    background: "#fff",
-                    borderRadius: "18px",
-                    padding: "24px",
-                    boxShadow: "0 24px 70px rgba(15, 23, 42, 0.28)",
-                  }}
-                >
+              <div className="control-modal-backdrop">
+                <div className="control-modal" role="dialog" aria-modal="true">
                   <div className={`control-modal-icon ${automationModal.enabled ? "on" : "off"}`}>
                     {automationModal.enabled ? "✓" : "!"}
                   </div>
