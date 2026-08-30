@@ -12,7 +12,6 @@ const DEFAULT_RULES = {
   buyoutUntil: "",
   auctionEnds: "",
   bidCutoff: "60",
-  antiSniper: "0",
 };
 
 const REQUIRED_ENVIRONMENTS = [
@@ -516,16 +515,6 @@ function buildRuleLines(
     );
   }
 
-  const antiSniper = Number(rules.antiSniper);
-
-  if (
-    Number.isFinite(antiSniper) &&
-    antiSniper >= 0
-  ) {
-    lines.push(
-      `Anti Sniper: ${Math.trunc(antiSniper)}`
-    );
-  }
 
   return lines;
 }
@@ -548,10 +537,6 @@ function mergeRules(shared, item) {
       item.bidCutoff !== ""
         ? item.bidCutoff
         : shared.bidCutoff,
-    antiSniper:
-      item.antiSniper !== ""
-        ? item.antiSniper
-        : shared.antiSniper,
   };
 }
 
@@ -570,7 +555,6 @@ function createItem(file, index) {
     buyoutUntil: "",
     auctionEnds: "",
     bidCutoff: "",
-    antiSniper: "",
     itemSource: "MANUAL",
     inventoryItemId: "",
   };
@@ -853,25 +837,6 @@ function RuleFields({
         <span className="eo2-rule-help" />
       </label>
 
-      <label className="eo2-rule-compact eo2-rule-short eo2-rule-sniper">
-        <span className="eo2-rule-heading">
-          Anti Sniper (mins)
-        </span>
-
-        <input
-          type="number"
-          min="0"
-          step="1"
-          value={value.antiSniper}
-          onChange={(e) =>
-            set("antiSniper", e.target.value)
-          }
-          placeholder={shared ? "0" : "Inherit"}
-          disabled={disabled}
-        />
-
-        <span className="eo2-rule-help" />
-      </label>
     </div>
   );
 }
@@ -1797,8 +1762,7 @@ export default function FacebookPostPage({
       buyoutUntil: "",
       auctionEnds: "",
       bidCutoff: "60",
-      antiSniper: "0",
-    });
+        });
 
     setItems([]);
     itemsRef.current = [];
@@ -2365,13 +2329,13 @@ export default function FacebookPostPage({
           grid-template-areas:
             "minbid increment bidders buyout"
             "buyoutUntil buyoutUntil ends ends"
-            "cutoff sniper . .";
+            "cutoff . . .";
         }
 
         .fb-rule-grid.no-buyout {
           grid-template-areas:
             "minbid increment bidders buyout"
-            "ends ends cutoff sniper";
+            "ends ends cutoff cutoff";
         }
 
         .fb-rule-grid > label {
@@ -2439,10 +2403,6 @@ export default function FacebookPostPage({
 
         .fb-rule-grid .eo2-rule-cutoff {
           grid-area: cutoff;
-        }
-
-        .fb-rule-grid .eo2-rule-sniper {
-          grid-area: sniper;
         }
 
         .fb-rule-grid input,
@@ -2802,7 +2762,7 @@ export default function FacebookPostPage({
               "minbid increment"
               "bidders buyout"
               "buyoutUntil ends"
-              "cutoff sniper";
+              "cutoff cutoff";
           }
 
           .fb-rule-grid .eo2-rule-short {
@@ -2820,8 +2780,7 @@ export default function FacebookPostPage({
               "buyout"
               "buyoutUntil"
               "ends"
-              "cutoff"
-              "sniper";
+              "cutoff";
           }
 
         }
