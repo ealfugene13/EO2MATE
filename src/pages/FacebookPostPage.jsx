@@ -215,19 +215,194 @@ function ScrollDateTimePicker({
   disabled = false,
   hasError = false,
   inputRef,
+  minDate = getPhilippineNowInput().slice(0, 10),
 }) {
+  const [open, setOpen] = useState(false);
+  const [draftValue, setDraftValue] = useState(value || "");
+
+  const committedParts = splitDateTimeLocal(value);
+  const draftParts = splitDateTimeLocal(draftValue);
+
+  useEffect(() => {
+    if (!open) {
+      setDraftValue(value || "");
+    }
+  }, [value, open]);
+
+  const updateDraft = (patch) => {
+    setDraftValue(
+      combineDateTimeLocal({
+        ...draftParts,
+        ...patch,
+      })
+    );
+  };
+
+  const hours = Array.from({ length: 12 }, (_, index) =>
+    String(index + 1).padStart(2, "0")
+  );
+
+  const minutes = Array.from({ length: 60 }, (_, index) =>
+    String(index).padStart(2, "0")
+  );
+
+  const displayValue = value
+    ? formatFacebookAuctionDate(value)
+    : "Select date & time";
+
   return (
-    <input
-      ref={inputRef}
-      type="datetime-local"
-      className={`eo2-datetime-field ${
+    <div
+      className={`eo2-datetime-control ${
         hasError ? "eo2-datetime-error" : ""
       }`}
-      value={value || ""}
-      onChange={(e) => onChange(e.target.value)}
-      disabled={disabled}
-      aria-invalid={hasError}
-    />
+      ref={inputRef}
+      tabIndex={-1}
+    >
+      <button
+        type="button"
+        className="eo2-datetime-trigger"
+        onClick={() => {
+          if (disabled) return;
+          setDraftValue(value || "");
+          setOpen(true);
+        }}
+        disabled={disabled}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+      >
+        <span className={value ? "" : "eo2-datetime-placeholder"}>
+          {displayValue}
+        </span>
+        <span className="eo2-datetime-calendar" aria-hidden="true">
+          ▣
+        </span>
+      </button>
+
+      {open && (
+        <div
+          className="eo2-datetime-overlay"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setOpen(false);
+              setDraftValue(value || "");
+            }
+          }}
+        >
+          <div
+            className="eo2-datetime-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Choose date and time"
+          >
+            <div className="eo2-datetime-dialog-header">
+              <strong>Select date & time</strong>
+              <button
+                type="button"
+                className="eo2-datetime-close"
+                onClick={() => {
+                  setOpen(false);
+                  setDraftValue(value || "");
+                }}
+                aria-label="Close date and time picker"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="eo2-datetime-dialog-body">
+              <div className="eo2-date-part">
+                <span className="eo2-datetime-label">Date</span>
+                <input
+                  type="date"
+                  min={minDate}
+                  value={draftParts.date}
+                  onChange={(e) =>
+                    updateDraft({ date: e.target.value })
+                  }
+                  disabled={disabled}
+                />
+              </div>
+
+              <div className="eo2-time-part">
+                <span className="eo2-datetime-label">Time</span>
+
+                <div className="eo2-time-row">
+                  <select
+                    value={draftParts.hour12}
+                    onChange={(e) =>
+                      updateDraft({ hour12: e.target.value })
+                    }
+                    disabled={disabled}
+                    aria-label="Hour"
+                  >
+                    {hours.map((hour) => (
+                      <option key={hour} value={hour}>
+                        {hour}
+                      </option>
+                    ))}
+                  </select>
+
+                  <span className="eo2-time-colon">:</span>
+
+                  <select
+                    value={draftParts.minute}
+                    onChange={(e) =>
+                      updateDraft({ minute: e.target.value })
+                    }
+                    disabled={disabled}
+                    aria-label="Minute"
+                  >
+                    {minutes.map((minute) => (
+                      <option key={minute} value={minute}>
+                        {minute}
+                      </option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={draftParts.period}
+                    onChange={(e) =>
+                      updateDraft({ period: e.target.value })
+                    }
+                    disabled={disabled}
+                    aria-label="AM or PM"
+                  >
+                    <option value="AM">AM</option>
+                    <option value="PM">PM</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="eo2-datetime-actions">
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => {
+                  setOpen(false);
+                  setDraftValue(value || "");
+                }}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                className="primary-button"
+                disabled={!draftParts.date}
+                onClick={() => {
+                  onChange(draftValue);
+                  setOpen(false);
+                }}
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -2286,34 +2461,170 @@ export default function FacebookPostPage({
           max-width: none;
         }
 
-        .fb-rule-grid .eo2-datetime-field {
+        .eo2-datetime-control {
+          position: relative;
+          width: 100%;
+          min-width: 0;
+        }
+
+        .eo2-datetime-trigger {
           width: 100%;
           min-width: 0;
           height: 38px;
           min-height: 38px;
-          margin: 0;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
           padding: 7px 10px;
           border: 1px solid rgba(148, 163, 184, .42);
           border-radius: 9px;
-          box-sizing: border-box;
           background: rgba(255, 255, 255, .96);
           color: #111827;
           font: inherit;
-          font-size: .88rem;
+          font-size: .82rem;
           font-weight: 600;
+          text-align: left;
+          cursor: pointer;
+          box-sizing: border-box;
+        }
+
+        .eo2-datetime-trigger:focus {
+          border-color: var(--accent-color, #2563eb);
+          box-shadow: 0 0 0 3px rgba(37, 99, 235, .12);
           outline: none;
         }
 
-        .fb-rule-grid .eo2-datetime-field:focus {
-          border-color: var(--accent-color, #2563eb);
-          box-shadow: 0 0 0 3px rgba(37, 99, 235, .12);
-          background: #fff;
+        .eo2-datetime-placeholder {
+          color: #94a3b8;
+          font-weight: 500;
         }
 
-        .fb-rule-grid .eo2-datetime-field.eo2-datetime-error {
+        .eo2-datetime-calendar {
+          flex: 0 0 auto;
+          opacity: .65;
+        }
+
+        .eo2-datetime-error .eo2-datetime-trigger {
           border-color: #dc2626 !important;
           box-shadow: 0 0 0 3px rgba(220, 38, 38, .12) !important;
           background: rgba(254, 242, 242, .8);
+        }
+
+        .eo2-datetime-overlay {
+          position: fixed;
+          inset: 0;
+          z-index: 10020;
+          display: grid;
+          place-items: center;
+          padding: 18px;
+          background: rgba(15, 23, 42, .45);
+          backdrop-filter: blur(2px);
+        }
+
+        .eo2-datetime-dialog {
+          width: min(430px, 96vw);
+          max-height: calc(100vh - 36px);
+          overflow: auto;
+          border-radius: 18px;
+          border: 1px solid rgba(148, 163, 184, .22);
+          background: #fff;
+          color: #111827;
+          box-shadow: 0 24px 70px rgba(0, 0, 0, .26);
+        }
+
+        .eo2-datetime-dialog-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          padding: 14px 16px;
+          border-bottom: 1px solid rgba(148, 163, 184, .18);
+        }
+
+        .eo2-datetime-close {
+          width: 34px;
+          height: 34px;
+          min-height: 34px;
+          padding: 0;
+          border: 0;
+          border-radius: 50%;
+          background: rgba(148, 163, 184, .14);
+          color: #334155;
+          font-size: 1.35rem;
+          line-height: 1;
+          cursor: pointer;
+        }
+
+        .eo2-datetime-dialog-body {
+          display: grid;
+          grid-template-columns: minmax(0, 1.15fr) minmax(180px, .85fr);
+          gap: 14px;
+          padding: 16px;
+        }
+
+        .eo2-datetime-label {
+          display: block;
+          margin-bottom: 7px;
+          font-size: .76rem;
+          font-weight: 800;
+          color: #475569;
+        }
+
+        .eo2-date-part input[type="date"] {
+          width: 100%;
+          min-height: 44px;
+          padding: 0 11px;
+          border: 1px solid rgba(148, 163, 184, .42);
+          border-radius: 11px;
+          background: #fff;
+          color: #111827;
+          font: inherit;
+          box-sizing: border-box;
+        }
+
+        .eo2-time-row {
+          display: grid;
+          grid-template-columns: 1fr 10px 1fr 1.15fr;
+          align-items: center;
+          gap: 5px;
+        }
+
+        .eo2-time-row select {
+          width: 100%;
+          min-width: 0;
+          min-height: 44px;
+          padding: 0 8px;
+          border: 1px solid rgba(148, 163, 184, .42);
+          border-radius: 11px;
+          background: #fff;
+          color: #111827;
+          font: inherit;
+          font-weight: 700;
+        }
+
+        .eo2-time-colon {
+          text-align: center;
+          font-weight: 900;
+          color: #64748b;
+        }
+
+        .eo2-datetime-actions {
+          display: flex;
+          justify-content: flex-end;
+          gap: 9px;
+          padding: 12px 16px 16px;
+          border-top: 1px solid rgba(148, 163, 184, .18);
+        }
+
+        .eo2-datetime-actions button {
+          min-width: 90px;
+        }
+
+        @media (max-width: 520px) {
+          .eo2-datetime-dialog-body {
+            grid-template-columns: 1fr;
+          }
         }
 
         .fb-upload-empty-error {
@@ -2367,6 +2678,86 @@ export default function FacebookPostPage({
         .icon-button {
           min-height: 42px;
           border-radius: 11px !important;
+          font-weight: 700;
+        }
+
+        .fb-post-preview-layout {
+          display: grid;
+          grid-template-columns: minmax(0, 1.15fr) minmax(280px, .85fr);
+          gap: 16px;
+          align-items: start;
+        }
+
+        .fb-facebook-preview,
+        .fb-preview-photo-captions {
+          min-width: 0;
+          border: 1px solid rgba(148, 163, 184, .22);
+          border-radius: 16px;
+          background: rgba(255, 255, 255, .96);
+          color: #111827;
+          overflow: hidden;
+        }
+
+        .fb-preview-page {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 14px 16px 8px;
+        }
+
+        .fb-preview-page > div:last-child {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+
+        .fb-preview-page span {
+          font-size: .75rem;
+          color: #64748b;
+        }
+
+        .fb-preview-avatar {
+          width: 38px;
+          height: 38px;
+          display: grid;
+          place-items: center;
+          border-radius: 50%;
+          background: #1877f2;
+          color: #fff;
+          font-size: 1.15rem;
+          font-weight: 900;
+        }
+
+        .fb-facebook-preview pre,
+        .fb-preview-photo-captions pre {
+          margin: 0;
+          padding: 12px 16px 16px;
+          white-space: pre-wrap;
+          overflow-wrap: anywhere;
+          font: inherit;
+          font-size: .88rem;
+          line-height: 1.5;
+        }
+
+        .fb-preview-photo-captions h3 {
+          margin: 0;
+          padding: 14px 16px;
+          border-bottom: 1px solid rgba(148, 163, 184, .18);
+          font-size: .9rem;
+        }
+
+        .fb-preview-photo-captions details {
+          border-top: 1px solid rgba(148, 163, 184, .18);
+        }
+
+        .fb-preview-photo-captions details:first-of-type {
+          border-top: 0;
+        }
+
+        .fb-preview-photo-captions summary {
+          cursor: pointer;
+          padding: 11px 14px;
+          font-size: .82rem;
           font-weight: 700;
         }
 
@@ -2700,15 +3091,34 @@ export default function FacebookPostPage({
         </div>
 
         {showPreview && (
-          <div className="fb-facebook-preview">
-            <strong>
-              {getPageLabel(selectedPage)}
-            </strong>
+          <div className="fb-post-preview-layout">
+            <div className="fb-facebook-preview">
+              <div className="fb-preview-page">
+                <div className="fb-preview-avatar">f</div>
+                <div>
+                  <strong>{getPageLabel(selectedPage)}</strong>
+                  <span>Just now · Public</span>
+                </div>
+              </div>
 
-            <pre>
-              {mainCaption ||
-                "Your generated Facebook caption will appear here."}
-            </pre>
+              <pre>
+                {mainCaption ||
+                  "Your generated Facebook caption will appear here."}
+              </pre>
+            </div>
+
+            {isMultiple && (
+              <div className="fb-preview-photo-captions">
+                <h3>Per-photo captions</h3>
+
+                {photoCaptions.map((caption, index) => (
+                  <details key={items[index]?.id || index}>
+                    <summary>Item {index + 1}</summary>
+                    <pre>{caption}</pre>
+                  </details>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
