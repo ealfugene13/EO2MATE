@@ -2644,7 +2644,48 @@ export default function FacebookPostPage({
           }
         }
 
-      `}</style>
+      
+        @media (max-width: 1100px) {
+          .fb-rule-grid {
+            grid-template-columns:
+              repeat(2, minmax(0, 1fr)) !important;
+          }
+
+          .fb-rule-grid .eo2-rule-datetime {
+            grid-column: span 1;
+          }
+
+          .fb-rule-grid .eo2-rule-short {
+            max-width: none;
+          }
+        }
+
+        @media (max-width: 640px) {
+          .fb-post-setup-grid,
+          .fb-rule-grid {
+            grid-template-columns: 1fr !important;
+          }
+
+          .fb-rule-grid .eo2-rule-datetime {
+            grid-column: span 1;
+          }
+
+          .eo2-datetime-popover {
+            position: fixed;
+            left: 14px;
+            right: 14px;
+            top: 50%;
+            width: auto;
+            transform: translateY(-50%);
+            max-height: calc(100vh - 28px);
+            overflow: auto;
+          }
+
+          .eo2-time-scroll {
+            height: 154px;
+          }
+        }
+`}</style>
 
       <header className="dashboard-header fb-posting-header">
         <div>
@@ -3048,44 +3089,4 @@ export default function FacebookPostPage({
     </>
   );
 
-        @media (max-width: 1100px) {
-          .fb-rule-grid {
-            grid-template-columns:
-              repeat(2, minmax(0, 1fr)) !important;
-          }
-
-          .fb-rule-grid .eo2-rule-datetime {
-            grid-column: span 1;
-          }
-
-          .fb-rule-grid .eo2-rule-short {
-            max-width: none;
-          }
-        }
-
-        @media (max-width: 640px) {
-          .fb-post-setup-grid,
-          .fb-rule-grid {
-            grid-template-columns: 1fr !important;
-          }
-
-          .fb-rule-grid .eo2-rule-datetime {
-            grid-column: span 1;
-          }
-
-          .eo2-datetime-popover {
-            position: fixed;
-            left: 14px;
-            right: 14px;
-            top: 50%;
-            width: auto;
-            transform: translateY(-50%);
-            max-height: calc(100vh - 28px);
-            overflow: auto;
-          }
-
-          .eo2-time-scroll {
-            height: 154px;
-          }
-        }
 }
