@@ -215,87 +215,19 @@ function ScrollDateTimePicker({
   disabled = false,
   hasError = false,
   inputRef,
-  minDate = getPhilippineNowInput().slice(0, 10),
 }) {
-  const parts = splitDateTimeLocal(value);
-
-  const update = (patch) => {
-    onChange(
-      combineDateTimeLocal({
-        ...parts,
-        ...patch,
-      })
-    );
-  };
-
-  const hours = Array.from({ length: 12 }, (_, index) =>
-    String(index + 1).padStart(2, "0")
-  );
-
-  const minutes = Array.from({ length: 60 }, (_, index) =>
-    String(index).padStart(2, "0")
-  );
-
   return (
-    <div
-      className={`eo2-inline-datetime ${
+    <input
+      ref={inputRef}
+      type="datetime-local"
+      className={`eo2-datetime-field ${
         hasError ? "eo2-datetime-error" : ""
       }`}
-      ref={inputRef}
-      tabIndex={-1}
-    >
-      <div className="eo2-inline-date">
-        <input
-          type="date"
-          min={minDate}
-          value={parts.date}
-          onChange={(e) => update({ date: e.target.value })}
-          disabled={disabled}
-          aria-label="Date"
-        />
-      </div>
-
-      <div className="eo2-inline-time" aria-label="Time">
-        <select
-          value={parts.hour12}
-          onChange={(e) => update({ hour12: e.target.value })}
-          disabled={disabled}
-          aria-label="Hour"
-        >
-          {hours.map((hour) => (
-            <option key={hour} value={hour}>
-              {hour}
-            </option>
-          ))}
-        </select>
-
-        <span className="eo2-inline-time-colon">:</span>
-
-        <select
-          value={parts.minute}
-          onChange={(e) => update({ minute: e.target.value })}
-          disabled={disabled}
-          aria-label="Minute"
-        >
-          {minutes.map((minute) => (
-            <option key={minute} value={minute}>
-              {minute}
-            </option>
-          ))}
-        </select>
-
-        <select
-          className="eo2-inline-period"
-          value={parts.period}
-          onChange={(e) => update({ period: e.target.value })}
-          disabled={disabled}
-          aria-label="AM or PM"
-        >
-          <option value="AM">AM</option>
-          <option value="PM">PM</option>
-        </select>
-      </div>
-    </div>
+      value={value || ""}
+      onChange={(e) => onChange(e.target.value)}
+      disabled={disabled}
+      aria-invalid={hasError}
+    />
   );
 }
 
@@ -2354,104 +2286,34 @@ export default function FacebookPostPage({
           max-width: none;
         }
 
-        .eo2-inline-datetime {
-          display: grid;
-          grid-template-columns: minmax(180px, 1fr) auto;
-          align-items: center;
-          gap: 8px;
+        .fb-rule-grid .eo2-datetime-field {
           width: 100%;
           min-width: 0;
-        }
-
-        .eo2-inline-date {
-          min-width: 0;
-        }
-
-        .eo2-inline-date input[type="date"] {
-          width: 100%;
-          min-height: 44px;
+          height: 38px;
+          min-height: 38px;
+          margin: 0;
+          padding: 7px 10px;
+          border: 1px solid rgba(148, 163, 184, .42);
+          border-radius: 9px;
           box-sizing: border-box;
-          padding: 0 12px;
-          border: 1px solid rgba(148, 163, 184, .45);
-          border-radius: 12px;
-          background: #fff;
-          color: #0f172a;
-          font: inherit;
-          font-size: .9rem;
-          font-weight: 700;
-          outline: 0;
-          transition: border-color .15s ease, box-shadow .15s ease;
-        }
-
-        .eo2-inline-date input[type="date"]:focus {
-          border-color: rgba(99, 102, 241, .75);
-          box-shadow: 0 0 0 3px rgba(99, 102, 241, .12);
-        }
-
-        .eo2-inline-time {
-          display: grid;
-          grid-template-columns: 56px 10px 56px 66px;
-          align-items: center;
-          gap: 4px;
-          min-height: 44px;
-          padding: 0 6px;
-          border: 1px solid rgba(148, 163, 184, .45);
-          border-radius: 12px;
-          background: #fff;
-        }
-
-        .eo2-inline-time select {
-          width: 100%;
-          min-width: 0;
-          height: 34px;
-          padding: 0 4px;
-          border: 0;
-          background: transparent;
-          color: #0f172a;
+          background: rgba(255, 255, 255, .96);
+          color: #111827;
           font: inherit;
           font-size: .88rem;
-          font-weight: 800;
-          text-align: center;
-          outline: 0;
-          cursor: pointer;
+          font-weight: 600;
+          outline: none;
         }
 
-        .eo2-inline-time-colon {
-          color: #64748b;
-          font-size: .95rem;
-          font-weight: 900;
-          text-align: center;
+        .fb-rule-grid .eo2-datetime-field:focus {
+          border-color: var(--accent-color, #2563eb);
+          box-shadow: 0 0 0 3px rgba(37, 99, 235, .12);
+          background: #fff;
         }
 
-        .eo2-inline-period {
-          min-width: 62px;
-        }
-
-        .eo2-datetime-error .eo2-inline-date input[type="date"],
-        .eo2-datetime-error .eo2-inline-time {
-          border-color: #dc2626;
-          background-color: #fff7f7;
-        }
-
-        @media (max-width: 520px) {
-          .eo2-inline-datetime {
-            grid-template-columns: minmax(0, 1fr) auto;
-            gap: 6px;
-          }
-
-          .eo2-inline-date input[type="date"] {
-            padding: 0 8px;
-            font-size: .84rem;
-          }
-
-          .eo2-inline-time {
-            grid-template-columns: 46px 8px 46px 58px;
-            padding: 0 4px;
-          }
-
-          .eo2-inline-time select {
-            font-size: .82rem;
-          }
+        .fb-rule-grid .eo2-datetime-field.eo2-datetime-error {
+          border-color: #dc2626 !important;
+          box-shadow: 0 0 0 3px rgba(220, 38, 38, .12) !important;
+          background: rgba(254, 242, 242, .8);
         }
 
         .fb-upload-empty-error {
@@ -2571,21 +2433,6 @@ export default function FacebookPostPage({
               "sniper";
           }
 
-          .eo2-datetime-popover {
-            position: fixed;
-            z-index: 9999;
-            left: 12px;
-            right: 12px;
-            top: 50%;
-            width: auto;
-            transform: translateY(-50%);
-            max-height: calc(100vh - 24px);
-            overflow-y: auto;
-          }
-
-          .eo2-time-scroll {
-            height: 164px;
-          }
         }
 
 `}</style>
