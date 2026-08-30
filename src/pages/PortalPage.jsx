@@ -6,6 +6,193 @@ import AdminClientsPage from "./AdminClientsPage";
 import FacebookPostPage from "./FacebookPostPage";
 
 
+function NavIcon({ type }) {
+  const common = {
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.9,
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    "aria-hidden": "true",
+  };
+
+  const icons = {
+    clients: (
+      <svg {...common}>
+        <circle cx="9" cy="8" r="3" />
+        <path d="M3 20a6 6 0 0 1 12 0" />
+        <path d="M17 8h4" />
+        <path d="M19 6v4" />
+      </svg>
+    ),
+    dashboard: (
+      <svg {...common}>
+        <rect x="3" y="3" width="7" height="7" rx="1" />
+        <rect x="14" y="3" width="7" height="7" rx="1" />
+        <rect x="3" y="14" width="7" height="7" rx="1" />
+        <rect x="14" y="14" width="7" height="7" rx="1" />
+      </svg>
+    ),
+    facebook: (
+      <svg {...common}>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M13.5 8H12a2 2 0 0 0-2 2v2h3" />
+        <path d="M10 21v-9" />
+        <path d="M8 12h5" />
+      </svg>
+    ),
+    create: (
+      <svg {...common}>
+        <path d="M12 20h9" />
+        <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z" />
+      </svg>
+    ),
+    auction: (
+      <svg {...common}>
+        <path d="m14 5 5 5" />
+        <path d="m11 8 5 5" />
+        <path d="M4 20 14.5 9.5" />
+        <path d="M3 21h7" />
+      </svg>
+    ),
+    orders: (
+      <svg {...common}>
+        <path d="M6 7V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2" />
+        <rect x="4" y="7" width="16" height="14" rx="2" />
+        <path d="M9 11h6" />
+      </svg>
+    ),
+    payments: (
+      <svg {...common}>
+        <rect x="3" y="5" width="18" height="14" rx="2" />
+        <path d="M3 10h18" />
+        <path d="M7 15h3" />
+      </svg>
+    ),
+    delivery: (
+      <svg {...common}>
+        <path d="M3 6h11v11H3z" />
+        <path d="M14 10h4l3 3v4h-7z" />
+        <circle cx="7" cy="18" r="2" />
+        <circle cx="18" cy="18" r="2" />
+      </svg>
+    ),
+    automation: (
+      <svg {...common}>
+        <circle cx="12" cy="12" r="3" />
+        <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21h-4v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3v-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1L7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.6V3h4v.1a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.1v4H21a1.7 1.7 0 0 0-1.6 1Z" />
+      </svg>
+    ),
+    setup: (
+      <svg {...common}>
+        <path d="M4 21v-7" />
+        <path d="M4 10V3" />
+        <path d="M12 21v-9" />
+        <path d="M12 8V3" />
+        <path d="M20 21v-5" />
+        <path d="M20 12V3" />
+        <path d="M1 14h6" />
+        <path d="M9 8h6" />
+        <path d="M17 16h6" />
+      </svg>
+    ),
+    reports: (
+      <svg {...common}>
+        <path d="M4 19V9" />
+        <path d="M10 19V5" />
+        <path d="M16 19v-7" />
+        <path d="M22 19V3" />
+      </svg>
+    ),
+  };
+
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        width: 20,
+        height: 20,
+        minWidth: 20,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      {icons[type] || icons.dashboard}
+    </span>
+  );
+}
+
+function SidebarLogo({ admin = false }) {
+  const [logoFailed, setLogoFailed] = useState(false);
+
+  return (
+    <div
+      className="sidebar-brand eo2-sidebar-brand"
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 8,
+      }}
+    >
+      {!logoFailed ? (
+        <img
+          src={`${import.meta.env.BASE_URL}eo2mate-logo.png`}
+          alt="EO2MATE"
+          onError={() => setLogoFailed(true)}
+          style={{
+            display: "block",
+            width: "100%",
+            maxWidth: 170,
+            height: "auto",
+            objectFit: "contain",
+            borderRadius: 8,
+            background: "#ffffff",
+          }}
+        />
+      ) : (
+        <div
+          aria-label="EO2MATE"
+          style={{
+            width: "100%",
+            maxWidth: 170,
+            padding: "10px 12px",
+            borderRadius: 8,
+            background: "#ffffff",
+            color: "#08233f",
+            textAlign: "center",
+            fontWeight: 900,
+            letterSpacing: "0.12em",
+          }}
+        >
+          EO2MATE
+        </div>
+      )}
+
+      {admin && <span className="eo2-admin-label">Platform Admin</span>}
+    </div>
+  );
+}
+
+function SidebarNavButton({ icon, children, ...props }) {
+  return (
+    <button
+      {...props}
+      style={{
+        ...(props.style || {}),
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+      }}
+    >
+      <NavIcon type={icon} />
+      <span>{children}</span>
+    </button>
+  );
+}
+
 function formatCurrency(value) {
   if (value === null || value === undefined || value === "") return "-";
   return new Intl.NumberFormat("en-PH", {
@@ -1183,16 +1370,11 @@ export default function PortalPage({ session }) {
     return (
       <div className="app-shell">
         <aside className="sidebar">
-          <div className="sidebar-brand eo2-sidebar-brand">
-            <img
-              className="eo2-sidebar-logo-image"
-              src={`${import.meta.env.BASE_URL}eo2mate-logo.png`}
-              alt="EO2MATE - Let's Auto, Mate."
-            />
-            <span className="eo2-admin-label">Platform Admin</span>
-          </div>
+          <SidebarLogo admin />
           <nav className="sidebar-nav">
-            <button className="nav-item active">Clients</button>
+            <SidebarNavButton icon="clients" className="nav-item active">
+              Clients
+            </SidebarNavButton>
           </nav>
           <div className="sidebar-footer">
             <div className="user-mini-card"><strong>{session.user.email}</strong><span>{platformAdmin.role}</span></div>
@@ -1207,73 +1389,96 @@ export default function PortalPage({ session }) {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <div className="sidebar-brand eo2-sidebar-brand">
-          <img
-            className="eo2-sidebar-logo-image"
-            src={`${import.meta.env.BASE_URL}eo2mate-logo.png`}
-            alt="EO2MATE - Let's Auto, Mate."
-          />
-        </div>
+        <SidebarLogo />
 
         <nav className="sidebar-nav">
           {platformAdmin && (
-            <button
+            <SidebarNavButton
+              icon="clients"
               className={`nav-item ${page === "admin-clients" ? "active" : ""}`}
               onClick={() => setPage("admin-clients")}
             >
               Admin · Clients
-            </button>
+            </SidebarNavButton>
           )}
-          <button className={`nav-item ${page === "dashboard" ? "active" : ""}`} onClick={() => setPage("dashboard")}>
+
+          <SidebarNavButton
+            icon="dashboard"
+            className={`nav-item ${page === "dashboard" ? "active" : ""}`}
+            onClick={() => setPage("dashboard")}
+          >
             Dashboard
-          </button>
+          </SidebarNavButton>
 
-          <button className={`nav-item ${page === "facebook" ? "active" : ""}`} onClick={openFacebookSetup}>
+          <SidebarNavButton
+            icon="facebook"
+            className={`nav-item ${page === "facebook" ? "active" : ""}`}
+            onClick={openFacebookSetup}
+          >
             Facebook Setup
-          </button>
+          </SidebarNavButton>
 
-          <button
+          <SidebarNavButton
+            icon="create"
             className={`nav-item ${page === "facebook-post" ? "active" : ""}`}
             onClick={() => setPage("facebook-post")}
           >
             Create Auction Post
-          </button>
+          </SidebarNavButton>
 
-          <button className={`nav-item ${page.includes("auction") ? "active" : ""}`} onClick={() => goToAuctions("ALL")}>
+          <SidebarNavButton
+            icon="auction"
+            className={`nav-item ${page.includes("auction") ? "active" : ""}`}
+            onClick={() => goToAuctions("ALL")}
+          >
             Auctions
-          </button>
+          </SidebarNavButton>
 
-          <button className={`nav-item ${page.includes("order") ? "active" : ""}`} onClick={() => goToOrders("ALL")}>
+          <SidebarNavButton
+            icon="orders"
+            className={`nav-item ${page.includes("order") ? "active" : ""}`}
+            onClick={() => goToOrders("ALL")}
+          >
             Orders
-          </button>
+          </SidebarNavButton>
 
-          <button
+          <SidebarNavButton
+            icon="payments"
             className={`nav-item ${page.includes("payment") ? "active" : ""}`}
             onClick={() => paymentAccountStatus?.payment_enabled && goToPayments("ALL")}
             disabled={!paymentAccountStatus?.payment_enabled}
             title={paymentAccountStatus?.payment_enabled ? "Payments" : "Set up and activate PayMongo to enable online payments"}
           >
             Payments
-          </button>
+          </SidebarNavButton>
 
-          <button className={`nav-item ${page.includes("deliver") ? "active" : ""}`} onClick={() => goToDeliveries("ALL")}>
+          <SidebarNavButton
+            icon="delivery"
+            className={`nav-item ${page.includes("deliver") ? "active" : ""}`}
+            onClick={() => goToDeliveries("ALL")}
+          >
             Delivery
-          </button>
+          </SidebarNavButton>
 
-          <button
+          <SidebarNavButton
+            icon="automation"
             className={`nav-item ${page === "automation-control" ? "active" : ""}`}
             onClick={openAutomationControl}
           >
             Automation Control
-          </button>
+          </SidebarNavButton>
 
-          <button className={`nav-item ${page === "setup" ? "active" : ""}`} onClick={() => setPage("setup")}>
+          <SidebarNavButton
+            icon="setup"
+            className={`nav-item ${page === "setup" ? "active" : ""}`}
+            onClick={() => setPage("setup")}
+          >
             Setup
-          </button>
+          </SidebarNavButton>
 
-          <button className="nav-item" disabled>
+          <SidebarNavButton icon="reports" className="nav-item" disabled>
             Reports
-          </button>
+          </SidebarNavButton>
         </nav>
 
         <div className="sidebar-footer">
@@ -1419,8 +1624,33 @@ export default function PortalPage({ session }) {
         {page === "automation-control" && (
           <>
             {automationModal && (
-              <div className="control-modal-backdrop">
-                <div className="control-modal" role="dialog" aria-modal="true">
+              <div
+                className="control-modal-backdrop"
+                style={{
+                  position: "fixed",
+                  inset: 0,
+                  zIndex: 99999,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "20px",
+                  background: "rgba(15, 23, 42, 0.48)",
+                }}
+              >
+                <div
+                  className="control-modal"
+                  role="dialog"
+                  aria-modal="true"
+                  style={{
+                    width: "min(520px, 100%)",
+                    maxHeight: "90vh",
+                    overflowY: "auto",
+                    background: "#fff",
+                    borderRadius: "18px",
+                    padding: "24px",
+                    boxShadow: "0 24px 70px rgba(15, 23, 42, 0.28)",
+                  }}
+                >
                   <div className={`control-modal-icon ${automationModal.enabled ? "on" : "off"}`}>
                     {automationModal.enabled ? "✓" : "!"}
                   </div>
