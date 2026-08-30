@@ -15,6 +15,23 @@ const DEFAULT_RULES = {
   antiSniper: "0",
 };
 
+const REQUIRED_ENVIRONMENTS = [
+  {
+    environment_code: "CLNT",
+    environment_name: "Client",
+    is_active: true,
+  },
+  {
+    environment_code: "TEST",
+    environment_name: "Test",
+    is_active: true,
+  },
+  {
+    environment_code: "PROD",
+    environment_name: "Production",
+    is_active: true,
+  },
+];
 
 function normalizeMoney(value) {
   const raw = String(value ?? "")
@@ -205,6 +222,28 @@ function getPageLabel(page) {
     page?.display_name ||
     "Facebook Page"
   );
+}
+
+function normalizeEnvironmentRows(rows) {
+  const source = Array.isArray(rows) ? rows : [];
+
+  return REQUIRED_ENVIRONMENTS.map((required) => {
+    const existing = source.find(
+      (row) =>
+        String(row?.environment_code || "").toUpperCase() ===
+        required.environment_code
+    );
+
+    return {
+      ...required,
+      ...(existing || {}),
+      environment_code: required.environment_code,
+      environment_name:
+        existing?.environment_name ||
+        required.environment_name,
+      is_active: true,
+    };
+  });
 }
 
 function buildRuleLines(
@@ -702,6 +741,7 @@ export default function FacebookPostPage({
 
   const [pages, setPages] = useState([]);
   const [subscription, setSubscription] = useState(null);
+  const [environments, setEnvironments] = useState([]);
   const [postTypes, setPostTypes] = useState([]);
   const [selectedPageId, setSelectedPageId] = useState("");
   const [environment, setEnvironment] = useState("");
@@ -838,18 +878,12 @@ export default function FacebookPostPage({
       }
 
       const pageRows = data.pages || [];
+      const environmentRows = data.environments || [];
       const postTypeRows = data.auction_post_types || [];
 
       setPages(pageRows);
       setSubscription(data.subscription || null);
-
-      const internalEnvironment = String(
-        client?.default_environment ||
-          data.subscription?.allowed_environment ||
-          "CLNT"
-      ).toUpperCase();
-
-      setEnvironment(internalEnvironment);
+      setEnvironments(environmentRows);
       setPostTypes(postTypeRows);
 
       try {
@@ -1191,6 +1225,10 @@ export default function FacebookPostPage({
         "Select a Facebook Page.";
     }
 
+    if (!environment) {
+      errors.environment =
+        "Select an operating mode.";
+    }
 
     if (!items.length) {
       errors.images =
@@ -2275,7 +2313,6 @@ export default function FacebookPostPage({
               ))}
             </select>
           </label>
-
 
           <label>
             Auction Type
