@@ -181,6 +181,20 @@ function combineDateTimeLocal(date, time) {
   return `${date}T${time}`;
 }
 
+function philippineLocalToDate(value) {
+  const raw = String(value || "").trim();
+
+  if (!raw || !raw.includes("T")) {
+    return null;
+  }
+
+  const date = new Date(`${raw}:00+08:00`);
+
+  return Number.isNaN(date.getTime())
+    ? null
+    : date;
+}
+
 function DateTimePicker({
   value,
   onChange,
@@ -190,6 +204,9 @@ function DateTimePicker({
   minDateTime = getPhilippineNowInput(),
 }) {
   const pickerRef = useRef(null);
+  const hourScrollRef = useRef(null);
+  const minuteScrollRef = useRef(null);
+  const periodScrollRef = useRef(null);
   const [open, setOpen] = useState(false);
 
   const parts = splitDateTimeLocal(value);
@@ -222,9 +239,9 @@ function DateTimePicker({
       return "Select date & time";
     }
 
-    const timestamp = toPhilippineTimestamp(value);
+    const date = philippineLocalToDate(value);
 
-    if (!timestamp) {
+    if (!date) {
       return value;
     }
 
@@ -236,10 +253,15 @@ function DateTimePicker({
       hour: "2-digit",
       minute: "2-digit",
       hour12: true,
-    }).format(new Date(timestamp));
+    }).format(date);
   })();
 
   const setDate = (nextDate) => {
+    if (!nextDate) {
+      onChange("");
+      return;
+    }
+
     onChange(
       combineDateTimeLocal(
         nextDate,
@@ -276,10 +298,44 @@ function DateTimePicker({
     );
   };
 
+  const scrollSelectedIntoView = (
+    container,
+    selector
+  ) => {
+    if (!container) {
+      return;
+    }
+
+    const selected =
+      container.querySelector(selector);
+
+    if (selected) {
+      selected.scrollIntoView({
+        block: "center",
+        behavior: "instant",
+      });
+    }
+  };
+
   useEffect(() => {
     if (!open) {
       return undefined;
     }
+
+    const timer = window.setTimeout(() => {
+      scrollSelectedIntoView(
+        hourScrollRef.current,
+        ".selected"
+      );
+      scrollSelectedIntoView(
+        minuteScrollRef.current,
+        ".selected"
+      );
+      scrollSelectedIntoView(
+        periodScrollRef.current,
+        ".selected"
+      );
+    }, 0);
 
     const onOutside = (event) => {
       if (
@@ -293,6 +349,7 @@ function DateTimePicker({
     document.addEventListener("mousedown", onOutside);
 
     return () => {
+      window.clearTimeout(timer);
       document.removeEventListener(
         "mousedown",
         onOutside
@@ -309,6 +366,32 @@ function DateTimePicker({
     { length: 60 },
     (_, index) => index
   );
+
+  const wheelHandler = (
+    event,
+    values,
+    currentValue,
+    applyValue
+  ) => {
+    event.preventDefault();
+
+    const currentIndex = Math.max(
+      0,
+      values.indexOf(currentValue)
+    );
+
+    const direction =
+      event.deltaY > 0 ? 1 : -1;
+
+    const nextIndex = Math.min(
+      values.length - 1,
+      Math.max(0, currentIndex + direction)
+    );
+
+    if (nextIndex !== currentIndex) {
+      applyValue(values[nextIndex]);
+    }
+  };
 
   return (
     <div
@@ -364,7 +447,20 @@ function DateTimePicker({
             <div className="eo2-time-wheels">
               <div className="eo2-time-wheel">
                 <span>Hour</span>
-                <div className="eo2-time-scroll">
+
+                <div
+                  ref={hourScrollRef}
+                  className="eo2-time-scroll"
+                  onWheel={(event) =>
+                    wheelHandler(
+                      event,
+                      hours,
+                      selectedTime.hour12,
+                      (hour12) =>
+                        setTimePart({ hour12 })
+                    )
+                  }
+                >
                   {hours.map((hour) => (
                     <button
                       key={hour}
@@ -388,7 +484,20 @@ function DateTimePicker({
 
               <div className="eo2-time-wheel">
                 <span>Minute</span>
-                <div className="eo2-time-scroll">
+
+                <div
+                  ref={minuteScrollRef}
+                  className="eo2-time-scroll"
+                  onWheel={(event) =>
+                    wheelHandler(
+                      event,
+                      minutes,
+                      selectedTime.minute,
+                      (minute) =>
+                        setTimePart({ minute })
+                    )
+                  }
+                >
                   {minutes.map((minute) => (
                     <button
                       key={minute}
@@ -412,7 +521,20 @@ function DateTimePicker({
 
               <div className="eo2-time-wheel">
                 <span>AM/PM</span>
-                <div className="eo2-time-scroll eo2-time-period">
+
+                <div
+                  ref={periodScrollRef}
+                  className="eo2-time-scroll eo2-time-period"
+                  onWheel={(event) =>
+                    wheelHandler(
+                      event,
+                      ["AM", "PM"],
+                      selectedTime.period,
+                      (period) =>
+                        setTimePart({ period })
+                    )
+                  }
+                >
                   {["AM", "PM"].map((period) => (
                     <button
                       key={period}
@@ -656,7 +778,7 @@ function RuleFields({
       }`}
     >
       <label
-        className={`eo2-rule-compact ${fieldClass(
+        className={`eo2-rule-compact eo2-rule-minbid ${fieldClass(
           fieldErrors,
           key("minBid")
         )}`}
@@ -688,7 +810,7 @@ function RuleFields({
       </label>
 
       <label
-        className={`eo2-rule-compact ${fieldClass(
+        className={`eo2-rule-compact eo2-rule-increment ${fieldClass(
           fieldErrors,
           key("increment")
         )}`}
@@ -719,7 +841,7 @@ function RuleFields({
         )}
       </label>
 
-      <label className="eo2-rule-compact">
+      <label className="eo2-rule-compact eo2-rule-bidders">
         Minimum Bidders
 
         <input
@@ -736,7 +858,7 @@ function RuleFields({
       </label>
 
       <label
-        className={`eo2-rule-compact ${fieldClass(
+        className={`eo2-rule-compact eo2-rule-buyout ${fieldClass(
           fieldErrors,
           key("buyout")
         )}`}
@@ -804,7 +926,7 @@ function RuleFields({
 
         return (
           <label
-            className={`eo2-rule-datetime ${fieldClass(
+            className={`eo2-rule-datetime eo2-rule-buyout-until ${fieldClass(
               fieldErrors,
               key("buyoutUntil")
             )}`}
@@ -836,7 +958,7 @@ function RuleFields({
       })()}
 
       <label
-        className={`eo2-rule-datetime ${fieldClass(
+        className={`eo2-rule-datetime eo2-rule-auction-ends ${fieldClass(
           fieldErrors,
           key("auctionEnds")
         )}`}
@@ -865,7 +987,7 @@ function RuleFields({
         )}
       </label>
 
-      <label className="eo2-rule-compact eo2-rule-short">
+      <label className="eo2-rule-compact eo2-rule-short eo2-rule-cutoff">
         Bid Cutoff (mins)
 
         <input
@@ -881,7 +1003,7 @@ function RuleFields({
         />
       </label>
 
-      <label className="eo2-rule-compact eo2-rule-short">
+      <label className="eo2-rule-compact eo2-rule-short eo2-rule-sniper">
         Anti Sniper (mins)
 
         <input
@@ -2380,7 +2502,11 @@ export default function FacebookPostPage({
         .fb-rule-grid {
           display: grid;
           grid-template-columns:
-            repeat(4, minmax(0, 1fr)) !important;
+            repeat(4, minmax(150px, 1fr)) !important;
+          grid-template-areas:
+            "minbid increment bidders buyout"
+            "buyoutUntil buyoutUntil ends ends"
+            "cutoff sniper . .";
           gap: 12px 14px !important;
           align-items: start;
         }
@@ -2390,24 +2516,56 @@ export default function FacebookPostPage({
           margin: 0;
         }
 
-        .fb-rule-grid .eo2-rule-compact input {
-          min-height: 40px;
-          height: 40px;
-          padding: 8px 11px;
-          border-radius: 10px;
+        .fb-rule-grid .eo2-rule-minbid {
+          grid-area: minbid;
+        }
+
+        .fb-rule-grid .eo2-rule-increment {
+          grid-area: increment;
+        }
+
+        .fb-rule-grid .eo2-rule-bidders {
+          grid-area: bidders;
+        }
+
+        .fb-rule-grid .eo2-rule-buyout {
+          grid-area: buyout;
+        }
+
+        .fb-rule-grid .eo2-rule-buyout-until {
+          grid-area: buyoutUntil;
+        }
+
+        .fb-rule-grid .eo2-rule-auction-ends {
+          grid-area: ends;
+        }
+
+        .fb-rule-grid .eo2-rule-cutoff {
+          grid-area: cutoff;
+        }
+
+        .fb-rule-grid .eo2-rule-sniper {
+          grid-area: sniper;
+        }
+
+        .fb-rule-grid .eo2-rule-compact input,
+        .fb-rule-grid .eo2-datetime-field {
+          min-height: 38px;
+          height: 38px;
+          padding: 7px 10px;
+          border-radius: 9px;
         }
 
         .fb-rule-grid .eo2-rule-compact > small {
-          font-size: .69rem;
+          display: block;
+          min-height: 0;
+          margin-top: 4px;
+          font-size: .68rem;
           line-height: 1.25;
         }
 
         .fb-rule-grid .eo2-rule-short {
-          max-width: 220px;
-        }
-
-        .fb-rule-grid .eo2-rule-datetime {
-          grid-column: span 2;
+          max-width: 190px;
         }
 
         .eo2-datetime-picker {
@@ -2512,14 +2670,31 @@ export default function FacebookPostPage({
         }
 
         .eo2-time-scroll {
-          height: 132px;
-          overflow-y: auto;
+          height: 144px;
+          overflow-y: scroll;
           overscroll-behavior: contain;
           scroll-snap-type: y proximity;
           border: 1px solid rgba(148, 163, 184, .30);
           border-radius: 9px;
           background: #f8fafc;
           padding: 4px;
+          scrollbar-width: auto;
+          scrollbar-gutter: stable;
+          touch-action: pan-y;
+        }
+
+        .eo2-time-scroll::-webkit-scrollbar {
+          width: 10px;
+        }
+
+        .eo2-time-scroll::-webkit-scrollbar-thumb {
+          border: 2px solid #f8fafc;
+          border-radius: 999px;
+          background: rgba(100, 116, 139, .48);
+        }
+
+        .eo2-time-scroll::-webkit-scrollbar-track {
+          background: transparent;
         }
 
         .eo2-time-scroll button {
@@ -2618,7 +2793,6 @@ export default function FacebookPostPage({
 
         @media (max-width: 720px) {
           .fb-post-setup-grid,
-          .fb-rule-grid,
           .fb-post-preview-layout {
             grid-template-columns: 1fr !important;
           }
@@ -2645,14 +2819,16 @@ export default function FacebookPostPage({
         }
 
       
-        @media (max-width: 1100px) {
+
+        @media (max-width: 1180px) {
           .fb-rule-grid {
             grid-template-columns:
               repeat(2, minmax(0, 1fr)) !important;
-          }
-
-          .fb-rule-grid .eo2-rule-datetime {
-            grid-column: span 1;
+            grid-template-areas:
+              "minbid increment"
+              "bidders buyout"
+              "buyoutUntil ends"
+              "cutoff sniper";
           }
 
           .fb-rule-grid .eo2-rule-short {
@@ -2660,31 +2836,37 @@ export default function FacebookPostPage({
           }
         }
 
-        @media (max-width: 640px) {
-          .fb-post-setup-grid,
+        @media (max-width: 680px) {
           .fb-rule-grid {
             grid-template-columns: 1fr !important;
-          }
-
-          .fb-rule-grid .eo2-rule-datetime {
-            grid-column: span 1;
+            grid-template-areas:
+              "minbid"
+              "increment"
+              "bidders"
+              "buyout"
+              "buyoutUntil"
+              "ends"
+              "cutoff"
+              "sniper";
           }
 
           .eo2-datetime-popover {
             position: fixed;
-            left: 14px;
-            right: 14px;
+            z-index: 9999;
+            left: 12px;
+            right: 12px;
             top: 50%;
             width: auto;
             transform: translateY(-50%);
-            max-height: calc(100vh - 28px);
-            overflow: auto;
+            max-height: calc(100vh - 24px);
+            overflow-y: auto;
           }
 
           .eo2-time-scroll {
-            height: 154px;
+            height: 164px;
           }
         }
+
 `}</style>
 
       <header className="dashboard-header fb-posting-header">
