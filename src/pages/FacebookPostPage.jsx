@@ -15,23 +15,6 @@ const DEFAULT_RULES = {
   antiSniper: "0",
 };
 
-const REQUIRED_ENVIRONMENTS = [
-  {
-    environment_code: "CLNT",
-    environment_name: "Client",
-    is_active: true,
-  },
-  {
-    environment_code: "TEST",
-    environment_name: "Test",
-    is_active: true,
-  },
-  {
-    environment_code: "PROD",
-    environment_name: "Production",
-    is_active: true,
-  },
-];
 
 function normalizeMoney(value) {
   const raw = String(value ?? "")
@@ -126,7 +109,7 @@ function formatFacebookAuctionDate(value) {
     .trim();
 }
 
-function getPhilippineTodayInput() {
+function getPhilippineNowInput() {
   const now = new Date();
 
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -134,6 +117,9 @@ function getPhilippineTodayInput() {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
   }).formatToParts(now);
 
   const values = {};
@@ -142,7 +128,10 @@ function getPhilippineTodayInput() {
     values[part.type] = part.value;
   });
 
-  return `${values.year}-${values.month}-${values.day}`;
+  return (
+    `${values.year}-${values.month}-${values.day}` +
+    `T${values.hour}:${values.minute}`
+  );
 }
 
 function splitDateTimeLocal(value) {
@@ -181,65 +170,24 @@ function DateTimePicker({
   disabled = false,
   hasError = false,
   inputRef,
-  minDate = getPhilippineTodayInput(),
+  minDateTime = getPhilippineNowInput(),
 }) {
-  const parts = splitDateTimeLocal(value);
-
-  function updateDate(nextDate) {
-    onChange(
-      combineDateTimeLocal(
-        nextDate,
-        parts.time || "12:00"
-      )
-    );
-  }
-
-  function updateTime(nextTime) {
-    if (!parts.date) return;
-
-    onChange(
-      combineDateTimeLocal(
-        parts.date,
-        nextTime
-      )
-    );
-  }
-
   return (
     <div
-      ref={inputRef}
-      tabIndex={-1}
       className={`eo2-datetime-picker ${
         hasError ? "eo2-datetime-error" : ""
       }`}
     >
-      <div className="eo2-datetime-part">
-        <span className="eo2-datetime-label">
-          Date
-        </span>
-
-        <input
-          type="date"
-          min={minDate}
-          value={parts.date}
-          onChange={(e) => updateDate(e.target.value)}
-          disabled={disabled}
-        />
-      </div>
-
-      <div className="eo2-datetime-part">
-        <span className="eo2-datetime-label">
-          Time · PH
-        </span>
-
-        <input
-          type="time"
-          value={parts.time}
-          onChange={(e) => updateTime(e.target.value)}
-          disabled={disabled || !parts.date}
-          step="60"
-        />
-      </div>
+      <input
+        ref={inputRef}
+        type="datetime-local"
+        min={minDateTime}
+        value={value || ""}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        step="60"
+        aria-invalid={hasError}
+      />
 
       <small className="eo2-datetime-hint">
         Philippine Time · Asia/Manila
@@ -257,28 +205,6 @@ function getPageLabel(page) {
     page?.display_name ||
     "Facebook Page"
   );
-}
-
-function normalizeEnvironmentRows(rows) {
-  const source = Array.isArray(rows) ? rows : [];
-
-  return REQUIRED_ENVIRONMENTS.map((required) => {
-    const existing = source.find(
-      (row) =>
-        String(row?.environment_code || "").toUpperCase() ===
-        required.environment_code
-    );
-
-    return {
-      ...required,
-      ...(existing || {}),
-      environment_code: required.environment_code,
-      environment_name:
-        existing?.environment_name ||
-        required.environment_name,
-      is_active: true,
-    };
-  });
 }
 
 function buildRuleLines(
@@ -776,7 +702,6 @@ export default function FacebookPostPage({
 
   const [pages, setPages] = useState([]);
   const [subscription, setSubscription] = useState(null);
-  const [environments, setEnvironments] = useState([]);
   const [postTypes, setPostTypes] = useState([]);
   const [selectedPageId, setSelectedPageId] = useState("");
   const [environment, setEnvironment] = useState("");
@@ -913,12 +838,18 @@ export default function FacebookPostPage({
       }
 
       const pageRows = data.pages || [];
-      const environmentRows = data.environments || [];
       const postTypeRows = data.auction_post_types || [];
 
       setPages(pageRows);
       setSubscription(data.subscription || null);
-      setEnvironments(environmentRows);
+
+      const internalEnvironment = String(
+        client?.default_environment ||
+          data.subscription?.allowed_environment ||
+          "CLNT"
+      ).toUpperCase();
+
+      setEnvironment(internalEnvironment);
       setPostTypes(postTypeRows);
 
       try {
@@ -1260,10 +1191,6 @@ export default function FacebookPostPage({
         "Select a Facebook Page.";
     }
 
-    if (!environment) {
-      errors.environment =
-        "Select an operating mode.";
-    }
 
     if (!items.length) {
       errors.images =
@@ -1373,7 +1300,7 @@ export default function FacebookPostPage({
           errors[
             "shared.buyoutUntil"
           ] =
-            "Buyout Until cannot be later than Auction Ends.";
+            "Buyout Until must be on or before Auction Ends.";
         }
       }
     } else {
@@ -1535,7 +1462,7 @@ export default function FacebookPostPage({
               ] =
                 `Item ${
                   index + 1
-                }: Buyout Until cannot be later than Auction Ends.`;
+                }: Buyout Until must be on or before Auction Ends.`;
             }
           }
         }
@@ -1677,7 +1604,6 @@ export default function FacebookPostPage({
           `Page: ${getPageLabel(
             selectedPage
           )}\n` +
-          `Mode: ${environment}\n` +
           `Images: ${items.length}`
       );
 
@@ -2171,59 +2097,39 @@ export default function FacebookPostPage({
         }
 
         .fb-post-setup-grid {
+          display: grid;
           grid-template-columns:
-            repeat(auto-fit, minmax(220px, 1fr)) !important;
+            repeat(2, minmax(0, 1fr)) !important;
         }
 
         .fb-rule-grid {
+          display: grid;
           grid-template-columns:
-            repeat(auto-fit, minmax(200px, 1fr)) !important;
+            repeat(2, minmax(0, 1fr)) !important;
         }
 
         .eo2-datetime-picker {
-          display: grid;
-          grid-template-columns:
-            minmax(145px, 1.2fr)
-            minmax(120px, .8fr);
-          gap: 10px;
-          padding: 12px;
-          border: 1px solid rgba(148, 163, 184, .32);
-          border-radius: 14px;
-          background: rgba(148, 163, 184, .045);
+          display: flex;
+          flex-direction: column;
+          gap: 7px;
           min-width: 0;
         }
 
-        .eo2-datetime-picker:focus-within {
-          border-color: var(--accent-color, #2563eb);
-          box-shadow: 0 0 0 3px rgba(37, 99, 235, .10);
-        }
-
-        .eo2-datetime-error {
-          border-color: #dc2626 !important;
-        }
-
-        .eo2-datetime-part {
-          min-width: 0;
-        }
-
-        .eo2-datetime-label {
-          display: block;
-          margin: 0 0 6px 2px;
-          font-size: .70rem;
-          font-weight: 800;
-          text-transform: uppercase;
-          opacity: .60;
-        }
-
-        .eo2-datetime-picker input[type="date"],
-        .eo2-datetime-picker input[type="time"] {
-          min-height: 50px;
-          height: 50px;
+        .eo2-datetime-picker input[type="datetime-local"] {
+          width: 100%;
+          min-height: 46px;
+          height: 46px;
           font-size: 16px;
+          box-sizing: border-box;
+        }
+
+        .eo2-datetime-error input[type="datetime-local"] {
+          border-color: #dc2626 !important;
+          box-shadow: 0 0 0 3px rgba(220, 38, 38, .12) !important;
+          background: rgba(254, 242, 242, .8);
         }
 
         .eo2-datetime-hint {
-          grid-column: 1 / -1;
           margin: 0 2px;
           font-size: .72rem;
           opacity: .60;
@@ -2282,9 +2188,6 @@ export default function FacebookPostPage({
             grid-template-columns: 1fr !important;
           }
 
-          .eo2-datetime-picker {
-            grid-template-columns: 1fr 1fr;
-          }
 
           .eo2-success-actions {
             display: grid;
@@ -2302,15 +2205,6 @@ export default function FacebookPostPage({
           }
         }
 
-        @media (max-width: 430px) {
-          .eo2-datetime-picker {
-            grid-template-columns: 1fr;
-          }
-
-          .eo2-datetime-hint {
-            grid-column: 1;
-          }
-        }
       `}</style>
 
       <header className="dashboard-header fb-posting-header">
@@ -2355,7 +2249,7 @@ export default function FacebookPostPage({
           <div>
             <h2>1. Post setup</h2>
             <p>
-              Choose the Page, operating mode and auction type.
+              Choose the Facebook Page and auction type.
             </p>
           </div>
         </div>
@@ -2382,26 +2276,6 @@ export default function FacebookPostPage({
             </select>
           </label>
 
-          <label>
-            Operating Mode *
-
-            <select
-              value={environment}
-              onChange={(e) =>
-                setEnvironment(e.target.value)
-              }
-              disabled={loading || publishing}
-            >
-              {selectableEnvironments.map((row) => (
-                <option
-                  key={row.environment_code}
-                  value={row.environment_code}
-                >
-                  {row.environment_code} · {row.environment_name}
-                </option>
-              ))}
-            </select>
-          </label>
 
           <label>
             Auction Type
@@ -2411,8 +2285,18 @@ export default function FacebookPostPage({
               onChange={(e) =>
                 changePostType(e.target.value)
               }
-              disabled={loading || publishing}
+              disabled={
+                loading ||
+                publishing ||
+                !postTypes.length
+              }
             >
+              {!postTypes.length && (
+                <option value="">
+                  No auction type available
+                </option>
+              )}
+
               {postTypes.map((row) => (
                 <option
                   key={row.post_type_code}
@@ -2640,10 +2524,6 @@ export default function FacebookPostPage({
               {successPopup.page_name}
             </p>
 
-            <p>
-              <strong>Mode:</strong>{" "}
-              {successPopup.environment}
-            </p>
 
             <p>
               <strong>Type:</strong>{" "}
