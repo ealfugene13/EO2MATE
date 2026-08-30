@@ -2606,7 +2606,6 @@ export default function FacebookPostPage({
           }
         }
 
-`}
         .eo2-modern-time {
           display: grid;
           grid-template-columns: minmax(72px, 92px) auto minmax(72px, 92px) minmax(118px, 1fr);
@@ -2693,7 +2692,7 @@ export default function FacebookPostPage({
           }
         }
 
-</style>
+      `}</style>
 
       <header className="dashboard-header fb-posting-header">
         <div>
