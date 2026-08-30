@@ -1411,8 +1411,33 @@ export default function PortalPage({ session }) {
         {page === "automation-control" && (
           <>
             {automationModal && (
-              <div className="control-modal-backdrop">
-                <div className="control-modal" role="dialog" aria-modal="true">
+              <div
+                className="control-modal-backdrop"
+                style={{
+                  position: "fixed",
+                  inset: 0,
+                  zIndex: 99999,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "20px",
+                  background: "rgba(15, 23, 42, 0.48)",
+                }}
+              >
+                <div
+                  className="control-modal"
+                  role="dialog"
+                  aria-modal="true"
+                  style={{
+                    width: "min(520px, 100%)",
+                    maxHeight: "90vh",
+                    overflowY: "auto",
+                    background: "#fff",
+                    borderRadius: "18px",
+                    padding: "24px",
+                    boxShadow: "0 24px 70px rgba(15, 23, 42, 0.28)",
+                  }}
+                >
                   <div className={`control-modal-icon ${automationModal.enabled ? "on" : "off"}`}>
                     {automationModal.enabled ? "✓" : "!"}
                   </div>
