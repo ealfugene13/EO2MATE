@@ -1,0 +1,382 @@
+
+/* EO2MATE Modern UI override
+   Inspired by the approved dashboard visual, while preserving current behavior. */
+
+:root {
+  --eo2-bg: #f6f8fb;
+  --eo2-surface: #ffffff;
+  --eo2-surface-soft: #f9fbfd;
+  --eo2-border: #e5eaf0;
+  --eo2-border-strong: #d7dee7;
+  --eo2-text: #10233f;
+  --eo2-muted: #6b7d94;
+  --eo2-green: #2ea84a;
+  --eo2-green-soft: #eaf7ee;
+  --eo2-green-strong: #168538;
+  --eo2-navy: #0a2442;
+  --eo2-danger: #d94b4b;
+  --eo2-danger-soft: #fff1f1;
+  --eo2-warning: #d99a14;
+  --eo2-shadow: 0 10px 30px rgba(16,35,63,.07);
+  --eo2-radius: 16px;
+  --eo2-radius-sm: 12px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  background: var(--eo2-bg);
+  color: var(--eo2-text);
+}
+
+.app-shell {
+  min-height: 100vh;
+  background: var(--eo2-bg);
+}
+
+.sidebar {
+  background: var(--eo2-surface) !important;
+  border-right: 1px solid var(--eo2-border);
+  box-shadow: 8px 0 24px rgba(16,35,63,.03);
+  color: var(--eo2-text) !important;
+}
+
+.sidebar-brand {
+  min-height: 112px;
+  padding: 18px 18px 14px !important;
+  border-bottom: 1px solid var(--eo2-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.eo2-sidebar-logo-image {
+  width: min(220px, 92%);
+  max-height: 76px;
+  object-fit: contain;
+  display: block;
+}
+
+.sidebar-nav {
+  padding: 14px 12px !important;
+  gap: 6px !important;
+}
+
+.nav-item {
+  border-radius: 11px !important;
+  min-height: 44px;
+  padding: 10px 14px !important;
+  color: var(--eo2-text) !important;
+  font-weight: 650 !important;
+  background: transparent !important;
+  border: 0 !important;
+  transition: background .18s ease, color .18s ease, transform .18s ease;
+}
+
+.nav-item:hover:not(:disabled) {
+  background: #f2f6f9 !important;
+  transform: translateX(2px);
+}
+
+.nav-item.active {
+  background: var(--eo2-green-soft) !important;
+  color: var(--eo2-green-strong) !important;
+  box-shadow: inset 3px 0 0 var(--eo2-green);
+}
+
+.nav-item:disabled {
+  opacity: .38;
+}
+
+.sidebar-footer {
+  border-top: 1px solid var(--eo2-border);
+  padding: 14px !important;
+  background: var(--eo2-surface);
+}
+
+.user-mini-card {
+  border: 1px solid var(--eo2-border) !important;
+  border-radius: 14px !important;
+  background: var(--eo2-surface-soft) !important;
+  color: var(--eo2-text) !important;
+}
+
+.user-mini-card span {
+  color: var(--eo2-green-strong) !important;
+  font-weight: 700;
+}
+
+.logout-button {
+  border-radius: 11px !important;
+  border: 1px solid var(--eo2-border-strong) !important;
+  background: #fff !important;
+  color: var(--eo2-text) !important;
+}
+
+.dashboard-content {
+  background: var(--eo2-bg) !important;
+  padding: 28px 30px 44px !important;
+}
+
+.eo2-dashboard-hero,
+.dashboard-header,
+.dashboard-panel,
+.toolbar-card,
+.detail-card,
+.payment-setup-card,
+.connection-warning-card,
+.facebook-connect-card,
+.setup-requirements-card,
+.automation-hierarchy-note,
+.action-card,
+.form-card,
+.reopen-payment-card,
+.completion-card {
+  border: 1px solid var(--eo2-border) !important;
+  border-radius: var(--eo2-radius) !important;
+  background: var(--eo2-surface) !important;
+  box-shadow: var(--eo2-shadow);
+}
+
+.eo2-dashboard-hero {
+  background:
+    radial-gradient(circle at 88% 16%, rgba(46,168,74,.15), transparent 34%),
+    linear-gradient(135deg, #ffffff 0%, #fbfefd 55%, #eefaf1 100%) !important;
+  padding: 26px 28px !important;
+}
+
+.eo2-dashboard-hero h1,
+.dashboard-header h1 {
+  color: var(--eo2-text) !important;
+  letter-spacing: -.035em;
+}
+
+.eo2-dashboard-hero h1 span {
+  color: var(--eo2-green) !important;
+}
+
+.eyebrow {
+  color: #58739a !important;
+  font-weight: 800 !important;
+  letter-spacing: .13em !important;
+}
+
+.dashboard-header {
+  padding: 22px 24px !important;
+  margin-top: 18px;
+}
+
+.dashboard-header p,
+.panel-header p,
+.metric-subtitle,
+.automation-control-copy span,
+.automation-control-copy small,
+.detail-row span,
+.table-muted {
+  color: var(--eo2-muted) !important;
+}
+
+.metrics-grid {
+  gap: 16px !important;
+}
+
+.metric-card {
+  border: 1px solid var(--eo2-border) !important;
+  border-radius: var(--eo2-radius) !important;
+  background: var(--eo2-surface) !important;
+  box-shadow: var(--eo2-shadow);
+  padding: 20px !important;
+  text-align: left !important;
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+
+.metric-card:hover {
+  transform: translateY(-2px);
+  border-color: #cfd8e3 !important;
+  box-shadow: 0 14px 34px rgba(16,35,63,.10);
+}
+
+.metric-title {
+  color: var(--eo2-muted) !important;
+  font-weight: 700 !important;
+}
+
+.metric-value {
+  color: #0c1728 !important;
+  font-size: clamp(26px, 3vw, 38px) !important;
+  font-weight: 800 !important;
+}
+
+.dashboard-panel {
+  overflow: hidden;
+}
+
+.panel-header {
+  padding: 18px 20px !important;
+  border-bottom: 1px solid var(--eo2-border);
+}
+
+.panel-header h2 {
+  color: var(--eo2-text) !important;
+}
+
+.table-wrapper {
+  border: 0 !important;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+thead th {
+  background: #f8fafc !important;
+  color: #6d7f96 !important;
+  font-size: 11px !important;
+  letter-spacing: .045em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--eo2-border) !important;
+}
+
+tbody td {
+  color: var(--eo2-text) !important;
+  border-bottom: 1px solid #edf1f5 !important;
+}
+
+tbody tr:hover {
+  background: #fbfdfc !important;
+}
+
+.status-badge {
+  border-radius: 999px !important;
+  padding: 5px 9px !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  letter-spacing: .04em;
+}
+
+.status-active,
+.status-success {
+  background: var(--eo2-green-soft) !important;
+  color: var(--eo2-green-strong) !important;
+  border: 1px solid #c9ead2;
+}
+
+.status-warning {
+  background: #fff8e7 !important;
+  color: #a56a00 !important;
+  border: 1px solid #f1dfaa;
+}
+
+.status-danger {
+  background: var(--eo2-danger-soft) !important;
+  color: #b23737 !important;
+  border: 1px solid #f0c7c7;
+}
+
+.status-muted {
+  background: #f2f5f8 !important;
+  color: #65778d !important;
+  border: 1px solid #dfe5eb;
+}
+
+.primary-button,
+.secondary-button,
+.table-action-button,
+.control-on-button,
+.control-off-button,
+.danger-confirm-button,
+.icon-button,
+.back-button {
+  border-radius: 10px !important;
+  font-weight: 750 !important;
+}
+
+.primary-button,
+.control-on-button {
+  background: var(--eo2-green) !important;
+  color: #fff !important;
+  border: 1px solid var(--eo2-green) !important;
+}
+
+.primary-button:hover,
+.control-on-button:hover {
+  background: var(--eo2-green-strong) !important;
+}
+
+.secondary-button,
+.icon-button,
+.back-button,
+.table-action-button {
+  background: #fff !important;
+  color: var(--eo2-text) !important;
+  border: 1px solid var(--eo2-border-strong) !important;
+}
+
+.control-off-button,
+.danger-confirm-button {
+  background: #fff !important;
+  color: #c14545 !important;
+  border: 1px solid #efb9b9 !important;
+}
+
+.automation-hierarchy-note {
+  background: linear-gradient(135deg, #f9fbff 0%, #f3f8ff 100%) !important;
+}
+
+.automation-control-row {
+  border-bottom: 1px solid #edf1f5 !important;
+  padding: 16px 20px !important;
+}
+
+.automation-switch-orb {
+  box-shadow: inset 0 0 0 1px rgba(16,35,63,.08);
+}
+
+.automation-switch-orb.enabled {
+  background: #48a96b !important;
+}
+
+.automation-switch-orb.disabled {
+  background: #cfd7e1 !important;
+}
+
+.control-modal-backdrop {
+  backdrop-filter: blur(3px);
+}
+
+.control-modal {
+  border: 1px solid var(--eo2-border) !important;
+}
+
+.search-input,
+.filter-select,
+input,
+select,
+textarea {
+  border-radius: 10px !important;
+  border-color: var(--eo2-border-strong) !important;
+}
+
+.search-input:focus,
+.filter-select:focus,
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid rgba(46,168,74,.16) !important;
+  border-color: var(--eo2-green) !important;
+}
+
+@media (max-width: 980px) {
+  .dashboard-content {
+    padding: 18px 14px 34px !important;
+  }
+
+  .sidebar-brand {
+    min-height: 90px;
+  }
+
+  .eo2-sidebar-logo-image {
+    width: 170px;
+  }
+}
