@@ -217,7 +217,7 @@ function ScrollDateTimePicker({
   inputRef,
 }) {
   const parts = splitDateTimeLocal(value);
-  const today = getPhilippineTodayInput();
+  const today = getPhilippineNowInput().slice(0, 10);
 
   const baseDate = parts.date || today;
   const [yearRaw, monthRaw, dayRaw] = baseDate.split("-");
