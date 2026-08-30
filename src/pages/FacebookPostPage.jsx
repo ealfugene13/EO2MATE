@@ -215,18 +215,35 @@ function ScrollDateTimePicker({
   disabled = false,
   hasError = false,
   inputRef,
-  minDate = getPhilippineTodayInput(),
 }) {
   const parts = splitDateTimeLocal(value);
+  const today = getPhilippineTodayInput();
 
-  const update = (patch) => {
-    onChange(
-      combineDateTimeLocal({
-        ...parts,
-        ...patch,
-      })
-    );
-  };
+  const baseDate = parts.date || today;
+  const [yearRaw, monthRaw, dayRaw] = baseDate.split("-");
+
+  const selectedYear = Number(yearRaw);
+  const selectedMonth = Number(monthRaw);
+  const selectedDay = Number(dayRaw);
+
+  const currentYear = Number(today.slice(0, 4));
+  const years = Array.from({ length: 6 }, (_, index) => currentYear + index);
+
+  const monthNames = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  ];
+
+  const daysInMonth = new Date(
+    selectedYear,
+    selectedMonth,
+    0
+  ).getDate();
+
+  const days = Array.from(
+    { length: daysInMonth },
+    (_, index) => index + 1
+  );
 
   const hours = Array.from({ length: 12 }, (_, index) =>
     String(index + 1).padStart(2, "0")
@@ -236,69 +253,166 @@ function ScrollDateTimePicker({
     String(index).padStart(2, "0")
   );
 
+  const update = (patch) => {
+    onChange(
+      combineDateTimeLocal({
+        ...parts,
+        date: parts.date || today,
+        ...patch,
+      })
+    );
+  };
+
+  const updateDatePart = ({
+    year = selectedYear,
+    month = selectedMonth,
+    day = selectedDay,
+  }) => {
+    const maxDay = new Date(year, month, 0).getDate();
+    const safeDay = Math.min(day, maxDay);
+
+    const nextDate =
+      `${String(year).padStart(4, "0")}-` +
+      `${String(month).padStart(2, "0")}-` +
+      `${String(safeDay).padStart(2, "0")}`;
+
+    update({ date: nextDate });
+  };
+
   return (
     <div
-      className={`eo2-datetime-picker ${
+      className={`eo2-ios-datetime ${
         hasError ? "eo2-datetime-error" : ""
       }`}
       ref={inputRef}
       tabIndex={-1}
     >
-      <div className="eo2-date-part">
+      <div className="eo2-ios-picker-section">
         <span className="eo2-datetime-label">Date</span>
-        <input
-          type="date"
-          min={minDate}
-          value={parts.date}
-          onChange={(e) => update({ date: e.target.value })}
-          disabled={disabled}
-        />
+
+        <div className="eo2-ios-wheel-shell eo2-ios-date-wheels">
+          <div className="eo2-ios-selection-band" aria-hidden="true" />
+
+          <select
+            className="eo2-ios-wheel eo2-ios-month"
+            value={String(selectedMonth)}
+            onChange={(e) =>
+              updateDatePart({
+                month: Number(e.target.value),
+              })
+            }
+            disabled={disabled}
+            aria-label="Month"
+            size={5}
+          >
+            {monthNames.map((month, index) => (
+              <option key={month} value={String(index + 1)}>
+                {month}
+              </option>
+            ))}
+          </select>
+
+          <select
+            className="eo2-ios-wheel"
+            value={String(selectedDay)}
+            onChange={(e) =>
+              updateDatePart({
+                day: Number(e.target.value),
+              })
+            }
+            disabled={disabled}
+            aria-label="Day"
+            size={5}
+          >
+            {days.map((day) => (
+              <option key={day} value={String(day)}>
+                {day}
+              </option>
+            ))}
+          </select>
+
+          <select
+            className="eo2-ios-wheel eo2-ios-year"
+            value={String(selectedYear)}
+            onChange={(e) =>
+              updateDatePart({
+                year: Number(e.target.value),
+              })
+            }
+            disabled={disabled}
+            aria-label="Year"
+            size={5}
+          >
+            {years.map((year) => (
+              <option key={year} value={String(year)}>
+                {year}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
-      <div className="eo2-time-part">
+      <div className="eo2-ios-picker-section">
         <span className="eo2-datetime-label">Time</span>
 
-        <div className="eo2-modern-time">
+        <div className="eo2-ios-wheel-shell eo2-ios-time-wheels">
+          <div className="eo2-ios-selection-band" aria-hidden="true" />
+
           <select
-            className="eo2-modern-time-number"
+            className="eo2-ios-wheel"
             value={parts.hour12}
-            onChange={(e) => update({ hour12: e.target.value })}
+            onChange={(e) =>
+              update({
+                hour12: e.target.value,
+              })
+            }
             disabled={disabled}
             aria-label="Hour"
+            size={5}
           >
             {hours.map((hour) => (
-              <option key={hour} value={hour}>{hour}</option>
+              <option key={hour} value={hour}>
+                {hour}
+              </option>
             ))}
           </select>
 
-          <span className="eo2-modern-time-separator">:</span>
+          <div className="eo2-ios-colon" aria-hidden="true">:</div>
 
           <select
-            className="eo2-modern-time-number"
+            className="eo2-ios-wheel"
             value={parts.minute}
-            onChange={(e) => update({ minute: e.target.value })}
+            onChange={(e) =>
+              update({
+                minute: e.target.value,
+              })
+            }
             disabled={disabled}
             aria-label="Minute"
+            size={5}
           >
             {minutes.map((minute) => (
-              <option key={minute} value={minute}>{minute}</option>
+              <option key={minute} value={minute}>
+                {minute}
+              </option>
             ))}
           </select>
 
-          <div className="eo2-modern-period" role="group" aria-label="AM or PM">
-            {["AM", "PM"].map((period) => (
-              <button
-                key={period}
-                type="button"
-                className={parts.period === period ? "active" : ""}
-                onClick={() => update({ period })}
-                disabled={disabled}
-                aria-pressed={parts.period === period}
-              >
-                {period}
-              </button>
-            ))}
-          </div>
+          <select
+            className="eo2-ios-wheel eo2-ios-period"
+            value={parts.period}
+            onChange={(e) =>
+              update({
+                period: e.target.value,
+              })
+            }
+            disabled={disabled}
+            aria-label="AM or PM"
+            size={5}
+          >
+            <option value="AM">AM</option>
+            <option value="PM">PM</option>
+          </select>
         </div>
       </div>
     </div>
@@ -2360,23 +2474,21 @@ export default function FacebookPostPage({
           max-width: none;
         }
 
-        .eo2-datetime-picker {
+        .eo2-ios-datetime {
           display: grid;
-          grid-template-columns: minmax(125px, 1fr) minmax(190px, 1.45fr);
-          gap: 10px;
-          align-items: start;
+          grid-template-columns: minmax(220px, 1.25fr) minmax(210px, 1fr);
+          gap: 12px;
           width: 100%;
           min-width: 0;
         }
 
-        .eo2-date-part,
-        .eo2-time-part {
+        .eo2-ios-picker-section {
           min-width: 0;
         }
 
         .eo2-datetime-label {
           display: block;
-          margin-bottom: 4px;
+          margin-bottom: 5px;
           color: #64748b;
           font-size: .66rem;
           font-weight: 800;
@@ -2384,70 +2496,116 @@ export default function FacebookPostPage({
           letter-spacing: .03em;
         }
 
-        .eo2-date-part input[type="date"] {
-          width: 100%;
-          height: 38px;
-          min-height: 38px;
-          margin: 0;
-          padding: 7px 9px;
-          border: 1px solid rgba(148, 163, 184, .45);
-          border-radius: 9px;
-          background: #fff;
-          box-sizing: border-box;
-        }
-
-        .eo2-time-wheel-group {
+        .eo2-ios-wheel-shell {
+          position: relative;
           display: grid;
-          grid-template-columns: minmax(54px, 1fr) 12px minmax(54px, 1fr) minmax(58px, .9fr);
-          gap: 5px;
           align-items: center;
+          height: 146px;
+          overflow: hidden;
+          border: 1px solid rgba(148, 163, 184, .35);
+          border-radius: 14px;
+          background:
+            linear-gradient(
+              to bottom,
+              rgba(248, 250, 252, .97) 0%,
+              rgba(255, 255, 255, .78) 34%,
+              #fff 50%,
+              rgba(255, 255, 255, .78) 66%,
+              rgba(248, 250, 252, .97) 100%
+            );
+          box-shadow:
+            inset 0 1px 0 rgba(255,255,255,.9),
+            0 1px 2px rgba(15, 23, 42, .04);
         }
 
-        .eo2-time-wheel,
-        .eo2-time-period {
+        .eo2-ios-date-wheels {
+          grid-template-columns: 1.15fr .75fr 1fr;
+        }
+
+        .eo2-ios-time-wheels {
+          grid-template-columns: 1fr 16px 1fr .9fr;
+        }
+
+        .eo2-ios-selection-band {
+          position: absolute;
+          z-index: 0;
+          left: 6px;
+          right: 6px;
+          top: 50%;
+          height: 34px;
+          transform: translateY(-50%);
+          border-top: 1px solid rgba(148, 163, 184, .28);
+          border-bottom: 1px solid rgba(148, 163, 184, .28);
+          border-radius: 8px;
+          background: rgba(241, 245, 249, .62);
+          pointer-events: none;
+        }
+
+        .eo2-ios-wheel {
+          position: relative;
+          z-index: 1;
           width: 100%;
           min-width: 0;
-          height: 76px;
+          height: 140px;
           margin: 0;
-          padding: 2px;
-          border: 1px solid rgba(148, 163, 184, .38);
-          border-radius: 9px;
-          background: #fff;
+          padding: 0 4px;
+          border: 0;
+          outline: 0;
+          background: transparent;
           color: #111827;
           font: inherit;
-          font-size: .82rem;
+          font-size: .92rem;
           font-weight: 700;
+          text-align: center;
           overflow-y: auto;
+          scrollbar-width: none;
           box-sizing: border-box;
         }
 
-        .eo2-time-period {
-          height: 58px;
+        .eo2-ios-wheel::-webkit-scrollbar {
+          display: none;
         }
 
-        .eo2-time-wheel option,
-        .eo2-time-period option {
-          padding: 4px 6px;
+        .eo2-ios-wheel option {
+          min-height: 28px;
+          padding: 5px 3px;
           text-align: center;
+          background: transparent;
+          color: #475569;
         }
 
-        .eo2-time-separator {
-          color: #111827;
+        .eo2-ios-wheel option:checked {
+          color: #0f172a;
+          font-weight: 900;
+        }
+
+        .eo2-ios-colon {
+          position: relative;
+          z-index: 2;
+          color: #0f172a;
           font-size: 1rem;
           font-weight: 900;
           text-align: center;
+          pointer-events: none;
         }
 
-        .eo2-datetime-error .eo2-date-part input,
-        .eo2-datetime-error .eo2-time-wheel,
-        .eo2-datetime-error .eo2-time-period {
-          border-color: #dc2626 !important;
+        .eo2-datetime-error .eo2-ios-wheel-shell {
+          border-color: #dc2626;
           background: #fff7f7;
         }
 
-        @media (max-width: 680px) {
-          .eo2-datetime-picker {
+        @media (max-width: 760px) {
+          .eo2-ios-datetime {
             grid-template-columns: 1fr;
+          }
+
+          .eo2-ios-wheel-shell {
+            height: 138px;
+          }
+
+          .eo2-ios-wheel {
+            height: 132px;
+            font-size: 1rem;
           }
         }
 
@@ -2465,27 +2623,6 @@ export default function FacebookPostPage({
           font-size: .76rem;
           font-weight: 700;
           line-height: 1.35;
-        }
-
-        @media (max-width: 680px) {
-          .eo2-datetime-popover-simple {
-            position: fixed;
-            z-index: 9999;
-            left: 12px;
-            right: 12px;
-            top: 50%;
-            width: auto;
-            transform: translateY(-50%);
-          }
-
-          .eo2-time-wheel-group {
-            grid-template-columns:
-              minmax(64px, 1fr)
-              10px
-              minmax(64px, 1fr)
-              minmax(62px, .9fr);
-            gap: 4px;
-          }
         }
 
         .fb-item-editor {
@@ -2606,93 +2743,7 @@ export default function FacebookPostPage({
           }
         }
 
-        .eo2-modern-time {
-          display: grid;
-          grid-template-columns: minmax(72px, 92px) auto minmax(72px, 92px) minmax(118px, 1fr);
-          align-items: center;
-          gap: 10px;
-          width: 100%;
-        }
-
-        .eo2-modern-time-number {
-          width: 100%;
-          min-height: 48px;
-          padding: 0 34px 0 14px;
-          border: 1px solid #d8dee8;
-          border-radius: 12px;
-          background: #fff;
-          color: #172033;
-          font: inherit;
-          font-size: 16px;
-          font-weight: 700;
-          text-align: center;
-          outline: none;
-          transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
-        }
-
-        .eo2-modern-time-number:focus {
-          border-color: #5b7cff;
-          box-shadow: 0 0 0 3px rgba(91, 124, 255, .14);
-        }
-
-        .eo2-modern-time-separator {
-          color: #667085;
-          font-size: 22px;
-          font-weight: 800;
-          line-height: 1;
-        }
-
-        .eo2-modern-period {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 4px;
-          min-height: 48px;
-          padding: 4px;
-          border: 1px solid #d8dee8;
-          border-radius: 12px;
-          background: #f5f7fa;
-        }
-
-        .eo2-modern-period button {
-          min-height: 38px;
-          border: 0;
-          border-radius: 9px;
-          background: transparent;
-          color: #667085;
-          font: inherit;
-          font-size: 14px;
-          font-weight: 800;
-          cursor: pointer;
-        }
-
-        .eo2-modern-period button.active {
-          background: #fff;
-          color: #172033;
-          box-shadow: 0 1px 4px rgba(16, 24, 40, .12);
-        }
-
-        .eo2-modern-period button:focus-visible {
-          outline: 3px solid rgba(91, 124, 255, .18);
-          outline-offset: 1px;
-        }
-
-        .eo2-modern-time-number:disabled,
-        .eo2-modern-period button:disabled {
-          cursor: not-allowed;
-          opacity: .6;
-        }
-
-        @media (max-width: 640px) {
-          .eo2-modern-time {
-            grid-template-columns: minmax(66px, 1fr) auto minmax(66px, 1fr);
-          }
-
-          .eo2-modern-period {
-            grid-column: 1 / -1;
-          }
-        }
-
-      `}</style>
+`}</style>
 
       <header className="dashboard-header fb-posting-header">
         <div>
