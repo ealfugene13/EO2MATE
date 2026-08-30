@@ -752,7 +752,7 @@ function RuleFields({
       </label>
 
       {buyoutEnabled && (
-          <label
+          <div
             className={`eo2-rule-datetime eo2-rule-buyout-until ${fieldClass(
               fieldErrors,
               key("buyoutUntil")
@@ -782,10 +782,10 @@ function RuleFields({
                 {fieldErrors[key("buyoutUntil")]}
               </small>
             )}
-          </label>
+          </div>
         )}
 
-      <label
+      <div
         className={`eo2-rule-datetime eo2-rule-auction-ends ${fieldClass(
           fieldErrors,
           key("auctionEnds")
@@ -815,7 +815,7 @@ function RuleFields({
             {fieldErrors[key("auctionEnds")]}
           </small>
         )}
-      </label>
+      </div>
 
       <label className="eo2-rule-compact eo2-rule-short eo2-rule-cutoff">
         <span className="eo2-rule-heading">
@@ -2419,6 +2419,17 @@ export default function FacebookPostPage({
 
         .fb-rule-grid .eo2-rule-short {
           max-width: none;
+        }
+
+
+        .fb-rule-grid .eo2-rule-datetime {
+          display: flex;
+          flex-direction: column;
+          gap: 7px;
+          min-width: 0;
+          font-size: .82rem;
+          font-weight: 700;
+          color: var(--text-color, #111827);
         }
 
         .eo2-datetime-control {
