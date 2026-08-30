@@ -4,7 +4,7 @@ import SetupPage from "./SetupPage";
 import OnboardingPage from "./OnboardingPage";
 import AdminClientsPage from "./AdminClientsPage";
 import FacebookPostPage from "./FacebookPostPage";
-import "../eo2mate-modern-ui.css";
+
 
 function formatCurrency(value) {
   if (value === null || value === undefined || value === "") return "-";
