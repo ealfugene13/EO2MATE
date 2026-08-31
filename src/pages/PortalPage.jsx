@@ -102,6 +102,31 @@ function NavIcon({ type }) {
         <path d="M16 14a5 5 0 0 1 5 5" />
       </svg>
     ),
+    inventory: (
+      <svg {...common}>
+        <path d="M4 7 12 3l8 4-8 4Z" />
+        <path d="M4 7v10l8 4 8-4V7" />
+        <path d="M12 11v10" />
+      </svg>
+    ),
+    sales: (
+      <svg {...common}>
+        <path d="M4 19V9" />
+        <path d="M10 19V5" />
+        <path d="M16 19v-7" />
+        <path d="M3 19h18" />
+        <path d="m15 7 3-3 3 3" />
+      </svg>
+    ),
+    purchases: (
+      <svg {...common}>
+        <path d="M3 4h2l2 11h10l2-7H7" />
+        <circle cx="9" cy="19" r="1.5" />
+        <circle cx="17" cy="19" r="1.5" />
+        <path d="M12 6v5" />
+        <path d="m10 9 2 2 2-2" />
+      </svg>
+    ),
     automation: (
       <svg {...common}>
         <circle cx="12" cy="12" r="3" />
@@ -470,6 +495,14 @@ export default function PortalPage({ session }) {
   const [reportDateRange, setReportDateRange] = useState("30D");
   const [reportPageFilter, setReportPageFilter] = useState("ALL");
   const [reportChannelFilter, setReportChannelFilter] = useState("ALL");
+
+  // UI-first operational dashboards. Data wiring follows after UI approval.
+  const [auctionWorkspaceTab, setAuctionWorkspaceTab] = useState("SUMMARY");
+  const [miningWorkspaceTab, setMiningWorkspaceTab] = useState("SUMMARY");
+  const [miningStatusFilter, setMiningStatusFilter] = useState("ALL");
+  const [inventoryTab, setInventoryTab] = useState("SUMMARY");
+  const [salesTab, setSalesTab] = useState("SUMMARY");
+  const [purchasesTab, setPurchasesTab] = useState("SUMMARY");
 
   useEffect(() => {
     loadPortal();
@@ -1584,6 +1617,30 @@ export default function PortalPage({ session }) {
             Delivery
           </SidebarNavButton>
 
+          <SidebarNavButton
+            icon="inventory"
+            className={`nav-item ${page === "inventory" ? "active" : ""}`}
+            onClick={() => setPage("inventory")}
+          >
+            Inventory
+          </SidebarNavButton>
+
+          <SidebarNavButton
+            icon="sales"
+            className={`nav-item ${page === "sales" ? "active" : ""}`}
+            onClick={() => setPage("sales")}
+          >
+            Sales
+          </SidebarNavButton>
+
+          <SidebarNavButton
+            icon="purchases"
+            className={`nav-item ${page === "purchases" ? "active" : ""}`}
+            onClick={() => setPage("purchases")}
+          >
+            Purchases
+          </SidebarNavButton>
+
           <SidebarSectionLabel>Facebook</SidebarSectionLabel>
 
           <SidebarNavButton
@@ -2356,45 +2413,131 @@ export default function PortalPage({ session }) {
               <div>
                 <p className="eyebrow">FACEBOOK SELLING</p>
                 <h1>Post Mining</h1>
-                <p>Prepare and manage Facebook posts that accept MINE comments from buyers.</p>
+                <p>Manage regular MINE posts and Live Mining activity from one workspace.</p>
               </div>
             </header>
 
-            <section className="dashboard-panel">
-              <div className="panel-header">
-                <div>
-                  <h2>Post Mining</h2>
-                  <p>This module is now available in the EO2MATE UI. Backend MINE processing will be connected separately.</p>
-                </div>
-              </div>
+            <section className="metrics-grid">
+              <MetricCard title="Total posts" value="0" subtitle="All mining posts" />
+              <MetricCard title="Active" value="0" subtitle="Currently accepting MINE" />
+              <MetricCard title="Live Mining" value="0" subtitle="Active live sessions" />
+              <MetricCard title="Completed" value="0" subtitle="Closed mining posts" />
+              <MetricCard title="Cancelled" value="0" subtitle="Cancelled posts" />
+              <MetricCard title="Total claims" value="0" subtitle="Recorded MINE claims" />
+              <MetricCard title="Unique buyers" value="0" subtitle="Mining customers" />
+              <MetricCard title="Claimed value" value={formatCurrency(0)} subtitle="Gross claimed sales" />
+            </section>
 
-              <div style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-                gap: 16,
-                marginTop: 16,
-              }}>
-                <button
-                  type="button"
-                  className="secondary-button"
-                  disabled
-                  title="Posting workflow will be enabled after Post Mining backend integration"
-                  style={{ minHeight: 96, textAlign: "left" }}
-                >
-                  Create Mining Post
-                </button>
-
-                <button
-                  type="button"
-                  className="secondary-button"
-                  disabled
-                  title="Mining activity will be enabled after Post Mining backend integration"
-                  style={{ minHeight: 96, textAlign: "left" }}
-                >
-                  Mining Activity
-                </button>
+            <section className="dashboard-panel" style={{ marginBottom: 18 }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {["SUMMARY", "POSTS", "LIVE MINING", "CLAIMS", "BUYERS"].map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    className={miningWorkspaceTab === tab ? "primary-button" : "secondary-button"}
+                    onClick={() => setMiningWorkspaceTab(tab)}
+                  >
+                    {tab === "LIVE MINING" ? "Live Mining" : tab.charAt(0) + tab.slice(1).toLowerCase()}
+                  </button>
+                ))}
               </div>
             </section>
+
+            {miningWorkspaceTab === "SUMMARY" && (
+              <>
+                <section className="toolbar-card">
+                  <select className="filter-select" value={miningStatusFilter} onChange={(e) => setMiningStatusFilter(e.target.value)}>
+                    <option value="ALL">All statuses</option>
+                    <option value="ACTIVE">Active</option>
+                    <option value="DRAFT">Scheduled / Draft</option>
+                    <option value="COMPLETED">Completed</option>
+                    <option value="CANCELLED">Cancelled</option>
+                  </select>
+                  <select className="filter-select" defaultValue="30D">
+                    <option value="TODAY">Today</option>
+                    <option value="7D">Last 7 days</option>
+                    <option value="30D">Last 30 days</option>
+                    <option value="MONTH">This month</option>
+                  </select>
+                </section>
+
+                <section className="dashboard-panel">
+                  <div className="panel-header">
+                    <div>
+                      <h2>Mining summary</h2>
+                      <p>Claims, conversion, buyers and selling value across regular and live mining.</p>
+                    </div>
+                  </div>
+                  <div className="metrics-grid">
+                    <MetricCard title="Claim conversion" value="—" subtitle="Claims versus offered stock" />
+                    <MetricCard title="Items claimed" value="0" subtitle="Total claimed quantity" />
+                    <MetricCard title="Remaining items" value="0" subtitle="Unclaimed quantity" />
+                    <MetricCard title="Paid value" value={formatCurrency(0)} subtitle="Collected mining sales" />
+                    <MetricCard title="Pending value" value={formatCurrency(0)} subtitle="Awaiting payment" />
+                    <MetricCard title="Released claims" value={formatCurrency(0)} subtitle="Cancelled / expired claims" />
+                  </div>
+                </section>
+              </>
+            )}
+
+            {miningWorkspaceTab === "POSTS" && (
+              <section className="dashboard-panel">
+                <div className="panel-header">
+                  <div><h2>Mining posts</h2><p>All regular Post Mining records by status.</p></div>
+                  <button className="primary-button" type="button" disabled title="Enabled after Post Mining backend integration">Create Mining Post</button>
+                </div>
+                <div className="table-wrapper">
+                  <table>
+                    <thead><tr><th>Post</th><th>Facebook Page</th><th>Status</th><th>Items</th><th>Claims</th><th>Buyers</th><th>Value</th><th>Created</th></tr></thead>
+                    <tbody><tr><td colSpan="8">No Post Mining records yet.</td></tr></tbody>
+                  </table>
+                </div>
+              </section>
+            )}
+
+            {miningWorkspaceTab === "LIVE MINING" && (
+              <>
+                <section className="dashboard-panel">
+                  <div className="panel-header">
+                    <div>
+                      <h2>Live Mining</h2>
+                      <p>Monitor Facebook Live selling sessions using MINE codes and real-time buyer claims.</p>
+                    </div>
+                    <button className="primary-button" type="button" disabled title="Enabled after Facebook Live backend integration">Start / Connect Live</button>
+                  </div>
+                  <div className="metrics-grid">
+                    <MetricCard title="Live sessions" value="0" subtitle="Currently connected" />
+                    <MetricCard title="Live comments" value="0" subtitle="Processed comments" />
+                    <MetricCard title="Valid MINE claims" value="0" subtitle="Matched MINE codes" />
+                    <MetricCard title="Live buyers" value="0" subtitle="Unique buyers" />
+                    <MetricCard title="Live sales" value={formatCurrency(0)} subtitle="Claimed value" />
+                  </div>
+                </section>
+                <section className="dashboard-panel">
+                  <div className="panel-header"><div><h2>Live sessions</h2><p>Current and previous Live Mining sessions.</p></div></div>
+                  <div className="table-wrapper">
+                    <table>
+                      <thead><tr><th>Live</th><th>Facebook Page</th><th>Status</th><th>MINE Codes</th><th>Claims</th><th>Buyers</th><th>Sales</th><th>Started</th></tr></thead>
+                      <tbody><tr><td colSpan="8">No Live Mining sessions yet.</td></tr></tbody>
+                    </table>
+                  </div>
+                </section>
+              </>
+            )}
+
+            {miningWorkspaceTab === "CLAIMS" && (
+              <section className="dashboard-panel">
+                <div className="panel-header"><div><h2>Claims</h2><p>Buyer MINE claims from posts and live sessions.</p></div></div>
+                <div className="table-wrapper"><table><thead><tr><th>Buyer</th><th>MINE Code</th><th>Item</th><th>Qty</th><th>Source</th><th>Status</th><th>Amount</th><th>Claimed</th></tr></thead><tbody><tr><td colSpan="8">No claims yet.</td></tr></tbody></table></div>
+              </section>
+            )}
+
+            {miningWorkspaceTab === "BUYERS" && (
+              <section className="dashboard-panel">
+                <div className="panel-header"><div><h2>Mining buyers</h2><p>Buyer activity across Post Mining and Live Mining.</p></div></div>
+                <div className="table-wrapper"><table><thead><tr><th>Buyer</th><th>Claims</th><th>Items</th><th>Total value</th><th>Paid</th><th>Pending</th><th>Last activity</th></tr></thead><tbody><tr><td colSpan="7">No mining buyers yet.</td></tr></tbody></table></div>
+              </section>
+            )}
           </>
         )}
 
@@ -2516,6 +2659,9 @@ export default function PortalPage({ session }) {
               <MetricCard title="Post Mining" value="Open" subtitle="Manage MINE posts" onClick={() => setPage("post-mining")} />
               <MetricCard title="Facebook Chats" value="Inbox" subtitle="Buyer conversations" onClick={() => setPage("facebook-chats")} />
               <MetricCard title="Reports & Insights" value="View" subtitle="Sales and opportunities" onClick={() => setPage("reports")} />
+              <MetricCard title="Inventory" value="View" subtitle="Products and stock" onClick={() => setPage("inventory")} />
+              <MetricCard title="Sales" value="View" subtitle="Consolidated selling" onClick={() => setPage("sales")} />
+              <MetricCard title="Purchases" value="View" subtitle="Suppliers and receiving" onClick={() => setPage("purchases")} />
               <MetricCard title="Pending orders" value={orderMetrics.pending} subtitle="Awaiting payment" onClick={() => goToOrders("PAYMENT_PENDING")} />
               {paymentAccountStatus?.payment_enabled ? (
                 <MetricCard title="Pending payments" value={paymentMetrics.pending} subtitle="Awaiting settlement" onClick={() => goToPayments("pending")} />
@@ -2581,52 +2727,103 @@ export default function PortalPage({ session }) {
               <div>
                 <p className="eyebrow">AUCTION MANAGEMENT</p>
                 <h1>Auctions</h1>
-                <p>Search, filter and inspect auction activity.</p>
+                <p>Monitor auction status, bids, winners and overall selling performance.</p>
               </div>
               <button className="icon-button refresh-icon-button" onClick={loadPortal} title="Refresh" aria-label="Refresh">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M20 6v5h-5" />
-            <path d="M4 18v-5h5" />
-            <path d="M6.1 9a7 7 0 0 1 11.3-2.1L20 9" />
-            <path d="M4 15l2.6 2.1A7 7 0 0 0 17.9 15" />
-          </svg>
-        </button>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v5h-5" /><path d="M4 18v-5h5" /><path d="M6.1 9a7 7 0 0 1 11.3-2.1L20 9" /><path d="M4 15l2.6 2.1A7 7 0 0 0 17.9 15" /></svg>
+              </button>
             </header>
 
-            <section className="toolbar-card">
-              <input className="search-input" value={auctionSearch} onChange={(e) => setAuctionSearch(e.target.value)} placeholder="Search auctions..." />
-              <select className="filter-select" value={auctionStatusFilter} onChange={(e) => setAuctionStatusFilter(e.target.value)}>
-                <option value="ALL">All statuses</option>
-                <option value="ACTIVE">Active</option>
-                <option value="COMPLETED_WITH_WINNER">Completed with winner</option>
-                <option value="CLOSED_NO_WINNER">Closed no winner</option>
-                <option value="AWAITING_FINALIZER">Awaiting finalizer</option>
-              </select>
+            <section className="metrics-grid">
+              <MetricCard title="Total auctions" value={auctions.length} subtitle="All auction items" onClick={() => { setAuctionWorkspaceTab("AUCTIONS"); setAuctionStatusFilter("ALL"); }} />
+              <MetricCard title="Active" value={auctions.filter((a) => a.ui_status === "ACTIVE").length} subtitle="Currently open" onClick={() => { setAuctionWorkspaceTab("AUCTIONS"); setAuctionStatusFilter("ACTIVE"); }} />
+              <MetricCard title="Completed" value={auctions.filter((a) => ["COMPLETED", "COMPLETED_WITH_WINNER", "CLOSED_NO_WINNER"].includes(a.ui_status)).length} subtitle="Closed auctions" />
+              <MetricCard title="Cancelled" value={auctions.filter((a) => a.ui_status === "CANCELLED").length} subtitle="Cancelled auctions" />
+              <MetricCard title="Total bids" value={auctions.reduce((sum, a) => sum + Number(a.valid_bid_count || a.bid_count || 0), 0)} subtitle="Recorded valid bids" />
+              <MetricCard title="Winning value" value={formatCurrency(auctions.reduce((sum, a) => sum + Number(a.highest_bid || 0), 0))} subtitle="Current / final highest bids" />
             </section>
 
-            <section className="dashboard-panel">
-              <div className="panel-header"><div><h2>Auction list</h2><p>{filteredAuctions.length} record(s)</p></div></div>
-              <div className="table-wrapper">
-                <table>
-                  <thead>
-                    <tr><th>Item</th><th>Status</th><th>Highest bid</th><th>Bidder</th><th>Valid bidders</th><th>Ends</th><th>Payment</th></tr>
-                  </thead>
-                  <tbody>
-                    {filteredAuctions.map((auction) => (
-                      <tr key={auction.auction_item_id} className="clickable-row" onClick={() => openAuction(auction.auction_item_id)}>
-                        <td>{auction.item_label}</td>
-                        <td><StatusBadge status={auction.ui_status} /></td>
-                        <td>{formatCurrency(auction.highest_bid)}</td>
-                        <td>{auction.highest_bidder_name || "-"}</td>
-                        <td>{auction.valid_bidder_count}/{auction.min_bidder_count}</td>
-                        <td>{formatDateTime(auction.auction_end_dt)}</td>
-                        <td>{auction.payment_status || "-"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            <section className="dashboard-panel" style={{ marginBottom: 18 }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {["SUMMARY", "AUCTIONS", "BIDS", "WINNERS"].map((tab) => (
+                  <button key={tab} type="button" className={auctionWorkspaceTab === tab ? "primary-button" : "secondary-button"} onClick={() => setAuctionWorkspaceTab(tab)}>
+                    {tab.charAt(0) + tab.slice(1).toLowerCase()}
+                  </button>
+                ))}
               </div>
             </section>
+
+            {auctionWorkspaceTab === "SUMMARY" && (
+              <>
+                <section className="toolbar-card">
+                  <select className="filter-select" value={auctionStatusFilter} onChange={(e) => setAuctionStatusFilter(e.target.value)}>
+                    <option value="ALL">All statuses</option><option value="ACTIVE">Active</option><option value="DRAFT">Scheduled / Draft</option><option value="COMPLETED_WITH_WINNER">Completed</option><option value="CANCELLED">Cancelled</option>
+                  </select>
+                  <select className="filter-select" defaultValue="30D"><option value="TODAY">Today</option><option value="7D">Last 7 days</option><option value="30D">Last 30 days</option><option value="MONTH">This month</option></select>
+                </section>
+                <section className="dashboard-panel">
+                  <div className="panel-header"><div><h2>Auction summary</h2><p>Quick operational and financial view of auction performance.</p></div></div>
+                  <div className="metrics-grid">
+                    <MetricCard title="Unique bidders" value="—" subtitle="Across selected period" />
+                    <MetricCard title="Average bids / auction" value="—" subtitle="Participation level" />
+                    <MetricCard title="Sell-through rate" value="—" subtitle="Auctions ending with winner" />
+                    <MetricCard title="Buyouts" value="—" subtitle="Closed through buyout" />
+                    <MetricCard title="Paid value" value="—" subtitle="Collected auction sales" />
+                    <MetricCard title="Pending value" value="—" subtitle="Awaiting payment" />
+                  </div>
+                </section>
+              </>
+            )}
+
+            {auctionWorkspaceTab === "AUCTIONS" && (
+              <>
+                <section className="toolbar-card">
+                  <input className="search-input" value={auctionSearch} onChange={(e) => setAuctionSearch(e.target.value)} placeholder="Search auctions..." />
+                  <select className="filter-select" value={auctionStatusFilter} onChange={(e) => setAuctionStatusFilter(e.target.value)}>
+                    <option value="ALL">All statuses</option><option value="ACTIVE">Active</option><option value="COMPLETED_WITH_WINNER">Completed with winner</option><option value="CLOSED_NO_WINNER">Closed no winner</option><option value="AWAITING_FINALIZER">Awaiting finalizer</option><option value="CANCELLED">Cancelled</option>
+                  </select>
+                </section>
+                <section className="dashboard-panel">
+                  <div className="panel-header"><div><h2>Auction list</h2><p>{filteredAuctions.length} record(s)</p></div></div>
+                  <div className="table-wrapper"><table><thead><tr><th>Item</th><th>Status</th><th>Highest bid</th><th>Bidder</th><th>Valid bidders</th><th>Ends</th><th>Payment</th></tr></thead><tbody>{filteredAuctions.map((auction) => (<tr key={auction.auction_item_id} className="clickable-row" onClick={() => openAuction(auction.auction_item_id)}><td>{auction.item_label}</td><td><StatusBadge status={auction.ui_status} /></td><td>{formatCurrency(auction.highest_bid)}</td><td>{auction.highest_bidder_name || "-"}</td><td>{auction.valid_bidder_count}/{auction.min_bidder_count}</td><td>{formatDateTime(auction.auction_end_dt)}</td><td>{auction.payment_status || "-"}</td></tr>))}</tbody></table></div>
+                </section>
+              </>
+            )}
+
+            {auctionWorkspaceTab === "BIDS" && (
+              <section className="dashboard-panel"><div className="panel-header"><div><h2>Bid activity</h2><p>Consolidated bid monitoring will be wired to the validated bid-history source.</p></div></div><div className="table-wrapper"><table><thead><tr><th>Auction</th><th>Bidder</th><th>Bid</th><th>Validity</th><th>Facebook Comment</th><th>Time</th></tr></thead><tbody><tr><td colSpan="6">Select an auction for its current bid history. Consolidated view will be connected after UI approval.</td></tr></tbody></table></div></section>
+            )}
+
+            {auctionWorkspaceTab === "WINNERS" && (
+              <section className="dashboard-panel"><div className="panel-header"><div><h2>Auction winners</h2><p>Winner, winning amount and downstream payment/order status.</p></div></div><div className="table-wrapper"><table><thead><tr><th>Auction</th><th>Winner</th><th>Winning amount</th><th>Order</th><th>Payment</th><th>Completed</th></tr></thead><tbody>{auctions.filter((a) => a.highest_bidder_name && ["COMPLETED_WITH_WINNER", "COMPLETED", "CLOSED"].includes(String(a.ui_status || "").toUpperCase())).map((a) => (<tr key={a.auction_item_id} className="clickable-row" onClick={() => openAuction(a.auction_item_id)}><td>{a.item_label}</td><td>{a.highest_bidder_name}</td><td>{formatCurrency(a.highest_bid)}</td><td>{a.order_status || "-"}</td><td>{a.payment_status || "-"}</td><td>{formatDateTime(a.auction_end_dt)}</td></tr>))}</tbody></table></div></section>
+            )}
+          </>
+        )}
+
+        {page === "inventory" && (
+          <>
+            <header className="dashboard-header"><div><p className="eyebrow">INVENTORY</p><h1>Inventory</h1><p>Track products, stock availability, reservations and stock movement.</p></div></header>
+            <section className="metrics-grid"><MetricCard title="Products" value="0" subtitle="Active inventory items" /><MetricCard title="Stock on hand" value="0" subtitle="Physical quantity" /><MetricCard title="Reserved" value="0" subtitle="Allocated to selling/orders" /><MetricCard title="Available" value="0" subtitle="Ready to sell" /><MetricCard title="Low stock" value="0" subtitle="Needs replenishment" /><MetricCard title="Inventory value" value={formatCurrency(0)} subtitle="Estimated stock cost" /></section>
+            <section className="dashboard-panel" style={{ marginBottom: 18 }}><div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>{["SUMMARY", "PRODUCTS", "STOCK", "MOVEMENTS"].map((tab) => <button key={tab} type="button" className={inventoryTab === tab ? "primary-button" : "secondary-button"} onClick={() => setInventoryTab(tab)}>{tab.charAt(0)+tab.slice(1).toLowerCase()}</button>)}</div></section>
+            <section className="dashboard-panel"><div className="panel-header"><div><h2>{inventoryTab === "SUMMARY" ? "Inventory summary" : inventoryTab.charAt(0)+inventoryTab.slice(1).toLowerCase()}</h2><p>Inventory remains optional; Auction and Post Mining can continue to support manual items.</p></div>{inventoryTab === "PRODUCTS" && <button className="primary-button" type="button" disabled>Add Product</button>}</div><div className="table-wrapper"><table><thead><tr><th>SKU</th><th>Product / Item</th><th>On Hand</th><th>Reserved</th><th>Available</th><th>Unit Cost</th><th>Selling Price</th><th>Status</th></tr></thead><tbody><tr><td colSpan="8">No inventory records yet.</td></tr></tbody></table></div></section>
+          </>
+        )}
+
+        {page === "sales" && (
+          <>
+            <header className="dashboard-header"><div><p className="eyebrow">SALES</p><h1>Sales</h1><p>Consolidated sales from Auctions, Post Mining, Live Mining and manual transactions.</p></div></header>
+            <section className="metrics-grid"><MetricCard title="Gross sales" value={formatCurrency(0)} subtitle="Before deductions" /><MetricCard title="Net sales" value={formatCurrency(0)} subtitle="After discounts / adjustments" /><MetricCard title="Paid" value={formatCurrency(0)} subtitle="Collected sales" /><MetricCard title="Pending" value={formatCurrency(0)} subtitle="Awaiting payment" /><MetricCard title="Transactions" value="0" subtitle="Sales records" /><MetricCard title="Average sale" value={formatCurrency(0)} subtitle="Per transaction" /></section>
+            <section className="dashboard-panel" style={{ marginBottom: 18 }}><div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>{["SUMMARY", "TRANSACTIONS", "RETURNS"].map((tab) => <button key={tab} type="button" className={salesTab === tab ? "primary-button" : "secondary-button"} onClick={() => setSalesTab(tab)}>{tab.charAt(0)+tab.slice(1).toLowerCase()}</button>)}</div></section>
+            <section className="dashboard-panel"><div className="panel-header"><div><h2>{salesTab === "SUMMARY" ? "Sales summary" : salesTab.charAt(0)+salesTab.slice(1).toLowerCase()}</h2><p>Sales data will consolidate all enabled EO2MATE selling channels.</p></div></div><div className="table-wrapper"><table><thead><tr><th>Date</th><th>Reference</th><th>Channel</th><th>Buyer</th><th>Items</th><th>Gross</th><th>Paid</th><th>Status</th></tr></thead><tbody><tr><td colSpan="8">No consolidated sales records yet.</td></tr></tbody></table></div></section>
+          </>
+        )}
+
+        {page === "purchases" && (
+          <>
+            <header className="dashboard-header"><div><p className="eyebrow">PURCHASING</p><h1>Purchases</h1><p>Record stock purchases, suppliers, receiving and inventory cost.</p></div></header>
+            <section className="metrics-grid"><MetricCard title="Purchases" value={formatCurrency(0)} subtitle="Selected period" /><MetricCard title="Open POs" value="0" subtitle="Awaiting receipt" /><MetricCard title="Received" value="0" subtitle="Completed receipts" /><MetricCard title="Suppliers" value="0" subtitle="Active suppliers" /><MetricCard title="Items received" value="0" subtitle="Purchased quantity" /><MetricCard title="Outstanding" value={formatCurrency(0)} subtitle="Supplier payable" /></section>
+            <section className="dashboard-panel" style={{ marginBottom: 18 }}><div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>{["SUMMARY", "PURCHASES", "SUPPLIERS", "RECEIVING"].map((tab) => <button key={tab} type="button" className={purchasesTab === tab ? "primary-button" : "secondary-button"} onClick={() => setPurchasesTab(tab)}>{tab.charAt(0)+tab.slice(1).toLowerCase()}</button>)}</div></section>
+            <section className="dashboard-panel"><div className="panel-header"><div><h2>{purchasesTab === "SUMMARY" ? "Purchase summary" : purchasesTab.charAt(0)+purchasesTab.slice(1).toLowerCase()}</h2><p>Purchase and supplier backend will be connected after the UI structure is approved.</p></div>{purchasesTab === "PURCHASES" && <button className="primary-button" type="button" disabled>New Purchase</button>}</div><div className="table-wrapper"><table><thead><tr><th>Date</th><th>Purchase Ref</th><th>Supplier</th><th>Items</th><th>Total Cost</th><th>Received</th><th>Payment</th><th>Status</th></tr></thead><tbody><tr><td colSpan="8">No purchase records yet.</td></tr></tbody></table></div></section>
           </>
         )}
 
