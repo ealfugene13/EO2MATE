@@ -548,20 +548,13 @@ export default function PortalPage({ session }) {
   const filteredChatConversations = useMemo(() => {
     const query = chatSearch.trim().toLowerCase();
 
-    const rows = query
-      ? chatConversations.filter((conversation) =>
-          [
-            conversation?.participant?.name,
-            conversation?.latest_message?.text,
-          ].some((value) => String(value || "").toLowerCase().includes(query))
-        )
-      : [...chatConversations];
+    if (!query) return chatConversations;
 
-    return rows.sort((a, b) => {
-      const aTime = a?.updated_time ? new Date(a.updated_time).getTime() : 0;
-      const bTime = b?.updated_time ? new Date(b.updated_time).getTime() : 0;
-      return bTime - aTime;
-    });
+    return chatConversations.filter((conversation) =>
+      String(conversation?.participant?.name || "")
+        .toLowerCase()
+        .includes(query)
+    );
   }, [chatConversations, chatSearch]);
 
 
@@ -783,7 +776,7 @@ export default function PortalPage({ session }) {
           body: {
             client_id: client.client_id,
             fb_page_id: fbPageId || undefined,
-            limit: 15,
+            limit: 12,
           },
         },
       );
@@ -798,7 +791,13 @@ export default function PortalPage({ session }) {
 
       setChatPages(pages);
       setChatPageFilter(selectedPageId);
-      setChatConversations(data.conversations || []);
+      setChatConversations(
+        [...(data.conversations || [])].sort((a, b) => {
+          const aTime = Number(a?.last_activity_ms) || 0;
+          const bTime = Number(b?.last_activity_ms) || 0;
+          return bTime - aTime;
+        })
+      );
       setChatSelectedConversation(null);
       setChatMessages([]);
       setChatDraft("");
@@ -911,6 +910,8 @@ export default function PortalPage({ session }) {
           ? {
               ...current,
               updated_time: now,
+              last_activity_at: now,
+              last_activity_ms: Date.parse(now) || Date.now(),
               latest_message: {
                 id: data?.message_id || null,
                 text: messageText,
@@ -928,6 +929,8 @@ export default function PortalPage({ session }) {
             ? {
                 ...conversation,
                 updated_time: now,
+                last_activity_at: now,
+                last_activity_ms: Date.parse(now) || Date.now(),
                 latest_message: {
                   id: data?.message_id || null,
                   text: messageText,
@@ -2137,7 +2140,7 @@ export default function PortalPage({ session }) {
                       type="search"
                       value={chatSearch}
                       onChange={(event) => setChatSearch(event.target.value)}
-                      placeholder="Search buyer or latest message"
+                      placeholder="Search buyer"
                     />
                   </div>
 
@@ -2170,7 +2173,7 @@ export default function PortalPage({ session }) {
                               <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
                                 <strong style={{ color: "#263548" }}>{conversation?.participant?.name || "Facebook User"}</strong>
                                 <span style={{ fontSize: 11, color: "#718096", whiteSpace: "nowrap" }}>
-                                  {conversation?.updated_time ? new Date(conversation.updated_time).toLocaleString() : ""}
+                                  {conversation?.last_activity_at ? new Date(conversation.last_activity_at).toLocaleString() : ""}
                                 </span>
                               </div>
                               <div style={{ marginTop: 5, color: "#718096", fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
