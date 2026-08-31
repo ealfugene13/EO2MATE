@@ -547,14 +547,21 @@ export default function PortalPage({ session }) {
 
   const filteredChatConversations = useMemo(() => {
     const query = chatSearch.trim().toLowerCase();
-    if (!query) return chatConversations;
 
-    return chatConversations.filter((conversation) =>
-      [
-        conversation?.participant?.name,
-        conversation?.latest_message?.text,
-      ].some((value) => String(value || "").toLowerCase().includes(query))
-    );
+    const rows = query
+      ? chatConversations.filter((conversation) =>
+          [
+            conversation?.participant?.name,
+            conversation?.latest_message?.text,
+          ].some((value) => String(value || "").toLowerCase().includes(query))
+        )
+      : [...chatConversations];
+
+    return rows.sort((a, b) => {
+      const aTime = a?.updated_time ? new Date(a.updated_time).getTime() : 0;
+      const bTime = b?.updated_time ? new Date(b.updated_time).getTime() : 0;
+      return bTime - aTime;
+    });
   }, [chatConversations, chatSearch]);
 
 
