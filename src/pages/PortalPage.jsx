@@ -87,6 +87,21 @@ function NavIcon({ type }) {
         <circle cx="18" cy="18" r="2" />
       </svg>
     ),
+    chat: (
+      <svg {...common}>
+        <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4Z" />
+        <path d="M8 10h8" />
+        <path d="M8 14h5" />
+      </svg>
+    ),
+    users: (
+      <svg {...common}>
+        <circle cx="9" cy="8" r="3" />
+        <path d="M3 20a6 6 0 0 1 12 0" />
+        <circle cx="17" cy="9" r="2" />
+        <path d="M16 14a5 5 0 0 1 5 5" />
+      </svg>
+    ),
     automation: (
       <svg {...common}>
         <circle cx="12" cy="12" r="3" />
@@ -201,6 +216,91 @@ function SidebarNavButton({ icon, children, ...props }) {
     </button>
   );
 }
+
+function SidebarSectionLabel({ children }) {
+  return (
+    <div
+      aria-hidden="true"
+      style={{
+        padding: "16px 14px 6px",
+        fontSize: 10,
+        fontWeight: 800,
+        letterSpacing: "0.12em",
+        textTransform: "uppercase",
+        color: "#8a98a8",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+const REPORT_CATALOG = [
+  {
+    key: "sales-summary",
+    title: "Sales Summary",
+    group: "Sales",
+    description: "Gross sales, paid sales, unpaid or forfeited orders, discounts, shipping and order count.",
+    highlights: ["Gross and net sales", "Paid vs unpaid", "Average order value", "Sales by channel"],
+  },
+  {
+    key: "auction-performance",
+    title: "Auction Performance",
+    group: "Selling",
+    description: "Auction participation, sell-through, bids, bidders, buyouts and winning values.",
+    highlights: ["Sell-through rate", "Average bidders", "Buyout usage", "Top auction items"],
+  },
+  {
+    key: "post-mining-performance",
+    title: "Post Mining Performance",
+    group: "Selling",
+    description: "MINE activity, claimed quantities, unclaimed items, buyers and conversion by post.",
+    highlights: ["Claim conversion", "Fastest claimed items", "Unclaimed stock", "Top MINE buyers"],
+  },
+  {
+    key: "payment-collection",
+    title: "Payment Collection",
+    group: "Finance",
+    description: "Paid, pending and expired payments with collection rate and aging visibility.",
+    highlights: ["Collection rate", "Payment aging", "Expired payments", "Method breakdown"],
+  },
+  {
+    key: "order-fulfillment",
+    title: "Order Fulfillment",
+    group: "Operations",
+    description: "Order status movement from payment through booking, shipment and delivery.",
+    highlights: ["Processing time", "Ready for booking", "Delivery completion", "Cancelled orders"],
+  },
+  {
+    key: "inventory-movement",
+    title: "Inventory Movement",
+    group: "Inventory",
+    description: "Beginning, received, reserved, sold, adjusted and ending stock once Inventory is enabled.",
+    highlights: ["Fast movers", "Slow movers", "Stock movement", "Low-stock opportunities"],
+  },
+  {
+    key: "buyer-analysis",
+    title: "Buyer Analysis",
+    group: "Customers",
+    description: "Unique and repeat buyers, order frequency, average spend and customer value.",
+    highlights: ["Repeat buyer rate", "Average spend", "Top buyers", "Order frequency"],
+  },
+  {
+    key: "facebook-page-performance",
+    title: "Facebook Page Performance",
+    group: "Facebook",
+    description: "Compare selling results and activity across connected Facebook Pages.",
+    highlights: ["Sales by Page", "Orders by Page", "Auction activity", "MINE activity"],
+  },
+  {
+    key: "opportunity",
+    title: "EO2MATE Opportunity Report",
+    group: "Insights",
+    description: "A decision-focused report that surfaces where the client may be gaining or losing sales opportunities.",
+    highlights: ["High interest / low close", "Unpaid sales at risk", "Fast-demand products", "Best selling windows"],
+    featured: true,
+  },
+];
 
 function formatCurrency(value) {
   if (value === null || value === undefined || value === "") return "-";
@@ -359,6 +459,17 @@ export default function PortalPage({ session }) {
   const [automationControlMessage, setAutomationControlMessage] = useState("");
   const [automationModal, setAutomationModal] = useState(null);
   const [automationReason, setAutomationReason] = useState("");
+
+  // UI-first modules. These states are intentionally local until their backend APIs are wired.
+  const [chatSearch, setChatSearch] = useState("");
+  const [chatPageFilter, setChatPageFilter] = useState("ALL");
+  const [staffSearch, setStaffSearch] = useState("");
+  const [showStaffForm, setShowStaffForm] = useState(false);
+  const [staffDraft, setStaffDraft] = useState({ name: "", email: "", role: "STAFF" });
+  const [selectedReport, setSelectedReport] = useState("opportunity");
+  const [reportDateRange, setReportDateRange] = useState("30D");
+  const [reportPageFilter, setReportPageFilter] = useState("ALL");
+  const [reportChannelFilter, setReportChannelFilter] = useState("ALL");
 
   useEffect(() => {
     loadPortal();
@@ -1419,13 +1530,7 @@ export default function PortalPage({ session }) {
             Dashboard
           </SidebarNavButton>
 
-          <SidebarNavButton
-            icon="facebook"
-            className={`nav-item ${page === "facebook" ? "active" : ""}`}
-            onClick={openFacebookSetup}
-          >
-            Facebook Setup
-          </SidebarNavButton>
+          <SidebarSectionLabel>Selling</SidebarSectionLabel>
 
           <SidebarNavButton
             icon="create"
@@ -1436,6 +1541,14 @@ export default function PortalPage({ session }) {
           </SidebarNavButton>
 
           <SidebarNavButton
+            icon="auction"
+            className={`nav-item ${page.includes("auction") ? "active" : ""}`}
+            onClick={() => goToAuctions("ALL")}
+          >
+            Auctions
+          </SidebarNavButton>
+
+          <SidebarNavButton
             icon="mining"
             className={`nav-item ${page === "post-mining" ? "active" : ""}`}
             onClick={() => setPage("post-mining")}
@@ -1443,13 +1556,7 @@ export default function PortalPage({ session }) {
             Post Mining
           </SidebarNavButton>
 
-          <SidebarNavButton
-            icon="auction"
-            className={`nav-item ${page.includes("auction") ? "active" : ""}`}
-            onClick={() => goToAuctions("ALL")}
-          >
-            Auctions
-          </SidebarNavButton>
+          <SidebarSectionLabel>Operations</SidebarSectionLabel>
 
           <SidebarNavButton
             icon="orders"
@@ -1477,6 +1584,34 @@ export default function PortalPage({ session }) {
             Delivery
           </SidebarNavButton>
 
+          <SidebarSectionLabel>Facebook</SidebarSectionLabel>
+
+          <SidebarNavButton
+            icon="chat"
+            className={`nav-item ${page === "facebook-chats" ? "active" : ""}`}
+            onClick={() => setPage("facebook-chats")}
+          >
+            Facebook Chats
+          </SidebarNavButton>
+
+          <SidebarNavButton
+            icon="facebook"
+            className={`nav-item ${page === "facebook" ? "active" : ""}`}
+            onClick={openFacebookSetup}
+          >
+            Facebook Setup
+          </SidebarNavButton>
+
+          <SidebarSectionLabel>Maintenance</SidebarSectionLabel>
+
+          <SidebarNavButton
+            icon="users"
+            className={`nav-item ${page === "users-staff" ? "active" : ""}`}
+            onClick={() => setPage("users-staff")}
+          >
+            Users &amp; Staff
+          </SidebarNavButton>
+
           <SidebarNavButton
             icon="automation"
             className={`nav-item ${page === "automation-control" ? "active" : ""}`}
@@ -1486,15 +1621,19 @@ export default function PortalPage({ session }) {
           </SidebarNavButton>
 
           <SidebarNavButton
+            icon="reports"
+            className={`nav-item ${page === "reports" ? "active" : ""}`}
+            onClick={() => setPage("reports")}
+          >
+            Reports
+          </SidebarNavButton>
+
+          <SidebarNavButton
             icon="setup"
             className={`nav-item ${page === "setup" ? "active" : ""}`}
             onClick={() => setPage("setup")}
           >
             Setup
-          </SidebarNavButton>
-
-          <SidebarNavButton icon="reports" className="nav-item" disabled>
-            Reports
           </SidebarNavButton>
         </nav>
 
@@ -1635,6 +1774,291 @@ export default function PortalPage({ session }) {
                 <div><strong>No developer setup</strong><span>Your platform's Meta app handles OAuth, webhook and API integration.</span></div>
               </div>
             </section>
+          </>
+        )}
+
+        {page === "facebook-chats" && (
+          <>
+            <header className="dashboard-header">
+              <div>
+                <p className="eyebrow">FACEBOOK · INBOX</p>
+                <h1>Facebook Chats</h1>
+                <p>One workspace for Messenger conversations from the client&apos;s connected Facebook Pages.</p>
+              </div>
+              <button className="secondary-button" type="button" disabled title="Live Messenger sync will be enabled during backend integration">
+                Sync Messages
+              </button>
+            </header>
+
+            <section className="dashboard-panel">
+              <div className="panel-header">
+                <div>
+                  <h2>Page Inbox</h2>
+                  <p>Search conversations, choose a Page and continue buyer support from one screen.</p>
+                </div>
+                <StatusBadge status={facebookStatus?.connected ? "CONNECTED" : "NOT_CONNECTED"} />
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "minmax(240px, 340px) minmax(0, 1fr)", gap: 18, marginTop: 18 }}>
+                <div style={{ border: "1px solid #e5eaf0", borderRadius: 14, overflow: "hidden", background: "#fff" }}>
+                  <div style={{ padding: 14, borderBottom: "1px solid #e5eaf0", display: "grid", gap: 10 }}>
+                    <select value={chatPageFilter} onChange={(event) => setChatPageFilter(event.target.value)}>
+                      <option value="ALL">All connected Pages</option>
+                      {(automationPages || []).map((fbPage) => (
+                        <option key={fbPage.fb_page_id} value={fbPage.fb_page_id}>
+                          {fbPage.page_name || fbPage.page_nm || fbPage.fb_page_id}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      type="search"
+                      value={chatSearch}
+                      onChange={(event) => setChatSearch(event.target.value)}
+                      placeholder="Search buyer or message"
+                    />
+                  </div>
+                  <div style={{ padding: 28, textAlign: "center", color: "#718096" }}>
+                    <strong style={{ display: "block", color: "#263548", marginBottom: 6 }}>No conversations loaded yet</strong>
+                    <span style={{ fontSize: 13 }}>Messenger history will appear here after the Facebook messaging integration is connected.</span>
+                  </div>
+                </div>
+
+                <div style={{ minHeight: 430, border: "1px solid #e5eaf0", borderRadius: 14, background: "#fff", display: "flex", flexDirection: "column" }}>
+                  <div style={{ padding: "16px 18px", borderBottom: "1px solid #e5eaf0" }}>
+                    <strong>Select a conversation</strong>
+                    <div style={{ fontSize: 12, color: "#718096", marginTop: 3 }}>Buyer, Page and linked order details will appear here.</div>
+                  </div>
+                  <div style={{ flex: 1, display: "grid", placeItems: "center", padding: 30, color: "#718096", textAlign: "center" }}>
+                    Choose a Messenger conversation from the inbox to view its message history.
+                  </div>
+                  <div style={{ padding: 14, borderTop: "1px solid #e5eaf0", display: "flex", gap: 10 }}>
+                    <input type="text" placeholder="Write a message..." disabled style={{ flex: 1 }} />
+                    <button className="primary-button" type="button" disabled title="Sending will be enabled when Messenger integration is connected">Send</button>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </>
+        )}
+
+        {page === "users-staff" && (
+          <>
+            <header className="dashboard-header">
+              <div>
+                <p className="eyebrow">MAINTENANCE · ACCESS</p>
+                <h1>Users &amp; Staff</h1>
+                <p>Create and maintain client staff access without exposing platform administration.</p>
+              </div>
+              <button className="primary-button" type="button" onClick={() => setShowStaffForm((current) => !current)}>
+                {showStaffForm ? "Close Form" : "Add Staff"}
+              </button>
+            </header>
+
+            {showStaffForm && (
+              <section className="dashboard-panel" style={{ marginBottom: 18 }}>
+                <div className="panel-header">
+                  <div>
+                    <h2>Invite Client Staff</h2>
+                    <p>Prepare the account and permission role. Invitation delivery will be wired after the access-control backend is finalized.</p>
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14, marginTop: 16 }}>
+                  <label>
+                    <span>Full Name</span>
+                    <input
+                      value={staffDraft.name}
+                      onChange={(event) => setStaffDraft((current) => ({ ...current, name: event.target.value }))}
+                      placeholder="Staff name"
+                    />
+                  </label>
+                  <label>
+                    <span>Email</span>
+                    <input
+                      type="email"
+                      value={staffDraft.email}
+                      onChange={(event) => setStaffDraft((current) => ({ ...current, email: event.target.value }))}
+                      placeholder="staff@example.com"
+                    />
+                  </label>
+                  <label>
+                    <span>Role</span>
+                    <select value={staffDraft.role} onChange={(event) => setStaffDraft((current) => ({ ...current, role: event.target.value }))}>
+                      <option value="STAFF">Client Staff</option>
+                      <option value="ADMIN">Client Admin</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 16 }}>
+                  <button className="secondary-button" type="button" onClick={() => { setShowStaffForm(false); setStaffDraft({ name: "", email: "", role: "STAFF" }); }}>Cancel</button>
+                  <button className="primary-button" type="button" disabled title="Staff invitation backend will be connected after UI completion">Send Invitation</button>
+                </div>
+              </section>
+            )}
+
+            <section className="metrics-grid">
+              <MetricCard title="Client Admins" value="—" subtitle="Administrative users" />
+              <MetricCard title="Client Staff" value="—" subtitle="Operational users" />
+              <MetricCard title="Pending Invites" value="—" subtitle="Awaiting acceptance" />
+              <MetricCard title="Inactive Users" value="—" subtitle="Access disabled" />
+            </section>
+
+            <section className="dashboard-panel">
+              <div className="panel-header">
+                <div>
+                  <h2>Client Users</h2>
+                  <p>Role, status and access activity for this client only.</p>
+                </div>
+                <input type="search" value={staffSearch} onChange={(event) => setStaffSearch(event.target.value)} placeholder="Search users" style={{ maxWidth: 260 }} />
+              </div>
+
+              <div className="table-wrapper">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Email</th>
+                      <th>Role</th>
+                      <th>Status</th>
+                      <th>Last Login</th>
+                      <th>Added</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td colSpan="7" style={{ textAlign: "center", padding: 30, color: "#718096" }}>
+                        Staff accounts will appear here once client user provisioning is connected.
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div style={{ marginTop: 16, padding: 14, borderRadius: 12, background: "#f8fafc", fontSize: 13, color: "#526274" }}>
+                <strong style={{ color: "#263548" }}>Access model:</strong> Client Admin can manage staff and permitted sensitive settings. Client Staff receives only the modules and actions explicitly allowed for their role.
+              </div>
+            </section>
+          </>
+        )}
+
+        {page === "reports" && (
+          <>
+            <header className="dashboard-header">
+              <div>
+                <p className="eyebrow">REPORTS · INSIGHTS</p>
+                <h1>Reports &amp; Insights</h1>
+                <p>Operational reports plus EO2MATE insights designed to help clients decide what to sell, collect and improve next.</p>
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button className="secondary-button" type="button" disabled title="Export will be enabled after report data sources are wired">Excel</button>
+                <button className="secondary-button" type="button" disabled title="Export will be enabled after report data sources are wired">CSV</button>
+                <button className="secondary-button" type="button" disabled title="Export will be enabled after report data sources are wired">PDF</button>
+              </div>
+            </header>
+
+            <section className="dashboard-panel" style={{ marginBottom: 18 }}>
+              <div className="panel-header">
+                <div>
+                  <h2>Report Filters</h2>
+                  <p>The same filters will apply to previews and exported files.</p>
+                </div>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginTop: 14 }}>
+                <label>
+                  <span>Date Range</span>
+                  <select value={reportDateRange} onChange={(event) => setReportDateRange(event.target.value)}>
+                    <option value="7D">Last 7 days</option>
+                    <option value="30D">Last 30 days</option>
+                    <option value="MTD">Month to date</option>
+                    <option value="YTD">Year to date</option>
+                    <option value="CUSTOM">Custom range</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Facebook Page</span>
+                  <select value={reportPageFilter} onChange={(event) => setReportPageFilter(event.target.value)}>
+                    <option value="ALL">All Pages</option>
+                    {(automationPages || []).map((fbPage) => (
+                      <option key={fbPage.fb_page_id} value={fbPage.fb_page_id}>{fbPage.page_name || fbPage.page_nm || fbPage.fb_page_id}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>Sales Channel</span>
+                  <select value={reportChannelFilter} onChange={(event) => setReportChannelFilter(event.target.value)}>
+                    <option value="ALL">All channels</option>
+                    <option value="AUCTION">Auction</option>
+                    <option value="POST_MINING">Post Mining</option>
+                    <option value="MANUAL">Manual / Other</option>
+                  </select>
+                </label>
+              </div>
+            </section>
+
+            <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 14, marginBottom: 18 }}>
+              {REPORT_CATALOG.map((report) => (
+                <button
+                  key={report.key}
+                  type="button"
+                  onClick={() => setSelectedReport(report.key)}
+                  style={{
+                    border: report.key === selectedReport ? "2px solid #2ea84a" : "1px solid #e3e9ef",
+                    background: report.featured ? "linear-gradient(135deg, #f1fff4 0%, #ffffff 65%)" : "#ffffff",
+                    borderRadius: 14,
+                    padding: 18,
+                    textAlign: "left",
+                    cursor: "pointer",
+                    boxShadow: report.key === selectedReport ? "0 8px 24px rgba(46,168,74,.10)" : "none",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", marginBottom: 8 }}>
+                    <strong style={{ color: "#1e2d3d" }}>{report.title}</strong>
+                    <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: ".08em", color: report.featured ? "#20833a" : "#718096" }}>{report.featured ? "EO2MATE" : report.group.toUpperCase()}</span>
+                  </div>
+                  <div style={{ fontSize: 13, lineHeight: 1.5, color: "#607083" }}>{report.description}</div>
+                </button>
+              ))}
+            </section>
+
+            {(() => {
+              const report = REPORT_CATALOG.find((item) => item.key === selectedReport) || REPORT_CATALOG[0];
+              return (
+                <section className="dashboard-panel">
+                  <div className="panel-header">
+                    <div>
+                      <p className="eyebrow">SELECTED REPORT</p>
+                      <h2>{report.title}</h2>
+                      <p>{report.description}</p>
+                    </div>
+                    {report.featured && <StatusBadge status="INSIGHT" />}
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, marginTop: 16 }}>
+                    {report.highlights.map((highlight) => (
+                      <div key={highlight} style={{ padding: 14, border: "1px solid #e5eaf0", borderRadius: 12, background: "#fbfcfd" }}>
+                        <strong style={{ display: "block", color: "#263548", marginBottom: 4 }}>{highlight}</strong>
+                        <span style={{ fontSize: 12, color: "#718096" }}>Calculated from validated EO2MATE transaction data once reporting is connected.</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {report.featured && (
+                    <div style={{ marginTop: 16, padding: 16, borderRadius: 12, background: "#f3fbf5", border: "1px solid #d6efdc" }}>
+                      <strong style={{ display: "block", color: "#1d6530", marginBottom: 6 }}>What makes this report different</strong>
+                      <span style={{ fontSize: 13, lineHeight: 1.55, color: "#456353" }}>
+                        Instead of only listing totals, the Opportunity Report will flag patterns such as high-interest auctions with weak closing values, fast MINE claims, unpaid sales at risk, repeat high-value buyers, underperforming stock and the strongest historical selling windows.
+                      </span>
+                    </div>
+                  )}
+
+                  <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
+                    <button className="primary-button" type="button" disabled title="Live report generation will be enabled after backend report queries are validated">Generate Report</button>
+                  </div>
+                </section>
+              );
+            })()}
           </>
         )}
 
@@ -2090,6 +2514,8 @@ export default function PortalPage({ session }) {
             <section className="metrics-grid">
               <MetricCard title="Active auctions" value={auctionMetrics.active} subtitle="Currently open" onClick={() => goToAuctions("ACTIVE")} />
               <MetricCard title="Post Mining" value="Open" subtitle="Manage MINE posts" onClick={() => setPage("post-mining")} />
+              <MetricCard title="Facebook Chats" value="Inbox" subtitle="Buyer conversations" onClick={() => setPage("facebook-chats")} />
+              <MetricCard title="Reports & Insights" value="View" subtitle="Sales and opportunities" onClick={() => setPage("reports")} />
               <MetricCard title="Pending orders" value={orderMetrics.pending} subtitle="Awaiting payment" onClick={() => goToOrders("PAYMENT_PENDING")} />
               {paymentAccountStatus?.payment_enabled ? (
                 <MetricCard title="Pending payments" value={paymentMetrics.pending} subtitle="Awaiting settlement" onClick={() => goToPayments("pending")} />
