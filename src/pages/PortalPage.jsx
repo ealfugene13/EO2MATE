@@ -1522,14 +1522,14 @@ export default function PortalPage({ session }) {
   if (platformAdmin && !client) {
     return (
       <div className="app-shell">
-        <aside className="sidebar">
+        <aside className="sidebar" style={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" }}>
           <SidebarLogo admin />
-          <nav className="sidebar-nav">
+          <nav className="sidebar-nav" style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", paddingBottom: 12 }}>
             <SidebarNavButton icon="clients" className="nav-item active">
               Clients
             </SidebarNavButton>
           </nav>
-          <div className="sidebar-footer">
+          <div className="sidebar-footer" style={{ flexShrink: 0 }}>
             <div className="user-mini-card"><strong>{session.user.email}</strong><span>{platformAdmin.role}</span></div>
             <button className="logout-button" onClick={handleLogout}>Sign out</button>
           </div>
@@ -1541,10 +1541,10 @@ export default function PortalPage({ session }) {
 
   return (
     <div className="app-shell">
-      <aside className="sidebar">
+      <aside className="sidebar" style={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" }}>
         <SidebarLogo />
 
-        <nav className="sidebar-nav">
+        <nav className="sidebar-nav" style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", paddingBottom: 16 }}>
           {platformAdmin && (
             <SidebarNavButton
               icon="clients"
@@ -1694,7 +1694,7 @@ export default function PortalPage({ session }) {
           </SidebarNavButton>
         </nav>
 
-        <div className="sidebar-footer">
+        <div className="sidebar-footer" style={{ flexShrink: 0 }}>
           <div className="user-mini-card">
             <strong>{client?.name || session.user.email}</strong>
             <span>{client?.role || "CLIENT"}</span>
