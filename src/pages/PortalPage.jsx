@@ -48,6 +48,15 @@ function NavIcon({ type }) {
         <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z" />
       </svg>
     ),
+    mining: (
+      <svg {...common}>
+        <path d="M4 6h16" />
+        <path d="M6 10h12" />
+        <path d="M8 14h8" />
+        <path d="M10 18h4" />
+        <circle cx="12" cy="6" r="1" />
+      </svg>
+    ),
     auction: (
       <svg {...common}>
         <path d="m14 5 5 5" />
@@ -1427,6 +1436,14 @@ export default function PortalPage({ session }) {
           </SidebarNavButton>
 
           <SidebarNavButton
+            icon="mining"
+            className={`nav-item ${page === "post-mining" ? "active" : ""}`}
+            onClick={() => setPage("post-mining")}
+          >
+            Post Mining
+          </SidebarNavButton>
+
+          <SidebarNavButton
             icon="auction"
             className={`nav-item ${page.includes("auction") ? "active" : ""}`}
             onClick={() => goToAuctions("ALL")}
@@ -1909,6 +1926,54 @@ export default function PortalPage({ session }) {
           </>
         )}
 
+        {page === "post-mining" && (
+          <>
+            <header className="dashboard-header">
+              <div>
+                <p className="eyebrow">FACEBOOK SELLING</p>
+                <h1>Post Mining</h1>
+                <p>Prepare and manage Facebook posts that accept MINE comments from buyers.</p>
+              </div>
+            </header>
+
+            <section className="dashboard-panel">
+              <div className="panel-header">
+                <div>
+                  <h2>Post Mining</h2>
+                  <p>This module is now available in the EO2MATE UI. Backend MINE processing will be connected separately.</p>
+                </div>
+              </div>
+
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                gap: 16,
+                marginTop: 16,
+              }}>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  disabled
+                  title="Posting workflow will be enabled after Post Mining backend integration"
+                  style={{ minHeight: 96, textAlign: "left" }}
+                >
+                  Create Mining Post
+                </button>
+
+                <button
+                  type="button"
+                  className="secondary-button"
+                  disabled
+                  title="Mining activity will be enabled after Post Mining backend integration"
+                  style={{ minHeight: 96, textAlign: "left" }}
+                >
+                  Mining Activity
+                </button>
+              </div>
+            </section>
+          </>
+        )}
+
         {page === "dashboard" && (
           <>
             <section className="eo2-dashboard-hero">
@@ -2024,6 +2089,7 @@ export default function PortalPage({ session }) {
 
             <section className="metrics-grid">
               <MetricCard title="Active auctions" value={auctionMetrics.active} subtitle="Currently open" onClick={() => goToAuctions("ACTIVE")} />
+              <MetricCard title="Post Mining" value="Open" subtitle="Manage MINE posts" onClick={() => setPage("post-mining")} />
               <MetricCard title="Pending orders" value={orderMetrics.pending} subtitle="Awaiting payment" onClick={() => goToOrders("PAYMENT_PENDING")} />
               {paymentAccountStatus?.payment_enabled ? (
                 <MetricCard title="Pending payments" value={paymentMetrics.pending} subtitle="Awaiting settlement" onClick={() => goToPayments("pending")} />
