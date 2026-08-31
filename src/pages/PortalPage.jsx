@@ -327,6 +327,38 @@ const REPORT_CATALOG = [
   },
 ];
 
+async function getEdgeFunctionErrorMessage(error, fallbackMessage) {
+  let message = error?.message || fallbackMessage;
+  const context = error?.context;
+
+  if (context && typeof context.clone === "function") {
+    try {
+      const response = context.clone();
+      const contentType = response.headers?.get?.("content-type") || "";
+
+      if (contentType.includes("application/json")) {
+        const body = await response.json();
+        const metaCode = body?.facebook_error?.code;
+        const metaSubcode = body?.facebook_error?.error_subcode;
+        const suffix = [
+          metaCode ? `Meta code ${metaCode}` : "",
+          metaSubcode ? `subcode ${metaSubcode}` : "",
+        ].filter(Boolean).join(", ");
+
+        message = body?.message || body?.error || message;
+        if (suffix) message = `${message} (${suffix})`;
+      } else {
+        const text = await response.text();
+        if (text?.trim()) message = text.trim();
+      }
+    } catch {
+      // Preserve the original FunctionsHttpError message.
+    }
+  }
+
+  return message || fallbackMessage;
+}
+
 function formatCurrency(value) {
   if (value === null || value === undefined || value === "") return "-";
   return new Intl.NumberFormat("en-PH", {
@@ -512,6 +544,19 @@ export default function PortalPage({ session }) {
   const [inventoryTab, setInventoryTab] = useState("SUMMARY");
   const [salesTab, setSalesTab] = useState("SUMMARY");
   const [purchasesTab, setPurchasesTab] = useState("SUMMARY");
+
+  const filteredChatConversations = useMemo(() => {
+    const query = chatSearch.trim().toLowerCase();
+    if (!query) return chatConversations;
+
+    return chatConversations.filter((conversation) =>
+      [
+        conversation?.participant?.name,
+        conversation?.latest_message?.text,
+      ].some((value) => String(value || "").toLowerCase().includes(query))
+    );
+  }, [chatConversations, chatSearch]);
+
 
   useEffect(() => {
     loadPortal();
@@ -731,7 +776,7 @@ export default function PortalPage({ session }) {
           body: {
             client_id: client.client_id,
             fb_page_id: fbPageId || undefined,
-            limit: 25,
+            limit: 15,
           },
         },
       );
@@ -751,11 +796,15 @@ export default function PortalPage({ session }) {
       setChatMessages([]);
       setChatDraft("");
     } catch (error) {
-      setChatPages([]);
       setChatConversations([]);
       setChatSelectedConversation(null);
       setChatMessages([]);
-      setChatMessage(error.message || "Unable to load Facebook conversations.");
+      setChatMessage(
+        await getEdgeFunctionErrorMessage(
+          error,
+          "Unable to load Facebook conversations."
+        )
+      );
     } finally {
       setChatLoading(false);
     }
@@ -795,19 +844,24 @@ export default function PortalPage({ session }) {
       setChatMessages((data.messages || []).slice().reverse());
     } catch (error) {
       setChatMessages([]);
-      setChatMessage(error.message || "Unable to load Messenger messages.");
+      setChatMessage(
+        await getEdgeFunctionErrorMessage(
+          error,
+          "Unable to load Messenger messages."
+        )
+      );
     } finally {
       setChatMessagesLoading(false);
     }
   }
 
-  async function sendFacebookChatMessage(event) {
-    event?.preventDefault?.();
-
+  async function sendFacebookChatMessage() {
     const recipientPsid = chatSelectedConversation?.participant?.id;
     const messageText = chatDraft.trim();
 
-    if (!client?.client_id || !chatPageFilter || !recipientPsid || !messageText) return;
+    if (!client?.client_id || !chatPageFilter || !recipientPsid || !messageText || chatSending) {
+      return;
+    }
 
     setChatSending(true);
     setChatMessage("");
@@ -826,16 +880,68 @@ export default function PortalPage({ session }) {
         },
       );
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
       if (!data?.success) {
         throw new Error(data?.message || "Unable to send Messenger message.");
       }
 
+      const now = data?.sent_at || new Date().toISOString();
+      const optimisticMessage = {
+        id: data?.message_id || `local-${Date.now()}`,
+        text: messageText,
+        created_time: now,
+        direction: "OUTBOUND",
+        attachments: [],
+        local_echo: true,
+      };
+
       setChatDraft("");
-      await selectFacebookConversation(chatSelectedConversation);
-      await loadFacebookChats(chatPageFilter);
+      setChatMessages((current) => [...current, optimisticMessage]);
+      setChatSelectedConversation((current) =>
+        current
+          ? {
+              ...current,
+              updated_time: now,
+              latest_message: {
+                id: data?.message_id || null,
+                text: messageText,
+                created_time: now,
+              },
+            }
+          : current
+      );
+      setChatConversations((current) => {
+        const selectedId = chatSelectedConversation?.conversation_id;
+        if (!selectedId) return current;
+
+        const updated = current.map((conversation) =>
+          conversation.conversation_id === selectedId
+            ? {
+                ...conversation,
+                updated_time: now,
+                latest_message: {
+                  id: data?.message_id || null,
+                  text: messageText,
+                  created_time: now,
+                },
+              }
+            : conversation
+        );
+
+        const selected = updated.find((row) => row.conversation_id === selectedId);
+        return selected
+          ? [selected, ...updated.filter((row) => row.conversation_id !== selectedId)]
+          : updated;
+      });
     } catch (error) {
-      setChatMessage(error.message || "Unable to send Messenger message.");
+      setChatMessage(
+        await getEdgeFunctionErrorMessage(
+          error,
+          "Unable to send Messenger message."
+        )
+      );
     } finally {
       setChatSending(false);
     }
@@ -2001,7 +2107,7 @@ export default function PortalPage({ session }) {
               )}
 
               <div style={{ display: "grid", gridTemplateColumns: "minmax(260px, 360px) minmax(0, 1fr)", gap: 18, marginTop: 18 }}>
-                <div style={{ border: "1px solid #e5eaf0", borderRadius: 14, overflow: "hidden", background: "#fff", minHeight: 520 }}>
+                <div style={{ border: "1px solid #e5eaf0", borderRadius: 14, overflow: "hidden", background: "#fff", height: 620, display: "flex", flexDirection: "column" }}>
                   <div style={{ padding: 14, borderBottom: "1px solid #e5eaf0", display: "grid", gap: 10 }}>
                     <select
                       value={chatPageFilter}
@@ -2028,30 +2134,16 @@ export default function PortalPage({ session }) {
                     />
                   </div>
 
-                  <div style={{ maxHeight: 455, overflowY: "auto" }}>
+                  <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
                     {chatLoading ? (
                       <div style={{ padding: 28, textAlign: "center", color: "#718096" }}>Loading live Messenger inbox...</div>
-                    ) : chatConversations.filter((conversation) => {
-                      const query = chatSearch.trim().toLowerCase();
-                      if (!query) return true;
-                      return [
-                        conversation?.participant?.name,
-                        conversation?.latest_message?.text,
-                      ].some((value) => String(value || "").toLowerCase().includes(query));
-                    }).length === 0 ? (
+                    ) : filteredChatConversations.length === 0 ? (
                       <div style={{ padding: 28, textAlign: "center", color: "#718096" }}>
                         <strong style={{ display: "block", color: "#263548", marginBottom: 6 }}>No conversations found</strong>
                         <span style={{ fontSize: 13 }}>If this Page has Messenger conversations, check the Page token and Meta permissions.</span>
                       </div>
                     ) : (
-                      chatConversations
-                        .filter((conversation) => {
-                          const query = chatSearch.trim().toLowerCase();
-                          if (!query) return true;
-                          return [conversation?.participant?.name, conversation?.latest_message?.text]
-                            .some((value) => String(value || "").toLowerCase().includes(query));
-                        })
-                        .map((conversation) => {
+                      filteredChatConversations.map((conversation) => {
                           const selected = chatSelectedConversation?.conversation_id === conversation.conversation_id;
                           return (
                             <button
@@ -2084,7 +2176,7 @@ export default function PortalPage({ session }) {
                   </div>
                 </div>
 
-                <div style={{ minHeight: 520, border: "1px solid #e5eaf0", borderRadius: 14, background: "#fff", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+                <div style={{ height: 620, minHeight: 620, maxHeight: 620, border: "1px solid #e5eaf0", borderRadius: 14, background: "#fff", display: "flex", flexDirection: "column", overflow: "hidden" }}>
                   <div style={{ padding: "16px 18px", borderBottom: "1px solid #e5eaf0" }}>
                     <strong>{chatSelectedConversation?.participant?.name || "Select a conversation"}</strong>
                     <div style={{ fontSize: 12, color: "#718096", marginTop: 3 }}>
@@ -2094,7 +2186,7 @@ export default function PortalPage({ session }) {
                     </div>
                   </div>
 
-                  <div style={{ flex: 1, minHeight: 350, overflowY: "auto", padding: 18, background: "#f8fafc" }}>
+                  <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 18, background: "#f8fafc" }}>
                     {!chatSelectedConversation ? (
                       <div style={{ height: "100%", display: "grid", placeItems: "center", color: "#718096", textAlign: "center" }}>
                         Choose a Messenger conversation from the inbox to view its current message history.
@@ -2134,11 +2226,17 @@ export default function PortalPage({ session }) {
                     )}
                   </div>
 
-                  <form onSubmit={sendFacebookChatMessage} style={{ padding: 14, borderTop: "1px solid #e5eaf0", display: "flex", gap: 10 }}>
+                  <div style={{ padding: 14, borderTop: "1px solid #e5eaf0", display: "flex", gap: 10, flex: "0 0 auto", background: "#fff" }}>
                     <input
                       type="text"
                       value={chatDraft}
                       onChange={(event) => setChatDraft(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" && !event.shiftKey) {
+                          event.preventDefault();
+                          sendFacebookChatMessage();
+                        }
+                      }}
                       placeholder="Write a Messenger reply..."
                       disabled={!chatSelectedConversation || chatSending}
                       maxLength={2000}
@@ -2146,12 +2244,13 @@ export default function PortalPage({ session }) {
                     />
                     <button
                       className="primary-button"
-                      type="submit"
+                      type="button"
+                      onClick={sendFacebookChatMessage}
                       disabled={!chatSelectedConversation || !chatDraft.trim() || chatSending}
                     >
                       {chatSending ? "Sending..." : "Send"}
                     </button>
-                  </form>
+                  </div>
                 </div>
               </div>
             </section>
