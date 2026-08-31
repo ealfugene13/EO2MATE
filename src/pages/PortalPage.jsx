@@ -485,9 +485,18 @@ export default function PortalPage({ session }) {
   const [automationModal, setAutomationModal] = useState(null);
   const [automationReason, setAutomationReason] = useState("");
 
-  // UI-first modules. These states are intentionally local until their backend APIs are wired.
+  // Facebook Chats uses Meta as the live source of truth. EO2MATE does not persist conversation content.
   const [chatSearch, setChatSearch] = useState("");
-  const [chatPageFilter, setChatPageFilter] = useState("ALL");
+  const [chatPageFilter, setChatPageFilter] = useState("");
+  const [chatPages, setChatPages] = useState([]);
+  const [chatConversations, setChatConversations] = useState([]);
+  const [chatSelectedConversation, setChatSelectedConversation] = useState(null);
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatDraft, setChatDraft] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
+  const [chatMessagesLoading, setChatMessagesLoading] = useState(false);
+  const [chatSending, setChatSending] = useState(false);
+  const [chatMessage, setChatMessage] = useState("");
   const [staffSearch, setStaffSearch] = useState("");
   const [showStaffForm, setShowStaffForm] = useState(false);
   const [staffDraft, setStaffDraft] = useState({ name: "", email: "", role: "STAFF" });
@@ -706,6 +715,130 @@ export default function PortalPage({ session }) {
   async function openAutomationControl() {
     setPage("automation-control");
     await loadAutomationControls();
+  }
+
+  async function loadFacebookChats(fbPageId = "") {
+    if (!client?.client_id) return;
+
+    setChatLoading(true);
+    setChatMessage("");
+
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        "facebook-chat-conversations",
+        {
+          method: "POST",
+          body: {
+            client_id: client.client_id,
+            fb_page_id: fbPageId || undefined,
+            limit: 25,
+          },
+        },
+      );
+
+      if (error) throw error;
+      if (!data?.success) {
+        throw new Error(data?.message || "Unable to load Facebook conversations.");
+      }
+
+      const pages = data.pages || [];
+      const selectedPageId = data.selected_page?.fb_page_id || fbPageId || pages[0]?.fb_page_id || "";
+
+      setChatPages(pages);
+      setChatPageFilter(selectedPageId);
+      setChatConversations(data.conversations || []);
+      setChatSelectedConversation(null);
+      setChatMessages([]);
+      setChatDraft("");
+    } catch (error) {
+      setChatPages([]);
+      setChatConversations([]);
+      setChatSelectedConversation(null);
+      setChatMessages([]);
+      setChatMessage(error.message || "Unable to load Facebook conversations.");
+    } finally {
+      setChatLoading(false);
+    }
+  }
+
+  async function openFacebookChats() {
+    setPage("facebook-chats");
+    await loadFacebookChats(chatPageFilter);
+  }
+
+  async function selectFacebookConversation(conversation) {
+    if (!client?.client_id || !chatPageFilter || !conversation?.conversation_id) return;
+
+    setChatSelectedConversation(conversation);
+    setChatMessagesLoading(true);
+    setChatMessage("");
+
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        "facebook-chat-messages",
+        {
+          method: "POST",
+          body: {
+            client_id: client.client_id,
+            fb_page_id: chatPageFilter,
+            conversation_id: conversation.conversation_id,
+            limit: 50,
+          },
+        },
+      );
+
+      if (error) throw error;
+      if (!data?.success) {
+        throw new Error(data?.message || "Unable to load Messenger messages.");
+      }
+
+      setChatMessages((data.messages || []).slice().reverse());
+    } catch (error) {
+      setChatMessages([]);
+      setChatMessage(error.message || "Unable to load Messenger messages.");
+    } finally {
+      setChatMessagesLoading(false);
+    }
+  }
+
+  async function sendFacebookChatMessage(event) {
+    event?.preventDefault?.();
+
+    const recipientPsid = chatSelectedConversation?.participant?.id;
+    const messageText = chatDraft.trim();
+
+    if (!client?.client_id || !chatPageFilter || !recipientPsid || !messageText) return;
+
+    setChatSending(true);
+    setChatMessage("");
+
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        "facebook-chat-send",
+        {
+          method: "POST",
+          body: {
+            client_id: client.client_id,
+            fb_page_id: chatPageFilter,
+            recipient_psid: recipientPsid,
+            message: messageText,
+          },
+        },
+      );
+
+      if (error) throw error;
+      if (!data?.success) {
+        throw new Error(data?.message || "Unable to send Messenger message.");
+      }
+
+      setChatDraft("");
+      await selectFacebookConversation(chatSelectedConversation);
+      await loadFacebookChats(chatPageFilter);
+    } catch (error) {
+      setChatMessage(error.message || "Unable to send Messenger message.");
+    } finally {
+      setChatSending(false);
+    }
   }
 
   function requestAutomationChange({
@@ -1646,7 +1779,7 @@ export default function PortalPage({ session }) {
           <SidebarNavButton
             icon="chat"
             className={`nav-item ${page === "facebook-chats" ? "active" : ""}`}
-            onClick={() => setPage("facebook-chats")}
+            onClick={openFacebookChats}
           >
             Facebook Chats
           </SidebarNavButton>
@@ -1838,12 +1971,17 @@ export default function PortalPage({ session }) {
           <>
             <header className="dashboard-header">
               <div>
-                <p className="eyebrow">FACEBOOK · INBOX</p>
+                <p className="eyebrow">FACEBOOK · LIVE INBOX</p>
                 <h1>Facebook Chats</h1>
-                <p>One workspace for Messenger conversations from the client&apos;s connected Facebook Pages.</p>
+                <p>View and reply to Messenger conversations live from Meta. Conversation content is not stored in EO2MATE.</p>
               </div>
-              <button className="secondary-button" type="button" disabled title="Live Messenger sync will be enabled during backend integration">
-                Sync Messages
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => loadFacebookChats(chatPageFilter)}
+                disabled={chatLoading || !client?.client_id}
+              >
+                {chatLoading ? "Refreshing..." : "Refresh Inbox"}
               </button>
             </header>
 
@@ -1851,47 +1989,169 @@ export default function PortalPage({ session }) {
               <div className="panel-header">
                 <div>
                   <h2>Page Inbox</h2>
-                  <p>Search conversations, choose a Page and continue buyer support from one screen.</p>
+                  <p>Facebook remains the source of truth. Messages are fetched only while this screen is in use.</p>
                 </div>
-                <StatusBadge status={facebookStatus?.connected ? "CONNECTED" : "NOT_CONNECTED"} />
+                <StatusBadge status={chatPages.length ? "CONNECTED" : "NOT_CONNECTED"} />
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "minmax(240px, 340px) minmax(0, 1fr)", gap: 18, marginTop: 18 }}>
-                <div style={{ border: "1px solid #e5eaf0", borderRadius: 14, overflow: "hidden", background: "#fff" }}>
+              {chatMessage && (
+                <div className="form-error" style={{ marginTop: 14 }}>
+                  {chatMessage}
+                </div>
+              )}
+
+              <div style={{ display: "grid", gridTemplateColumns: "minmax(260px, 360px) minmax(0, 1fr)", gap: 18, marginTop: 18 }}>
+                <div style={{ border: "1px solid #e5eaf0", borderRadius: 14, overflow: "hidden", background: "#fff", minHeight: 520 }}>
                   <div style={{ padding: 14, borderBottom: "1px solid #e5eaf0", display: "grid", gap: 10 }}>
-                    <select value={chatPageFilter} onChange={(event) => setChatPageFilter(event.target.value)}>
-                      <option value="ALL">All connected Pages</option>
-                      {(automationPages || []).map((fbPage) => (
+                    <select
+                      value={chatPageFilter}
+                      onChange={async (event) => {
+                        const nextPage = event.target.value;
+                        setChatPageFilter(nextPage);
+                        await loadFacebookChats(nextPage);
+                      }}
+                      disabled={chatLoading || !chatPages.length}
+                    >
+                      {!chatPages.length && <option value="">No connected Page</option>}
+                      {chatPages.map((fbPage) => (
                         <option key={fbPage.fb_page_id} value={fbPage.fb_page_id}>
-                          {fbPage.page_name || fbPage.page_nm || fbPage.fb_page_id}
+                          {fbPage.page_name || fbPage.fb_page_id}
                         </option>
                       ))}
                     </select>
+
                     <input
                       type="search"
                       value={chatSearch}
                       onChange={(event) => setChatSearch(event.target.value)}
-                      placeholder="Search buyer or message"
+                      placeholder="Search buyer or latest message"
                     />
                   </div>
-                  <div style={{ padding: 28, textAlign: "center", color: "#718096" }}>
-                    <strong style={{ display: "block", color: "#263548", marginBottom: 6 }}>No conversations loaded yet</strong>
-                    <span style={{ fontSize: 13 }}>Messenger history will appear here after the Facebook messaging integration is connected.</span>
+
+                  <div style={{ maxHeight: 455, overflowY: "auto" }}>
+                    {chatLoading ? (
+                      <div style={{ padding: 28, textAlign: "center", color: "#718096" }}>Loading live Messenger inbox...</div>
+                    ) : chatConversations.filter((conversation) => {
+                      const query = chatSearch.trim().toLowerCase();
+                      if (!query) return true;
+                      return [
+                        conversation?.participant?.name,
+                        conversation?.latest_message?.text,
+                      ].some((value) => String(value || "").toLowerCase().includes(query));
+                    }).length === 0 ? (
+                      <div style={{ padding: 28, textAlign: "center", color: "#718096" }}>
+                        <strong style={{ display: "block", color: "#263548", marginBottom: 6 }}>No conversations found</strong>
+                        <span style={{ fontSize: 13 }}>If this Page has Messenger conversations, check the Page token and Meta permissions.</span>
+                      </div>
+                    ) : (
+                      chatConversations
+                        .filter((conversation) => {
+                          const query = chatSearch.trim().toLowerCase();
+                          if (!query) return true;
+                          return [conversation?.participant?.name, conversation?.latest_message?.text]
+                            .some((value) => String(value || "").toLowerCase().includes(query));
+                        })
+                        .map((conversation) => {
+                          const selected = chatSelectedConversation?.conversation_id === conversation.conversation_id;
+                          return (
+                            <button
+                              key={conversation.conversation_id}
+                              type="button"
+                              onClick={() => selectFacebookConversation(conversation)}
+                              style={{
+                                width: "100%",
+                                textAlign: "left",
+                                padding: "14px 16px",
+                                border: 0,
+                                borderBottom: "1px solid #edf1f5",
+                                background: selected ? "#f1f8f3" : "#fff",
+                                cursor: "pointer",
+                              }}
+                            >
+                              <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+                                <strong style={{ color: "#263548" }}>{conversation?.participant?.name || "Facebook User"}</strong>
+                                <span style={{ fontSize: 11, color: "#718096", whiteSpace: "nowrap" }}>
+                                  {conversation?.updated_time ? new Date(conversation.updated_time).toLocaleString() : ""}
+                                </span>
+                              </div>
+                              <div style={{ marginTop: 5, color: "#718096", fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                {conversation?.latest_message?.text || "Messenger conversation"}
+                              </div>
+                            </button>
+                          );
+                        })
+                    )}
                   </div>
                 </div>
 
-                <div style={{ minHeight: 430, border: "1px solid #e5eaf0", borderRadius: 14, background: "#fff", display: "flex", flexDirection: "column" }}>
+                <div style={{ minHeight: 520, border: "1px solid #e5eaf0", borderRadius: 14, background: "#fff", display: "flex", flexDirection: "column", overflow: "hidden" }}>
                   <div style={{ padding: "16px 18px", borderBottom: "1px solid #e5eaf0" }}>
-                    <strong>Select a conversation</strong>
-                    <div style={{ fontSize: 12, color: "#718096", marginTop: 3 }}>Buyer, Page and linked order details will appear here.</div>
+                    <strong>{chatSelectedConversation?.participant?.name || "Select a conversation"}</strong>
+                    <div style={{ fontSize: 12, color: "#718096", marginTop: 3 }}>
+                      {chatSelectedConversation
+                        ? `Messenger · ${chatPages.find((row) => row.fb_page_id === chatPageFilter)?.page_name || chatPageFilter}`
+                        : "Choose a Messenger conversation from the live Page inbox."}
+                    </div>
                   </div>
-                  <div style={{ flex: 1, display: "grid", placeItems: "center", padding: 30, color: "#718096", textAlign: "center" }}>
-                    Choose a Messenger conversation from the inbox to view its message history.
+
+                  <div style={{ flex: 1, minHeight: 350, overflowY: "auto", padding: 18, background: "#f8fafc" }}>
+                    {!chatSelectedConversation ? (
+                      <div style={{ height: "100%", display: "grid", placeItems: "center", color: "#718096", textAlign: "center" }}>
+                        Choose a Messenger conversation from the inbox to view its current message history.
+                      </div>
+                    ) : chatMessagesLoading ? (
+                      <div style={{ textAlign: "center", color: "#718096", padding: 30 }}>Loading messages from Meta...</div>
+                    ) : chatMessages.length === 0 ? (
+                      <div style={{ textAlign: "center", color: "#718096", padding: 30 }}>No messages returned for this conversation.</div>
+                    ) : (
+                      <div style={{ display: "grid", gap: 10 }}>
+                        {chatMessages.map((message) => {
+                          const outbound = message.direction === "OUTBOUND";
+                          return (
+                            <div key={message.id || `${message.created_time}-${message.text}`} style={{ display: "flex", justifyContent: outbound ? "flex-end" : "flex-start" }}>
+                              <div style={{
+                                maxWidth: "78%",
+                                padding: "10px 12px",
+                                borderRadius: 14,
+                                background: outbound ? "#dff3e4" : "#fff",
+                                border: "1px solid #e2e8f0",
+                                color: "#263548",
+                              }}>
+                                {message.text && <div style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{message.text}</div>}
+                                {message.attachments?.length > 0 && (
+                                  <div style={{ marginTop: message.text ? 8 : 0, fontSize: 12, color: "#718096" }}>
+                                    {message.attachments.length} attachment{message.attachments.length === 1 ? "" : "s"}
+                                  </div>
+                                )}
+                                <div style={{ marginTop: 5, fontSize: 10, color: "#8a98a8", textAlign: outbound ? "right" : "left" }}>
+                                  {message.created_time ? new Date(message.created_time).toLocaleString() : ""}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
-                  <div style={{ padding: 14, borderTop: "1px solid #e5eaf0", display: "flex", gap: 10 }}>
-                    <input type="text" placeholder="Write a message..." disabled style={{ flex: 1 }} />
-                    <button className="primary-button" type="button" disabled title="Sending will be enabled when Messenger integration is connected">Send</button>
-                  </div>
+
+                  <form onSubmit={sendFacebookChatMessage} style={{ padding: 14, borderTop: "1px solid #e5eaf0", display: "flex", gap: 10 }}>
+                    <input
+                      type="text"
+                      value={chatDraft}
+                      onChange={(event) => setChatDraft(event.target.value)}
+                      placeholder="Write a Messenger reply..."
+                      disabled={!chatSelectedConversation || chatSending}
+                      maxLength={2000}
+                      style={{ flex: 1 }}
+                    />
+                    <button
+                      className="primary-button"
+                      type="submit"
+                      disabled={!chatSelectedConversation || !chatDraft.trim() || chatSending}
+                    >
+                      {chatSending ? "Sending..." : "Send"}
+                    </button>
+                  </form>
                 </div>
               </div>
             </section>
