@@ -529,6 +529,7 @@ export default function PortalPage({ session }) {
   const [chatMessagesLoading, setChatMessagesLoading] = useState(false);
   const [chatSending, setChatSending] = useState(false);
   const [chatMessage, setChatMessage] = useState("");
+  const [chatMetaWindowBlocked, setChatMetaWindowBlocked] = useState(false);
   const [staffSearch, setStaffSearch] = useState("");
   const [showStaffForm, setShowStaffForm] = useState(false);
   const [staffDraft, setStaffDraft] = useState({ name: "", email: "", role: "STAFF" });
@@ -556,6 +557,44 @@ export default function PortalPage({ session }) {
         .includes(query)
     );
   }, [chatConversations, chatSearch]);
+
+  const chatReplyWindow = useMemo(() => {
+    if (!chatSelectedConversation) {
+      return { status: "NONE", label: "Select a conversation", lastInboundAt: null };
+    }
+
+    const inboundMessages = chatMessages
+      .filter((message) => message?.direction === "INBOUND" && message?.created_time)
+      .map((message) => ({ ...message, timestamp: Date.parse(message.created_time) }))
+      .filter((message) => Number.isFinite(message.timestamp))
+      .sort((a, b) => b.timestamp - a.timestamp);
+
+    const lastInboundAt = inboundMessages[0]?.created_time || null;
+    const lastInboundMs = inboundMessages[0]?.timestamp || 0;
+    const withinStandardWindow = lastInboundMs > 0 && Date.now() - lastInboundMs <= 24 * 60 * 60 * 1000;
+
+    if (withinStandardWindow) {
+      return {
+        status: "AVAILABLE",
+        label: "Reply available",
+        lastInboundAt,
+      };
+    }
+
+    if (chatMetaWindowBlocked || lastInboundMs > 0) {
+      return {
+        status: "EXPIRED",
+        label: "Reply window expired",
+        lastInboundAt,
+      };
+    }
+
+    return {
+      status: "UNKNOWN",
+      label: "Reply availability will be confirmed by Meta",
+      lastInboundAt: null,
+    };
+  }, [chatSelectedConversation, chatMessages, chatMetaWindowBlocked]);
 
 
   useEffect(() => {
@@ -801,6 +840,7 @@ export default function PortalPage({ session }) {
       setChatSelectedConversation(null);
       setChatMessages([]);
       setChatDraft("");
+      setChatMetaWindowBlocked(false);
     } catch (error) {
       setChatConversations([]);
       setChatSelectedConversation(null);
@@ -827,6 +867,7 @@ export default function PortalPage({ session }) {
     setChatSelectedConversation(conversation);
     setChatMessagesLoading(true);
     setChatMessage("");
+    setChatMetaWindowBlocked(false);
 
     try {
       const { data, error } = await supabase.functions.invoke(
@@ -866,6 +907,13 @@ export default function PortalPage({ session }) {
     const messageText = chatDraft.trim();
 
     if (!client?.client_id || !chatPageFilter || !recipientPsid || !messageText || chatSending) {
+      return;
+    }
+
+    if (chatReplyWindow.status === "EXPIRED") {
+      setChatMessage(
+        "Reply unavailable. Meta's standard messaging window for this conversation has expired. Ask the customer to message the Page again or continue in Meta Inbox."
+      );
       return;
     }
 
@@ -946,12 +994,24 @@ export default function PortalPage({ session }) {
           : updated;
       });
     } catch (error) {
-      setChatMessage(
-        await getEdgeFunctionErrorMessage(
-          error,
-          "Unable to send Messenger message."
-        )
+      const message = await getEdgeFunctionErrorMessage(
+        error,
+        "Unable to send Messenger message."
       );
+
+      const outsideWindow =
+        /outside of allowed window/i.test(message) ||
+        /subcode\s*2018278/i.test(message) ||
+        /2018278/.test(message);
+
+      if (outsideWindow) {
+        setChatMetaWindowBlocked(true);
+        setChatMessage(
+          "Reply unavailable. Meta has closed the standard messaging window for this conversation. Ask the customer to message the Page again or use Meta Inbox for any Meta-supported options."
+        );
+      } else {
+        setChatMessage(message);
+      }
     } finally {
       setChatSending(false);
     }
@@ -2187,13 +2247,64 @@ export default function PortalPage({ session }) {
                 </div>
 
                 <div style={{ height: 620, minHeight: 620, maxHeight: 620, border: "1px solid #e5eaf0", borderRadius: 14, background: "#fff", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-                  <div style={{ padding: "16px 18px", borderBottom: "1px solid #e5eaf0" }}>
-                    <strong>{chatSelectedConversation?.participant?.name || "Select a conversation"}</strong>
-                    <div style={{ fontSize: 12, color: "#718096", marginTop: 3 }}>
-                      {chatSelectedConversation
-                        ? `Messenger · ${chatPages.find((row) => row.fb_page_id === chatPageFilter)?.page_name || chatPageFilter}`
-                        : "Choose a Messenger conversation from the live Page inbox."}
+                  <div style={{ padding: "16px 18px", borderBottom: "1px solid #e5eaf0", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
+                    <div style={{ minWidth: 0 }}>
+                      <strong>{chatSelectedConversation?.participant?.name || "Select a conversation"}</strong>
+                      <div style={{ fontSize: 12, color: "#718096", marginTop: 3 }}>
+                        {chatSelectedConversation
+                          ? `Messenger · ${chatPages.find((row) => row.fb_page_id === chatPageFilter)?.page_name || chatPageFilter}`
+                          : "Choose a Messenger conversation from the live Page inbox."}
+                      </div>
+                      {chatSelectedConversation && (
+                        <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                          <span
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              padding: "3px 8px",
+                              borderRadius: 999,
+                              fontSize: 11,
+                              fontWeight: 800,
+                              background:
+                                chatReplyWindow.status === "AVAILABLE"
+                                  ? "#e9f7ee"
+                                  : chatReplyWindow.status === "EXPIRED"
+                                    ? "#fff1f1"
+                                    : "#f2f4f7",
+                              color:
+                                chatReplyWindow.status === "AVAILABLE"
+                                  ? "#247a3c"
+                                  : chatReplyWindow.status === "EXPIRED"
+                                    ? "#b43d3d"
+                                    : "#667085",
+                            }}
+                          >
+                            {chatReplyWindow.label}
+                          </span>
+                          {chatReplyWindow.lastInboundAt && (
+                            <span style={{ fontSize: 11, color: "#8a98a8" }}>
+                              Last buyer message: {new Date(chatReplyWindow.lastInboundAt).toLocaleString()}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
+
+                    {chatPageFilter && (
+                      <button
+                        className="secondary-button"
+                        type="button"
+                        onClick={() =>
+                          window.open(
+                            `https://business.facebook.com/latest/inbox/all?asset_id=${encodeURIComponent(chatPageFilter)}`,
+                            "_blank",
+                            "noopener,noreferrer"
+                          )
+                        }
+                      >
+                        Open Meta Inbox
+                      </button>
+                    )}
                   </div>
 
                   <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 18, background: "#f8fafc" }}>
@@ -2236,30 +2347,47 @@ export default function PortalPage({ session }) {
                     )}
                   </div>
 
-                  <div style={{ padding: 14, borderTop: "1px solid #e5eaf0", display: "flex", gap: 10, flex: "0 0 auto", background: "#fff" }}>
-                    <input
-                      type="text"
-                      value={chatDraft}
-                      onChange={(event) => setChatDraft(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" && !event.shiftKey) {
-                          event.preventDefault();
-                          sendFacebookChatMessage();
+                  <div style={{ padding: 14, borderTop: "1px solid #e5eaf0", flex: "0 0 auto", background: "#fff" }}>
+                    {chatSelectedConversation && chatReplyWindow.status === "EXPIRED" && (
+                      <div style={{ marginBottom: 10, padding: "9px 11px", borderRadius: 9, background: "#fff7ed", color: "#9a5412", fontSize: 12, lineHeight: 1.45 }}>
+                        Meta's standard reply window has expired. The conversation can still be viewed here, but normal API replies are disabled until the customer messages the Page again.
+                      </div>
+                    )}
+
+                    <div style={{ display: "flex", gap: 10 }}>
+                      <input
+                        type="text"
+                        value={chatDraft}
+                        onChange={(event) => setChatDraft(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" && !event.shiftKey) {
+                            event.preventDefault();
+                            sendFacebookChatMessage();
+                          }
+                        }}
+                        placeholder={
+                          chatReplyWindow.status === "EXPIRED"
+                            ? "Reply window expired — open Meta Inbox or wait for a new buyer message"
+                            : "Write a Messenger reply..."
                         }
-                      }}
-                      placeholder="Write a Messenger reply..."
-                      disabled={!chatSelectedConversation || chatSending}
-                      maxLength={2000}
-                      style={{ flex: 1 }}
-                    />
-                    <button
-                      className="primary-button"
-                      type="button"
-                      onClick={sendFacebookChatMessage}
-                      disabled={!chatSelectedConversation || !chatDraft.trim() || chatSending}
-                    >
-                      {chatSending ? "Sending..." : "Send"}
-                    </button>
+                        disabled={!chatSelectedConversation || chatSending || chatReplyWindow.status === "EXPIRED"}
+                        maxLength={2000}
+                        style={{ flex: 1 }}
+                      />
+                      <button
+                        className="primary-button"
+                        type="button"
+                        onClick={sendFacebookChatMessage}
+                        disabled={
+                          !chatSelectedConversation ||
+                          !chatDraft.trim() ||
+                          chatSending ||
+                          chatReplyWindow.status === "EXPIRED"
+                        }
+                      >
+                        {chatSending ? "Sending..." : "Send"}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
