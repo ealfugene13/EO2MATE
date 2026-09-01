@@ -65,7 +65,7 @@ export default function OnboardingPage({ session, initialStatus = null, onComple
 
     const baseUrl = import.meta.env.VITE_SUPABASE_URL;
     window.location.assign(
-      `${baseUrl}/functions/v1/facebook-oauth-start?client_id=${encodeURIComponent(clientId)}`
+      `${baseUrl}/functions/v1/meta?route=oauth-start&client_id=${encodeURIComponent(clientId)}`
     );
   }
 
