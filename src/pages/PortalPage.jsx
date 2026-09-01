@@ -623,10 +623,18 @@ export default function PortalPage({ session }) {
 
     try {
       const { data, error } = await supabase.functions.invoke(
-        "facebook-connection-status",
-        { method: "POST", body: {} },
+        "meta",
+        {
+          method: "POST",
+          headers: {
+            "x-eo2mate-meta-route": "connection-status",
+          },
+          body: {},
+        },
       );
 
+
+      
       if (error) throw error;
       if (!data?.success) {
         throw new Error(
@@ -738,7 +746,7 @@ export default function PortalPage({ session }) {
     }
 
     const baseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const connectUrl = `${baseUrl}/functions/v1/facebook-oauth-start?client_id=${encodeURIComponent(client.client_id)}`;
+    const connectUrl = `${baseUrl}/functions/v1/meta?route=oauth-start&?client_id=${encodeURIComponent(client.client_id)}`;
     window.location.assign(connectUrl);
   }
 
@@ -809,9 +817,12 @@ export default function PortalPage({ session }) {
 
     try {
       const { data, error } = await supabase.functions.invoke(
-        "facebook-chat-conversations",
+        "meta",
         {
           method: "POST",
+          headers: {
+              "x-eo2mate-meta-route": "chat-conversations",
+            },
           body: {
             client_id: client.client_id,
             fb_page_id: fbPageId || undefined,
@@ -871,9 +882,12 @@ export default function PortalPage({ session }) {
 
     try {
       const { data, error } = await supabase.functions.invoke(
-        "facebook-chat-messages",
+        "meta",
         {
           method: "POST",
+          headers: {
+            "x-eo2mate-meta-route": "chat-messages",
+          },
           body: {
             client_id: client.client_id,
             fb_page_id: chatPageFilter,
@@ -922,9 +936,12 @@ export default function PortalPage({ session }) {
 
     try {
       const { data, error } = await supabase.functions.invoke(
-        "facebook-chat-send",
+        "meta",
         {
           method: "POST",
+          headers: {
+            "x-eo2mate-meta-route": "chat-send",
+          },
           body: {
             client_id: client.client_id,
             fb_page_id: chatPageFilter,
