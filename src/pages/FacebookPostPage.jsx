@@ -1040,9 +1040,12 @@ export default function FacebookPostPage({
     try {
       const { data, error } =
         await supabase.functions.invoke(
-          "facebook-auction-publish",
+          "meta",
           {
             method: "POST",
+            headers: {
+              "x-eo2mate-meta-route": "auction-publish",
+            },
             body: {
               action: "LIST_SETUP",
               client_id: client.client_id,
@@ -1996,8 +1999,11 @@ export default function FacebookPostPage({
 
       const { data, error } =
         await supabase.functions.invoke(
-          "facebook-auction-publish",
+          "meta",
           {
+            headers: {
+              "x-eo2mate-meta-route": "auction-publish",
+            },
             body: formData,
           }
         );
