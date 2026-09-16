@@ -498,3 +498,6 @@ verify_jwt = false
 
 [functions.inventory-admin]
 verify_jwt = false
+
+[functions.eo2mate]
+verify_jwt = false
