@@ -35,7 +35,7 @@ export default function AdminClientsPage() {
   useEffect(() => { loadClients(); }, []);
 
   async function invoke(body) {
-    const { data, error } = await supabase.functions.invoke("admin-clients", { method: "POST", body });
+    const { data, error } = await supabase.functions.invoke("eo2mate", { method: "POST", headers: { "x-eo2mate-route": "admin-clients" }, body });
     if (error) throw error;
     if (!data?.success) throw new Error(data?.message || "Admin request failed.");
     return data;

@@ -1077,9 +1077,10 @@ export default function FacebookPostPage({
           error: inventoryError,
         } =
           await supabase.functions.invoke(
-            "inventory-admin",
+            "eo2mate",
             {
               method: "POST",
+              headers: { "x-eo2mate-route": "inventory-admin" },
               body: {
                 action: "LIST_ITEMS",
                 client_id: client.client_id,

@@ -14,8 +14,9 @@ export default function OnboardingPage({ session, initialStatus = null, onComple
   }, []);
 
   async function invoke(body) {
-    const { data, error } = await supabase.functions.invoke("client-onboarding", {
+    const { data, error } = await supabase.functions.invoke("eo2mate", {
       method: "POST",
+      headers: { "x-eo2mate-route": "client-onboarding" },
       body,
     });
 

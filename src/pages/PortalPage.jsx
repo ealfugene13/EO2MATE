@@ -782,9 +782,10 @@ export default function PortalPage({ session }) {
 
     try {
       const { data, error } = await supabase.functions.invoke(
-        "automation-admin",
+        "eo2mate",
         {
           method: "POST",
+          headers: { "x-eo2mate-route": "automation-admin" },
           body: {
             action: "LIST",
             client_id: client.client_id,
@@ -1068,9 +1069,10 @@ export default function PortalPage({ session }) {
 
     try {
       const { data, error } = await supabase.functions.invoke(
-        "automation-admin",
+        "eo2mate",
         {
           method: "POST",
+          headers: { "x-eo2mate-route": "automation-admin" },
           body: {
             action: "SET",
             client_id: client.client_id,
@@ -1149,8 +1151,9 @@ export default function PortalPage({ session }) {
         }
 
         const { data: onboardingData, error: onboardingError } =
-          await supabase.functions.invoke("client-onboarding", {
+          await supabase.functions.invoke("eo2mate", {
             method: "POST",
+            headers: { "x-eo2mate-route": "client-onboarding" },
             body: { action: "STATUS" },
           });
 
@@ -1176,8 +1179,9 @@ export default function PortalPage({ session }) {
       });
 
       const { data: onboardingData, error: onboardingError } =
-        await supabase.functions.invoke("client-onboarding", {
+        await supabase.functions.invoke("eo2mate", {
           method: "POST",
+          headers: { "x-eo2mate-route": "client-onboarding" },
           body: { action: "STATUS" },
         });
 
