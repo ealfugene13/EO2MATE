@@ -467,6 +467,12 @@ export default function PortalPage({ session }) {
   const [deliveries, setDeliveries] = useState([]);
 
   const [page, setPage] = useState("dashboard");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [postsExpanded, setPostsExpanded] = useState(true);
+
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [page]);
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -1820,6 +1826,11 @@ export default function PortalPage({ session }) {
     setPage("deliveries");
   }
 
+  function navigateTo(nextPage) {
+    setPage(nextPage);
+    setMobileMenuOpen(false);
+  }
+
   async function handleLogout() {
     await supabase.auth.signOut();
   }
@@ -1867,8 +1878,17 @@ export default function PortalPage({ session }) {
 
   return (
     <div className="app-shell">
-      <aside className="sidebar" style={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" }}>
-        <SidebarLogo />
+      <button
+        type="button"
+        className={`mobile-nav-backdrop ${mobileMenuOpen ? "open" : ""}`}
+        aria-label="Close navigation"
+        onClick={() => setMobileMenuOpen(false)}
+      />
+      <aside className={`sidebar client-sidebar ${mobileMenuOpen ? "mobile-open" : ""}`} style={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" }}>
+        <div className="mobile-sidebar-head">
+          <SidebarLogo />
+          <button type="button" className="mobile-sidebar-close" aria-label="Close menu" onClick={() => setMobileMenuOpen(false)}>×</button>
+        </div>
 
         <nav className="sidebar-nav" style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", paddingBottom: 16 }}>
           {platformAdmin && (
@@ -1884,7 +1904,7 @@ export default function PortalPage({ session }) {
           <SidebarNavButton
             icon="dashboard"
             className={`nav-item ${page === "dashboard" ? "active" : ""}`}
-            onClick={() => setPage("dashboard")}
+            onClick={() => navigateTo("dashboard")}
           >
             Dashboard
           </SidebarNavButton>
@@ -1893,27 +1913,23 @@ export default function PortalPage({ session }) {
 
           <SidebarNavButton
             icon="create"
-            className={`nav-item ${page === "facebook-post" ? "active" : ""}`}
-            onClick={() => setPage("facebook-post")}
+            className={`nav-item ${page === "posts" || page === "facebook-post" || page === "post-mining" || page === "pre-order" || page === "regular-sale" || page.includes("auction") ? "active" : ""}`}
+            onClick={() => setPostsExpanded((value) => !value)}
+            aria-expanded={postsExpanded}
           >
-            Create Auction Post
+            <span className="nav-parent-label">Posts <span className="nav-chevron">{postsExpanded ? "▾" : "›"}</span></span>
           </SidebarNavButton>
 
-          <SidebarNavButton
-            icon="auction"
-            className={`nav-item ${page.includes("auction") ? "active" : ""}`}
-            onClick={() => goToAuctions("ALL")}
-          >
-            Auctions
-          </SidebarNavButton>
-
-          <SidebarNavButton
-            icon="mining"
-            className={`nav-item ${page === "post-mining" ? "active" : ""}`}
-            onClick={() => setPage("post-mining")}
-          >
-            Post Mining
-          </SidebarNavButton>
+          {postsExpanded && (
+            <div className="nav-submenu">
+              <button type="button" className={`nav-subitem ${page === "posts" ? "active" : ""}`} onClick={() => navigateTo("posts")}>Create Post</button>
+              <button type="button" className={`nav-subitem ${page.includes("auction") ? "active" : ""}`} onClick={() => { goToAuctions("ALL"); setMobileMenuOpen(false); }}>Auctions</button>
+              <button type="button" className={`nav-subitem ${page === "post-mining" ? "active" : ""}`} onClick={() => navigateTo("post-mining")}>Mining</button>
+              <button type="button" className={`nav-subitem ${page === "pre-order" ? "active" : ""}`} onClick={() => navigateTo("pre-order")}>Pre-Orders</button>
+              <button type="button" className={`nav-subitem ${page === "regular-sale" ? "active" : ""}`} onClick={() => navigateTo("regular-sale")}>Regular Sales</button>
+              <button type="button" className="nav-subitem" disabled title="Coming soon">Live Selling <span className="coming-soon-pill">Soon</span></button>
+            </div>
+          )}
 
           <SidebarSectionLabel>Operations</SidebarSectionLabel>
 
@@ -2033,6 +2049,12 @@ export default function PortalPage({ session }) {
       </aside>
 
       <main className="dashboard-content">
+        <div className="mobile-topbar">
+          <button type="button" className="mobile-menu-button" aria-label="Open navigation" onClick={() => setMobileMenuOpen(true)}>☰</button>
+          <img src={`${import.meta.env.BASE_URL}eo2mate-logo.png`} alt="EO2MATE" />
+          <span>{client?.name || "Portal"}</span>
+        </div>
+
         {errorMessage && (
           <div className="dashboard-error global-error">
             {errorMessage}
@@ -2041,6 +2063,59 @@ export default function PortalPage({ session }) {
 
         {page === "admin-clients" && platformAdmin && (
           <AdminClientsPage />
+        )}
+
+        {page === "posts" && (
+          <section className="post-hub">
+            <header className="dashboard-header post-hub-header">
+              <div>
+                <p className="eyebrow">SELLING · POSTS</p>
+                <h1>Create Post</h1>
+                <p>Choose how you want to sell on Facebook. All post types live in one consolidated workspace.</p>
+              </div>
+            </header>
+
+            <div className="post-type-grid">
+              <button type="button" className="post-type-card ready" onClick={() => navigateTo("facebook-post")}>
+                <span className="post-type-icon"><NavIcon type="auction" /></span>
+                <span className="post-type-copy"><strong>Auction</strong><small>Publish a bidding post with minimum bid, increment, buyout and cutoff rules.</small></span>
+                <span className="post-type-action">Create →</span>
+              </button>
+              <button type="button" className="post-type-card planned" onClick={() => navigateTo("post-mining")}>
+                <span className="post-type-icon"><NavIcon type="mining" /></span>
+                <span className="post-type-copy"><strong>Mining</strong><small>Fixed-price comment claiming for regular Facebook posts.</small></span>
+                <span className="post-type-action">Open →</span>
+              </button>
+              <button type="button" className="post-type-card planned" onClick={() => navigateTo("pre-order")}>
+                <span className="post-type-icon"><NavIcon type="orders" /></span>
+                <span className="post-type-copy"><strong>Pre-Order</strong><small>Reserve upcoming products with allocation, cutoff, ETA and optional down payment.</small></span>
+                <span className="coming-soon-pill">UI first</span>
+              </button>
+              <button type="button" className="post-type-card planned" onClick={() => navigateTo("regular-sale")}>
+                <span className="post-type-icon"><NavIcon type="sales" /></span>
+                <span className="post-type-copy"><strong>Regular Sale</strong><small>Simple fixed-price Facebook selling without auction or mining rules.</small></span>
+                <span className="coming-soon-pill">UI first</span>
+              </button>
+              <div className="post-type-card disabled-card">
+                <span className="post-type-icon"><NavIcon type="facebook" /></span>
+                <span className="post-type-copy"><strong>Live Selling</strong><small>Connect Facebook Live and process claims from live comments.</small></span>
+                <span className="coming-soon-pill">Coming soon</span>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {(page === "pre-order" || page === "regular-sale") && (
+          <section className="post-placeholder">
+            <button type="button" className="back-link-button" onClick={() => navigateTo("posts")}>← Back to Create Post</button>
+            <div className="dashboard-panel post-placeholder-card">
+              <span className="post-type-icon"><NavIcon type={page === "pre-order" ? "orders" : "sales"} /></span>
+              <p className="eyebrow">SELLING · POSTS</p>
+              <h1>{page === "pre-order" ? "Pre-Order" : "Regular Sale"}</h1>
+              <p>{page === "pre-order" ? "The Pre-Order workspace is now reserved in the UI. We will define its business rules before connecting backend processing." : "The Regular Sale workspace is now reserved in the UI for simple fixed-price Facebook selling."}</p>
+              <span className="coming-soon-pill">UI ready · backend pending</span>
+            </div>
+          </section>
         )}
 
         {page === "facebook-post" && (
@@ -3065,7 +3140,7 @@ export default function PortalPage({ session }) {
                   <span> {client?.name || "EO2MATE Client"}</span>
                 </h1>
                 <p>
-                  Manage your auctions, orders, payments and deliveries — all in one place.
+                  Manage posts, orders, payments and deliveries — all in one place.
                 </p>
               </div>
 
@@ -3077,7 +3152,7 @@ export default function PortalPage({ session }) {
               <div>
                 <p className="eyebrow">CLIENT DASHBOARD</p>
                 <h1>{client?.name ? `Welcome, ${client.name}` : "Dashboard"}</h1>
-                <p>Monitor auctions, orders, payments and deliveries.</p>
+                <p>Create and monitor selling posts, orders, payments and deliveries.</p>
               </div>
 
               <button className="icon-button refresh-icon-button" onClick={loadPortal} title="Refresh" aria-label="Refresh">
@@ -3169,6 +3244,7 @@ export default function PortalPage({ session }) {
             )}
 
             <section className="metrics-grid">
+              <MetricCard title="Create Post" value="Sell" subtitle="Auction · Mining · Pre-Order · Sale" onClick={() => navigateTo("posts")} />
               <MetricCard title="Active auctions" value={auctionMetrics.active} subtitle="Currently open" onClick={() => goToAuctions("ACTIVE")} />
               <MetricCard title="Post Mining" value="Open" subtitle="Manage MINE posts" onClick={() => setPage("post-mining")} />
               <MetricCard title="Facebook Chats" value="Inbox" subtitle="Buyer conversations" onClick={() => setPage("facebook-chats")} />
