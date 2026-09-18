@@ -924,7 +924,9 @@ export default function FacebookPostPage({
   const [pages, setPages] = useState([]);
   const [subscription, setSubscription] = useState(null);
   const [environments, setEnvironments] = useState([]);
+  const [postMode, setPostMode] = useState("AUCTION");
   const [postTypes, setPostTypes] = useState([]);
+  const [preorderPostTypes, setPreorderPostTypes] = useState([]);
   const [selectedPageId, setSelectedPageId] = useState("");
   const [environment, setEnvironment] = useState("");
   const [postType, setPostType] = useState("");
@@ -932,6 +934,10 @@ export default function FacebookPostPage({
   const [singleItem, setSingleItem] = useState("");
   const [singleItemSource, setSingleItemSource] = useState("MANUAL");
   const [singleInventoryItemId, setSingleInventoryItemId] = useState("");
+  const [preorderPrice, setPreorderPrice] = useState("");
+  const [preorderQuantity, setPreorderQuantity] = useState("");
+  const [preorderMaxPerBuyer, setPreorderMaxPerBuyer] = useState("");
+  const [preorderDeadline, setPreorderDeadline] = useState("");
   const [inventoryItems, setInventoryItems] = useState([]);
   const [sharedRules, setSharedRules] = useState({
     ...DEFAULT_RULES,
@@ -1066,6 +1072,18 @@ export default function FacebookPostPage({
       const environmentRows = data.environments || [];
       const postTypeRows = data.auction_post_types || [];
 
+      const { data: preorderData, error: preorderError } =
+        await supabase.functions.invoke("meta", {
+          method: "POST",
+          headers: { "x-eo2mate-meta-route": "preorder-publish" },
+          body: { action: "LIST_SETUP", client_id: client.client_id },
+        });
+      if (preorderError) throw preorderError;
+      if (!preorderData?.success) {
+        throw new Error(preorderData?.message || "Unable to load Pre-Order setup.");
+      }
+      setPreorderPostTypes(preorderData.preorder_post_types || []);
+
       setPages(pageRows);
       setSubscription(data.subscription || null);
       setEnvironments(environmentRows);
@@ -1149,14 +1167,16 @@ export default function FacebookPostPage({
     }
   }
 
+  const activePostTypes = postMode === "PREORDER" ? preorderPostTypes : postTypes;
+
   const selectedPostType = useMemo(
     () =>
-      postTypes.find(
+      activePostTypes.find(
         (row) =>
           String(row.post_type_code).toUpperCase() ===
           String(postType).toUpperCase()
       ) || null,
-    [postTypes, postType]
+    [activePostTypes, postType]
   );
 
   const isMultiple =
@@ -1179,7 +1199,7 @@ export default function FacebookPostPage({
       lines.push(sellerCaption.trim(), "");
     }
 
-    if (environment) {
+    if (postMode === "AUCTION" && environment) {
       lines.push(`EO2MATE-${environment}`);
       lines.push("");
     }
@@ -1190,7 +1210,15 @@ export default function FacebookPostPage({
       );
     }
 
-    if (!isMultiple) {
+    if (postMode === "PREORDER") {
+      if (singleItem.trim()) lines.push(`Item: ${singleItem.trim()}`);
+      const price = normalizeMoney(preorderPrice);
+      if (price !== null) lines.push(`Price: ${formatMoneyForCaption(preorderPrice)}`);
+      if (preorderQuantity) lines.push(`Available Qty: ${preorderQuantity}`);
+      if (preorderMaxPerBuyer) lines.push(`Max Qty / Buyer: ${preorderMaxPerBuyer}`);
+      if (preorderDeadline) lines.push(`Pre-Order Until: ${formatFacebookAuctionDate(preorderDeadline)}`);
+      lines.push("Comment PO <qty> or PREORDER <qty> to order.");
+    } else if (!isMultiple) {
       lines.push(
         ...buildRuleLines(sharedRules, {
           includeItem: true,
@@ -1207,10 +1235,15 @@ export default function FacebookPostPage({
   }, [
     sellerCaption,
     environment,
+    postMode,
     selectedPostType,
     isMultiple,
     sharedRules,
     singleItem,
+    preorderPrice,
+    preorderQuantity,
+    preorderMaxPerBuyer,
+    preorderDeadline,
   ]);
 
   const photoCaptions = useMemo(() => {
@@ -1417,8 +1450,25 @@ export default function FacebookPostPage({
     }
 
     if (!items.length) {
-      errors.images =
-        "Upload at least one image.";
+      errors.images = "Upload at least one image.";
+    }
+
+    if (postMode === "PREORDER") {
+      if (postType !== "SINGLE") errors.postType = "Pre-Order Multiple is not enabled yet.";
+      if (!singleItem.trim()) errors.singleItem = "Item name is required.";
+      const price = normalizeMoney(preorderPrice);
+      if (price === null || price <= 0) errors.preorderPrice = "Price must be greater than 0.";
+      const qty = Number(preorderQuantity);
+      if (!Number.isInteger(qty) || qty <= 0) errors.preorderQuantity = "Quantity must be a whole number greater than 0.";
+      if (preorderMaxPerBuyer !== "") {
+        const max = Number(preorderMaxPerBuyer);
+        if (!Number.isInteger(max) || max <= 0) errors.preorderMaxPerBuyer = "Max quantity per buyer must be a whole number greater than 0.";
+        else if (Number.isInteger(qty) && max > qty) errors.preorderMaxPerBuyer = "Max quantity per buyer cannot exceed available quantity.";
+      }
+      const deadline = phDateFromLocalInput(preorderDeadline);
+      if (!deadline) errors.preorderDeadline = "Pre-Order deadline is required.";
+      else if (deadline.getTime() <= Date.now()) errors.preorderDeadline = "Pre-Order deadline must be in the future.";
+      return errors;
     }
 
     if (!isMultiple) {
@@ -1744,19 +1794,17 @@ export default function FacebookPostPage({
       }
     );
 
-    setPostType(
-      postTypes.length
-        ? String(
-            postTypes[0]
-              .post_type_code
-          ).toUpperCase()
-        : ""
-    );
+    const resetTypes = postMode === "PREORDER" ? preorderPostTypes : postTypes;
+    setPostType(resetTypes.length ? String(resetTypes[0].post_type_code).toUpperCase() : "");
 
     setSellerCaption("");
     setSingleItem("");
     setSingleItemSource("MANUAL");
     setSingleInventoryItemId("");
+    setPreorderPrice("");
+    setPreorderQuantity("");
+    setPreorderMaxPerBuyer("");
+    setPreorderDeadline("");
 
     setSharedRules({
       minBid: "",
@@ -1797,6 +1845,46 @@ export default function FacebookPostPage({
         )
       );
     }
+  }
+
+  async function publishPreorder() {
+    const errors = validate();
+    if (Object.keys(errors).length) {
+      setFieldErrors(errors);
+      setErrorMessage("Please correct the highlighted field(s) below.");
+      focusFirstError(errors);
+      return;
+    }
+    setFieldErrors({});
+    if (!window.confirm(`Publish this Single Pre-Order to Facebook?\n\nPage: ${getPageLabel(selectedPage)}\nImages: ${items.length}`)) return;
+    setPublishing(true); setErrorMessage(""); setFailurePopup(null);
+    try {
+      const payload = {
+        client_id: client.client_id, fb_page_id: selectedPageId, post_type: "SINGLE",
+        main_caption: mainCaption, ends_at: phDateFromLocalInput(preorderDeadline)?.toISOString(),
+        item: {
+          item_label: singleItem.trim(), item_source: "MANUAL",
+          unit_price: normalizeMoney(preorderPrice), quantity_limit: Number(preorderQuantity),
+          max_quantity_per_buyer: preorderMaxPerBuyer === "" ? null : Number(preorderMaxPerBuyer),
+          // Inventory-backed Pre-Order UI will be enabled after the first MANUAL end-to-end flow is proven.
+        },
+      };
+      const formData = new FormData();
+      formData.append("payload", JSON.stringify(payload));
+      items.forEach((item, index) => formData.append(`image_${index}`, item.file, item.file.name));
+      const { data, error } = await supabase.functions.invoke("meta", {
+        headers: { "x-eo2mate-meta-route": "preorder-publish" }, body: formData,
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.message || data?.error || "Pre-Order publishing failed.");
+      const successData = { ...data, page_name: getPageLabel(selectedPage), environment, post_type_display_name: "Single Pre-Order", mode_display_name: "Pre-Order" };
+      resetFormForNewPost({ keepSuccessPopup: true });
+      setSuccessPopup(successData);
+    } catch (error) {
+      const resolvedMessage = await getFunctionErrorMessage(error);
+      setErrorMessage("");
+      setFailurePopup({ message: resolvedMessage, fb_post_id: null, permalink_url: null, mode_display_name: "Pre-Order" });
+    } finally { setPublishing(false); }
   }
 
   async function publishAuction() {
@@ -2808,14 +2896,13 @@ export default function FacebookPostPage({
       <header className="dashboard-header fb-posting-header">
         <div>
           <p className="eyebrow">
-            FACEBOOK · AUCTION POSTING
+            FACEBOOK · POSTING
           </p>
 
-          <h1>Create Auction Post</h1>
+          <h1>Create Facebook Post</h1>
 
           <p>
-            Build a valid EO2MATE auction caption, organize photos,
-            preview the post, and publish directly to your connected Page.
+            Create Auction or Pre-Order posts, preview them, and publish directly to your connected Page.
           </p>
         </div>
 
@@ -2847,7 +2934,7 @@ export default function FacebookPostPage({
           <div>
             <h2>1. Post setup</h2>
             <p>
-              Choose the Facebook Page and auction type.
+              Choose the Facebook Page, post mode, and type.
             </p>
           </div>
         </div>
@@ -2875,7 +2962,19 @@ export default function FacebookPostPage({
           </label>
 
           <label>
-            Auction Type
+            Post Mode *
+            <select value={postMode} onChange={(e) => {
+              const mode = e.target.value; setPostMode(mode); setFieldErrors({});
+              const rows = mode === "PREORDER" ? preorderPostTypes : postTypes;
+              setPostType(rows.length ? String(rows[0].post_type_code).toUpperCase() : "");
+            }} disabled={loading || publishing}>
+              <option value="AUCTION">Auction</option>
+              <option value="PREORDER">Pre-Order</option>
+            </select>
+          </label>
+
+          <label>
+            {postMode === "PREORDER" ? "Pre-Order Type" : "Auction Type"}
 
             <select
               value={postType}
@@ -2885,21 +2984,20 @@ export default function FacebookPostPage({
               disabled={
                 loading ||
                 publishing ||
-                !postTypes.length
+                !activePostTypes.length
               }
             >
-              {!postTypes.length && (
+              {!activePostTypes.length && (
                 <option value="">
-                  No auction type available
+                  No post type available
                 </option>
               )}
 
-              {postTypes.map((row) => (
+              {activePostTypes.map((row) => (
                 <option
                   key={row.post_type_code}
-                  value={String(
-                    row.post_type_code
-                  ).toUpperCase()}
+                  value={String(row.post_type_code).toUpperCase()}
+                  disabled={postMode === "PREORDER" && String(row.post_type_code).toUpperCase() === "MULTIPLE"}
                 >
                   {row.display_name}
                 </option>
@@ -2912,7 +3010,7 @@ export default function FacebookPostPage({
       <section className="dashboard-panel fb-posting-panel">
         <div className="panel-header">
           <div>
-            <h2>2. Auction details</h2>
+            <h2>2. {postMode === "PREORDER" ? "Pre-Order details" : "Auction details"}</h2>
           </div>
         </div>
 
@@ -2945,27 +3043,27 @@ export default function FacebookPostPage({
           </>
         )}
 
-        <h3>
-          {isMultiple
-            ? "Shared / default rules"
-            : "Auction rules"}
-        </h3>
-
-        <RuleFields
-          value={sharedRules}
-          onChange={setSharedRules}
-          shared
-          disabled={publishing}
-          fieldPrefix="shared"
-          fieldErrors={fieldErrors}
-          registerField={registerField}
-        />
+        {postMode === "PREORDER" ? (
+          <>
+            <h3>Pre-Order rules</h3>
+            <div className="fb-post-setup-grid">
+              <label>Price *<input ref={registerField("preorderPrice")} value={preorderPrice} onChange={(e)=>{setPreorderPrice(e.target.value); clearFieldError("preorderPrice");}} disabled={publishing} placeholder="100" />{fieldErrors.preorderPrice && <small className="eo2-field-error-text">{fieldErrors.preorderPrice}</small>}</label>
+              <label>Available Quantity *<input ref={registerField("preorderQuantity")} type="number" min="1" step="1" value={preorderQuantity} onChange={(e)=>{setPreorderQuantity(e.target.value); clearFieldError("preorderQuantity");}} disabled={publishing} />{fieldErrors.preorderQuantity && <small className="eo2-field-error-text">{fieldErrors.preorderQuantity}</small>}</label>
+              <label>Max Qty / Buyer<input ref={registerField("preorderMaxPerBuyer")} type="number" min="1" step="1" value={preorderMaxPerBuyer} onChange={(e)=>{setPreorderMaxPerBuyer(e.target.value); clearFieldError("preorderMaxPerBuyer");}} disabled={publishing} placeholder="Optional" />{fieldErrors.preorderMaxPerBuyer && <small className="eo2-field-error-text">{fieldErrors.preorderMaxPerBuyer}</small>}</label>
+              <label>Pre-Order Deadline *<input ref={registerField("preorderDeadline")} type="datetime-local" min={getPhilippineNowInput()} value={preorderDeadline} onChange={(e)=>{setPreorderDeadline(e.target.value); clearFieldError("preorderDeadline");}} disabled={publishing} />{fieldErrors.preorderDeadline && <small className="eo2-field-error-text">{fieldErrors.preorderDeadline}</small>}</label>
+            </div>
+            <small>Pre-Order Single is enabled first. Multiple will be enabled after Facebook photo-to-item mapping is implemented.</small>
+          </>
+        ) : (<>
+          <h3>{isMultiple ? "Shared / default rules" : "Auction rules"}</h3>
+          <RuleFields value={sharedRules} onChange={setSharedRules} shared disabled={publishing} fieldPrefix="shared" fieldErrors={fieldErrors} registerField={registerField} />
+        </>)}
       </section>
 
       <section className="dashboard-panel fb-posting-panel">
         <div className="panel-header">
           <div>
-            <h2>3. Auction photos</h2>
+            <h2>3. {postMode === "PREORDER" ? "Pre-Order photos" : "Auction photos"}</h2>
 
             <p>
               Upload up to {MAX_IMAGES} JPG/PNG images.
@@ -3003,7 +3101,7 @@ export default function FacebookPostPage({
               )}
             >
               <strong>
-                Upload auction photos
+                Upload post photos
               </strong>
             </button>
 
@@ -3022,7 +3120,7 @@ export default function FacebookPostPage({
               >
                 <img
                   src={item.previewUrl}
-                  alt={`Auction ${index + 1}`}
+                  alt={`Post ${index + 1}`}
                 />
 
                 <button
@@ -3103,7 +3201,7 @@ export default function FacebookPostPage({
           <button
             type="button"
             className="primary-button"
-            onClick={publishAuction}
+            onClick={postMode === "PREORDER" ? publishPreorder : publishAuction}
             disabled={
               loading ||
               publishing ||
@@ -3127,7 +3225,7 @@ export default function FacebookPostPage({
 
             <h2>
               {publishing
-                ? "Publishing auction…"
+                ? `Publishing ${postMode === "PREORDER" ? "Pre-Order" : "auction"}…`
                 : processingFiles
                   ? "Processing images…"
                   : "Loading posting setup…"}
@@ -3149,12 +3247,11 @@ export default function FacebookPostPage({
             </div>
 
             <h2 id="eo2-success-title">
-              Auction published
+              {successPopup.mode_display_name || "Auction"} published
             </h2>
 
             <p>
-              The Facebook post was created and EO2MATE automation
-              was activated successfully.
+              The Facebook post was created and EO2MATE automation was activated successfully.
             </p>
 
             <p>
@@ -3213,7 +3310,7 @@ export default function FacebookPostPage({
             </div>
 
             <h2>
-              Auction posting failed
+              {failurePopup.mode_display_name || "Auction"} posting failed
             </h2>
 
             <p className="eo2-failure-message">
