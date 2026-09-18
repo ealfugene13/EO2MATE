@@ -915,6 +915,7 @@ async function getFunctionErrorMessage(error) {
 
 export default function FacebookPostPage({
   client,
+  initialPostMode = "AUCTION",
 }) {
   const fileInputRef = useRef(null);
   const uploadButtonRef = useRef(null);
@@ -924,7 +925,9 @@ export default function FacebookPostPage({
   const [pages, setPages] = useState([]);
   const [subscription, setSubscription] = useState(null);
   const [environments, setEnvironments] = useState([]);
-  const [postMode, setPostMode] = useState("AUCTION");
+  const [postMode, setPostMode] = useState(() =>
+    String(initialPostMode || "AUCTION").toUpperCase() === "PREORDER" ? "PREORDER" : "AUCTION"
+  );
   const [postTypes, setPostTypes] = useState([]);
   const [preorderPostTypes, setPreorderPostTypes] = useState([]);
   const [selectedPageId, setSelectedPageId] = useState("");

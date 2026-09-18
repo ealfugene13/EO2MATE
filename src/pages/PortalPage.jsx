@@ -2090,10 +2090,10 @@ export default function PortalPage({ session }) {
                 <span className="post-type-copy"><strong>Mining</strong><small>Fixed-price comment claiming for regular Facebook posts.</small></span>
                 <span className="post-type-action">Open →</span>
               </button>
-              <button type="button" className="post-type-card planned" onClick={() => navigateTo("pre-order")}>
+              <button type="button" className="post-type-card ready" onClick={() => navigateTo("pre-order-create")}>
                 <span className="post-type-icon"><NavIcon type="orders" /></span>
                 <span className="post-type-copy"><strong>Pre-Order</strong><small>Reserve upcoming products with allocation, cutoff, ETA and optional down payment.</small></span>
-                <span className="coming-soon-pill">UI first</span>
+                <span className="post-type-action">Create →</span>
               </button>
               <button type="button" className="post-type-card planned" onClick={() => navigateTo("regular-sale")}>
                 <span className="post-type-icon"><NavIcon type="sales" /></span>
@@ -2123,7 +2123,11 @@ export default function PortalPage({ session }) {
         )}
 
         {page === "facebook-post" && (
-          <FacebookPostPage client={client} />
+          <FacebookPostPage client={client} initialPostMode="AUCTION" />
+        )}
+
+        {page === "pre-order-create" && (
+          <FacebookPostPage client={client} initialPostMode="PREORDER" />
         )}
 
         {page === "facebook" && (
