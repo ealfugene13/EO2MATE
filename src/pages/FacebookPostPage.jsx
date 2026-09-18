@@ -938,6 +938,7 @@ export default function FacebookPostPage({
   const [singleItemSource, setSingleItemSource] = useState("MANUAL");
   const [singleInventoryItemId, setSingleInventoryItemId] = useState("");
   const [preorderPrice, setPreorderPrice] = useState("");
+  const [preorderDownPayment, setPreorderDownPayment] = useState("");
   const [preorderQuantity, setPreorderQuantity] = useState("");
   const [preorderMaxPerBuyer, setPreorderMaxPerBuyer] = useState("");
   const [preorderDeadline, setPreorderDeadline] = useState("");
@@ -1217,6 +1218,8 @@ export default function FacebookPostPage({
       if (singleItem.trim()) lines.push(`Item: ${singleItem.trim()}`);
       const price = normalizeMoney(preorderPrice);
       if (price !== null) lines.push(`Price: ${formatMoneyForCaption(preorderPrice)}`);
+      const downPayment = normalizeMoney(preorderDownPayment);
+      if (downPayment !== null) lines.push(`Required Down Payment: ${formatMoneyForCaption(preorderDownPayment)}`);
       if (preorderQuantity) lines.push(`Available Qty: ${preorderQuantity}`);
       if (preorderMaxPerBuyer) lines.push(`Max Qty / Buyer: ${preorderMaxPerBuyer}`);
       if (preorderDeadline) lines.push(`Pre-Order Until: ${formatFacebookAuctionDate(preorderDeadline)}`);
@@ -1244,6 +1247,7 @@ export default function FacebookPostPage({
     sharedRules,
     singleItem,
     preorderPrice,
+    preorderDownPayment,
     preorderQuantity,
     preorderMaxPerBuyer,
     preorderDeadline,
@@ -1461,6 +1465,9 @@ export default function FacebookPostPage({
       if (!singleItem.trim()) errors.singleItem = "Item name is required.";
       const price = normalizeMoney(preorderPrice);
       if (price === null || price <= 0) errors.preorderPrice = "Price must be greater than 0.";
+      const downPayment = normalizeMoney(preorderDownPayment);
+      if (downPayment === null || downPayment <= 0) errors.preorderDownPayment = "Required down payment must be greater than 0.";
+      else if (price !== null && price > 0 && downPayment > price) errors.preorderDownPayment = "Required down payment cannot exceed the item price.";
       const qty = Number(preorderQuantity);
       if (!Number.isInteger(qty) || qty <= 0) errors.preorderQuantity = "Quantity must be a whole number greater than 0.";
       if (preorderMaxPerBuyer !== "") {
@@ -1805,6 +1812,7 @@ export default function FacebookPostPage({
     setSingleItemSource("MANUAL");
     setSingleInventoryItemId("");
     setPreorderPrice("");
+    setPreorderDownPayment("");
     setPreorderQuantity("");
     setPreorderMaxPerBuyer("");
     setPreorderDeadline("");
@@ -1868,6 +1876,7 @@ export default function FacebookPostPage({
         item: {
           item_label: singleItem.trim(), item_source: "MANUAL",
           unit_price: normalizeMoney(preorderPrice), quantity_limit: Number(preorderQuantity),
+          required_down_payment: normalizeMoney(preorderDownPayment),
           max_quantity_per_buyer: preorderMaxPerBuyer === "" ? null : Number(preorderMaxPerBuyer),
           // Inventory-backed Pre-Order UI will be enabled after the first MANUAL end-to-end flow is proven.
         },
@@ -3050,10 +3059,40 @@ export default function FacebookPostPage({
           <>
             <h3>Pre-Order rules</h3>
             <div className="fb-post-setup-grid">
-              <label>Price *<input ref={registerField("preorderPrice")} value={preorderPrice} onChange={(e)=>{setPreorderPrice(e.target.value); clearFieldError("preorderPrice");}} disabled={publishing} placeholder="100" />{fieldErrors.preorderPrice && <small className="eo2-field-error-text">{fieldErrors.preorderPrice}</small>}</label>
-              <label>Available Quantity *<input ref={registerField("preorderQuantity")} type="number" min="1" step="1" value={preorderQuantity} onChange={(e)=>{setPreorderQuantity(e.target.value); clearFieldError("preorderQuantity");}} disabled={publishing} />{fieldErrors.preorderQuantity && <small className="eo2-field-error-text">{fieldErrors.preorderQuantity}</small>}</label>
-              <label>Max Qty / Buyer<input ref={registerField("preorderMaxPerBuyer")} type="number" min="1" step="1" value={preorderMaxPerBuyer} onChange={(e)=>{setPreorderMaxPerBuyer(e.target.value); clearFieldError("preorderMaxPerBuyer");}} disabled={publishing} placeholder="Optional" />{fieldErrors.preorderMaxPerBuyer && <small className="eo2-field-error-text">{fieldErrors.preorderMaxPerBuyer}</small>}</label>
-              <label>Pre-Order Deadline *<input ref={registerField("preorderDeadline")} type="datetime-local" min={getPhilippineNowInput()} value={preorderDeadline} onChange={(e)=>{setPreorderDeadline(e.target.value); clearFieldError("preorderDeadline");}} disabled={publishing} />{fieldErrors.preorderDeadline && <small className="eo2-field-error-text">{fieldErrors.preorderDeadline}</small>}</label>
+              <label>
+                Price <span className="eo2-required">*</span>
+                <input ref={registerField("preorderPrice")} value={preorderPrice} onChange={(e)=>{setPreorderPrice(e.target.value); clearFieldError("preorderPrice");}} disabled={publishing} placeholder="100" />
+                {fieldErrors.preorderPrice && <small className="eo2-field-error-text">{fieldErrors.preorderPrice}</small>}
+              </label>
+              <label>
+                Required Down Payment <span className="eo2-required">*</span>
+                <input ref={registerField("preorderDownPayment")} value={preorderDownPayment} onChange={(e)=>{setPreorderDownPayment(e.target.value); clearFieldError("preorderDownPayment");}} disabled={publishing} placeholder="50" />
+                <small>Amount required per item. Must not exceed the item price.</small>
+                {fieldErrors.preorderDownPayment && <small className="eo2-field-error-text">{fieldErrors.preorderDownPayment}</small>}
+              </label>
+              <label>
+                Available Quantity <span className="eo2-required">*</span>
+                <input ref={registerField("preorderQuantity")} type="number" min="1" step="1" value={preorderQuantity} onChange={(e)=>{setPreorderQuantity(e.target.value); clearFieldError("preorderQuantity");}} disabled={publishing} />
+                {fieldErrors.preorderQuantity && <small className="eo2-field-error-text">{fieldErrors.preorderQuantity}</small>}
+              </label>
+              <label>
+                Max Qty / Buyer
+                <input ref={registerField("preorderMaxPerBuyer")} type="number" min="1" step="1" value={preorderMaxPerBuyer} onChange={(e)=>{setPreorderMaxPerBuyer(e.target.value); clearFieldError("preorderMaxPerBuyer");}} disabled={publishing} placeholder="Optional" />
+                {fieldErrors.preorderMaxPerBuyer && <small className="eo2-field-error-text">{fieldErrors.preorderMaxPerBuyer}</small>}
+              </label>
+              <div className={`eo2-rule-datetime eo2-rule-auction-ends ${fieldClass(fieldErrors, "preorderDeadline")}`}>
+                <span className="eo2-rule-heading">
+                  Pre-Order Deadline <span className="eo2-required">*</span>
+                </span>
+                <ScrollDateTimePicker
+                  inputRef={registerField("preorderDeadline")}
+                  value={preorderDeadline}
+                  onChange={(nextValue) => { setPreorderDeadline(nextValue); clearFieldError("preorderDeadline"); }}
+                  disabled={publishing}
+                  hasError={Boolean(fieldErrors.preorderDeadline)}
+                />
+                {fieldErrors.preorderDeadline && <small className="eo2-field-error-text">{fieldErrors.preorderDeadline}</small>}
+              </div>
             </div>
             <small>Pre-Order Single is enabled first. Multiple will be enabled after Facebook photo-to-item mapping is implemented.</small>
           </>
