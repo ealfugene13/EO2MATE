@@ -88,19 +88,30 @@ function formatMoneyForCaption(value) {
 function phDateFromLocalInput(value) {
   if (!value) return null;
 
+  // ScrollDateTimePicker normally returns a datetime-local string, but keep
+  // this helper tolerant of Date values so validation/publishing never calls
+  // Date methods on an un-normalized form value.
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : new Date(value.getTime());
+  }
+
   const raw = String(value).trim();
+  if (!raw) return null;
 
-  if (!raw.includes("T")) {
-    return null;
+  let date;
+
+  // datetime-local values have no timezone. EO2MATE's Facebook scheduling
+  // inputs are interpreted in Philippine time (+08:00).
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(raw)) {
+    date = new Date(`${raw}:00+08:00`);
+  } else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(raw)) {
+    date = new Date(`${raw}+08:00`);
+  } else {
+    // Also accept already-normalized ISO timestamps when this helper is reused.
+    date = new Date(raw);
   }
 
-  const date = new Date(`${raw}:00+08:00`);
-
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-
-  return date;
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 function formatFacebookAuctionDate(value) {
