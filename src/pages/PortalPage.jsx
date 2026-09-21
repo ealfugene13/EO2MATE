@@ -4,6 +4,7 @@ import SetupPage from "./SetupPage";
 import OnboardingPage from "./OnboardingPage";
 import AdminClientsPage from "./AdminClientsPage";
 import FacebookPostPage from "./FacebookPostPage";
+import PreorderAdminPage from "./PreorderAdminPage";
 
 
 function NavIcon({ type }) {
@@ -2109,17 +2110,21 @@ export default function PortalPage({ session }) {
           </section>
         )}
 
-        {(page === "pre-order" || page === "regular-sale") && (
+        {page === "regular-sale" && (
           <section className="post-placeholder">
             <button type="button" className="back-link-button" onClick={() => navigateTo("posts")}>← Back to Create Post</button>
             <div className="dashboard-panel post-placeholder-card">
-              <span className="post-type-icon"><NavIcon type={page === "pre-order" ? "orders" : "sales"} /></span>
+              <span className="post-type-icon"><NavIcon type="sales" /></span>
               <p className="eyebrow">SELLING · POSTS</p>
-              <h1>{page === "pre-order" ? "Pre-Order" : "Regular Sale"}</h1>
-              <p>{page === "pre-order" ? "The Pre-Order workspace is now reserved in the UI. We will define its business rules before connecting backend processing." : "The Regular Sale workspace is now reserved in the UI for simple fixed-price Facebook selling."}</p>
+              <h1>Regular Sale</h1>
+              <p>The Regular Sale workspace is now reserved in the UI for simple fixed-price Facebook selling.</p>
               <span className="coming-soon-pill">UI ready · backend pending</span>
             </div>
           </section>
+        )}
+
+        {page === "pre-order" && (
+          <PreorderAdminPage client={client} />
         )}
 
         {page === "facebook-post" && (
