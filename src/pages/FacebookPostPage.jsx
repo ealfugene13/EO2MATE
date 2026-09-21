@@ -939,6 +939,7 @@ export default function FacebookPostPage({
   const [singleInventoryItemId, setSingleInventoryItemId] = useState("");
   const [preorderPrice, setPreorderPrice] = useState("");
   const [preorderDownPayment, setPreorderDownPayment] = useState("");
+  const [preorderDownPaymentType, setPreorderDownPaymentType] = useState("FIXED");
   const [preorderQuantity, setPreorderQuantity] = useState("");
   const [preorderMaxPerBuyer, setPreorderMaxPerBuyer] = useState("");
   const [preorderDeadline, setPreorderDeadline] = useState("");
@@ -1222,7 +1223,7 @@ export default function FacebookPostPage({
       const price = normalizeMoney(preorderPrice);
       if (price !== null) lines.push(`Price: ${formatMoneyForCaption(preorderPrice)}`);
       const downPayment = normalizeMoney(preorderDownPayment);
-      if (downPayment !== null) lines.push(`Required Down Payment: ${formatMoneyForCaption(preorderDownPayment)}`);
+      if (downPayment !== null) lines.push(preorderDownPaymentType === "PERCENTAGE" ? `Required Down Payment: ${downPayment}%` : `Required Down Payment: ${formatMoneyForCaption(preorderDownPayment)} per item`);
       if (preorderQuantity) lines.push(`Available Qty: ${preorderQuantity}`);
       if (preorderMaxPerBuyer) lines.push(`Max Qty / Buyer: ${preorderMaxPerBuyer}`);
       if (preorderDeadline) lines.push(`Pre-Order Until: ${formatFacebookAuctionDate(preorderDeadline)}`);
@@ -1253,6 +1254,7 @@ export default function FacebookPostPage({
     singleItem,
     preorderPrice,
     preorderDownPayment,
+    preorderDownPaymentType,
     preorderQuantity,
     preorderMaxPerBuyer,
     preorderDeadline,
@@ -1474,7 +1476,8 @@ export default function FacebookPostPage({
       if (price === null || price <= 0) errors.preorderPrice = "Price must be greater than 0.";
       const downPayment = normalizeMoney(preorderDownPayment);
       if (downPayment === null || downPayment <= 0) errors.preorderDownPayment = "Required down payment must be greater than 0.";
-      else if (price !== null && price > 0 && downPayment > price) errors.preorderDownPayment = "Required down payment cannot exceed the item price.";
+      else if (preorderDownPaymentType === "PERCENTAGE" && downPayment > 100) errors.preorderDownPayment = "Down payment percentage cannot exceed 100%.";
+      else if (preorderDownPaymentType === "FIXED" && price !== null && price > 0 && downPayment > price) errors.preorderDownPayment = "Required down payment per item cannot exceed the item price.";
       const qty = Number(preorderQuantity);
       if (!Number.isInteger(qty) || qty <= 0) errors.preorderQuantity = "Quantity must be a whole number greater than 0.";
       if (preorderMaxPerBuyer !== "") {
@@ -1823,6 +1826,7 @@ export default function FacebookPostPage({
     setSingleInventoryItemId("");
     setPreorderPrice("");
     setPreorderDownPayment("");
+    setPreorderDownPaymentType("FIXED");
     setPreorderQuantity("");
     setPreorderMaxPerBuyer("");
     setPreorderDeadline("");
@@ -1888,6 +1892,7 @@ export default function FacebookPostPage({
         item: {
           item_label: singleItem.trim(), item_source: "MANUAL",
           unit_price: normalizeMoney(preorderPrice), quantity_limit: Number(preorderQuantity),
+          required_down_payment_type: preorderDownPaymentType,
           required_down_payment: normalizeMoney(preorderDownPayment),
           max_quantity_per_buyer: preorderMaxPerBuyer === "" ? null : Number(preorderMaxPerBuyer),
           // Inventory-backed Pre-Order UI will be enabled after the first MANUAL end-to-end flow is proven.
@@ -3077,9 +3082,17 @@ export default function FacebookPostPage({
                 {fieldErrors.preorderPrice && <small className="eo2-field-error-text">{fieldErrors.preorderPrice}</small>}
               </label>
               <label>
+                Down Payment Type <span className="eo2-required">*</span>
+                <select value={preorderDownPaymentType} onChange={(e)=>{setPreorderDownPaymentType(e.target.value); clearFieldError("preorderDownPayment");}} disabled={publishing}>
+                  <option value="FIXED">Exact Amount</option>
+                  <option value="PERCENTAGE">Percentage</option>
+                </select>
+                <small>Choose a fixed amount per accepted item or a percentage of the accepted reservation value.</small>
+              </label>
+              <label>
                 Required Down Payment <span className="eo2-required">*</span>
-                <input ref={registerField("preorderDownPayment")} value={preorderDownPayment} onChange={(e)=>{setPreorderDownPayment(e.target.value); clearFieldError("preorderDownPayment");}} disabled={publishing} placeholder="50" />
-                <small>Amount required per item. Must not exceed the item price.</small>
+                <input ref={registerField("preorderDownPayment")} type="number" min="0.01" step="0.01" max={preorderDownPaymentType === "PERCENTAGE" ? "100" : undefined} value={preorderDownPayment} onChange={(e)=>{setPreorderDownPayment(e.target.value); clearFieldError("preorderDownPayment");}} disabled={publishing} placeholder={preorderDownPaymentType === "PERCENTAGE" ? "20" : "50"} />
+                <small>{preorderDownPaymentType === "PERCENTAGE" ? "Percentage of the buyer's accepted reservation value (1-100%)." : "Exact down payment amount per accepted item. Must not exceed the item price."}</small>
                 {fieldErrors.preorderDownPayment && <small className="eo2-field-error-text">{fieldErrors.preorderDownPayment}</small>}
               </label>
               <label>
