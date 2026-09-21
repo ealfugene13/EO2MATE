@@ -942,6 +942,8 @@ export default function FacebookPostPage({
   const [preorderQuantity, setPreorderQuantity] = useState("");
   const [preorderMaxPerBuyer, setPreorderMaxPerBuyer] = useState("");
   const [preorderDeadline, setPreorderDeadline] = useState("");
+  const [preorderPaymentDeadline, setPreorderPaymentDeadline] = useState("");
+  const [preorderParticipationCommands, setPreorderParticipationCommands] = useState([]);
   const [inventoryItems, setInventoryItems] = useState([]);
   const [sharedRules, setSharedRules] = useState({
     ...DEFAULT_RULES,
@@ -1087,6 +1089,7 @@ export default function FacebookPostPage({
         throw new Error(preorderData?.message || "Unable to load Pre-Order setup.");
       }
       setPreorderPostTypes(preorderData.preorder_post_types || []);
+      setPreorderParticipationCommands(preorderData.participation_commands || []);
 
       setPages(pageRows);
       setSubscription(data.subscription || null);
@@ -1223,7 +1226,9 @@ export default function FacebookPostPage({
       if (preorderQuantity) lines.push(`Available Qty: ${preorderQuantity}`);
       if (preorderMaxPerBuyer) lines.push(`Max Qty / Buyer: ${preorderMaxPerBuyer}`);
       if (preorderDeadline) lines.push(`Pre-Order Until: ${formatFacebookAuctionDate(preorderDeadline)}`);
-      lines.push("Comment PO <qty> or PREORDER <qty> to order.");
+      if (preorderPaymentDeadline) lines.push(`Payment Deadline: ${formatFacebookAuctionDate(preorderPaymentDeadline)}`);
+      const configuredCommand = preorderParticipationCommands.find((row) => row?.command_text === "+")?.command_text || preorderParticipationCommands[0]?.command_text || "+";
+      lines.push(`Comment ${configuredCommand}<qty> to order, e.g. ${configuredCommand}1 or ${configuredCommand} 1.`);
     } else if (!isMultiple) {
       lines.push(
         ...buildRuleLines(sharedRules, {
@@ -1251,6 +1256,8 @@ export default function FacebookPostPage({
     preorderQuantity,
     preorderMaxPerBuyer,
     preorderDeadline,
+    preorderPaymentDeadline,
+    preorderParticipationCommands,
   ]);
 
   const photoCaptions = useMemo(() => {
@@ -1478,6 +1485,9 @@ export default function FacebookPostPage({
       const deadline = phDateFromLocalInput(preorderDeadline);
       if (!deadline) errors.preorderDeadline = "Pre-Order deadline is required.";
       else if (deadline.getTime() <= Date.now()) errors.preorderDeadline = "Pre-Order deadline must be in the future.";
+      const paymentDeadline = phDateFromLocalInput(preorderPaymentDeadline);
+      if (!paymentDeadline) errors.preorderPaymentDeadline = "Payment deadline is required.";
+      else if (deadline && paymentDeadline.getTime() <= deadline.getTime()) errors.preorderPaymentDeadline = "Payment deadline must be after the Pre-Order deadline.";
       return errors;
     }
 
@@ -1816,6 +1826,7 @@ export default function FacebookPostPage({
     setPreorderQuantity("");
     setPreorderMaxPerBuyer("");
     setPreorderDeadline("");
+    setPreorderPaymentDeadline("");
 
     setSharedRules({
       minBid: "",
@@ -1873,6 +1884,7 @@ export default function FacebookPostPage({
       const payload = {
         client_id: client.client_id, fb_page_id: selectedPageId, post_type: "SINGLE",
         main_caption: mainCaption, ends_at: phDateFromLocalInput(preorderDeadline)?.toISOString(),
+        payment_deadline_at: phDateFromLocalInput(preorderPaymentDeadline)?.toISOString(),
         item: {
           item_label: singleItem.trim(), item_source: "MANUAL",
           unit_price: normalizeMoney(preorderPrice), quantity_limit: Number(preorderQuantity),
@@ -3092,6 +3104,20 @@ export default function FacebookPostPage({
                   hasError={Boolean(fieldErrors.preorderDeadline)}
                 />
                 {fieldErrors.preorderDeadline && <small className="eo2-field-error-text">{fieldErrors.preorderDeadline}</small>}
+              </div>
+              <div className={`eo2-rule-datetime ${fieldClass(fieldErrors, "preorderPaymentDeadline")}`}>
+                <span className="eo2-rule-heading">
+                  Payment Deadline <span className="eo2-required">*</span>
+                </span>
+                <ScrollDateTimePicker
+                  inputRef={registerField("preorderPaymentDeadline")}
+                  value={preorderPaymentDeadline}
+                  onChange={(nextValue) => { setPreorderPaymentDeadline(nextValue); clearFieldError("preorderPaymentDeadline"); }}
+                  disabled={publishing}
+                  hasError={Boolean(fieldErrors.preorderPaymentDeadline)}
+                />
+                <small>Must be later than the Pre-Order ordering deadline.</small>
+                {fieldErrors.preorderPaymentDeadline && <small className="eo2-field-error-text">{fieldErrors.preorderPaymentDeadline}</small>}
               </div>
             </div>
             <small>Pre-Order Single is enabled first. Multiple will be enabled after Facebook photo-to-item mapping is implemented.</small>
