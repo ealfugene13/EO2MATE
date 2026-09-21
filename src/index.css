@@ -2550,3 +2550,43 @@ button.post-type-card:hover { transform: translateY(-2px); border-color: #bcdcc3
   .eo2-dashboard-code-badge { display: none; }
   .post-placeholder-card { padding: 20px; }
 }
+
+/* =========================================================
+   PRE-ORDER MANAGEMENT — aligned with EO2MATE portal design
+   ========================================================= */
+.preorder-admin-header { margin-bottom: 18px; }
+.preorder-panel { margin-bottom: 18px; overflow: hidden; }
+.preorder-panel .panel-header { display:flex; align-items:flex-start; justify-content:space-between; gap:18px; padding:20px 22px; }
+.preorder-panel .panel-header h2 { margin:0 0 5px; color:var(--eo2-navy-900); font-size:17px; }
+.preorder-panel .panel-header p { margin:0; color:var(--eo2-muted); line-height:1.5; }
+.preorder-caption { max-width:850px; white-space:normal; overflow-wrap:anywhere; }
+.selected-table-row td { background:#f4fbf5 !important; }
+.preorder-summary-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:1px; border-bottom:1px solid var(--eo2-border); background:var(--eo2-border); }
+.preorder-summary-grid > div { min-width:0; padding:15px 20px; background:#fff; }
+.preorder-summary-grid span { display:block; margin-bottom:5px; color:var(--eo2-muted); font-size:9px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+.preorder-summary-grid strong { display:block; overflow:hidden; color:var(--eo2-navy-900); font-size:13px; text-overflow:ellipsis; white-space:nowrap; }
+.danger-action { color:#a94444; }
+.danger-action:hover { border-color:#efc7c7 !important; background:#fff7f7 !important; color:#963b3b !important; }
+.message-template-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; padding:18px 20px 22px; background:#f8fafc; }
+.message-template-card { min-width:0; padding:18px; border:1px solid var(--eo2-border); border-radius:14px; background:#fff; box-shadow:0 7px 20px rgba(11,35,61,.045); }
+.message-template-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+.message-template-head h3 { margin:5px 0 0; color:var(--eo2-navy-900); font-size:14px; }
+.message-channel { color:var(--eo2-green-600); font-size:9px; font-weight:850; letter-spacing:.08em; text-transform:uppercase; }
+.default-pill,.override-pill { flex:0 0 auto; padding:5px 8px; border-radius:999px; font-size:8px; font-weight:850; white-space:nowrap; }
+.default-pill { background:#eef2f6; color:#68758a; }
+.override-pill { background:#e8f7ec; color:#23813e; }
+.message-template-card > p { min-height:42px; margin:14px 0 16px; color:#59677b; font-size:11px; line-height:1.65; white-space:pre-wrap; overflow-wrap:anywhere; }
+.message-template-actions { display:flex; justify-content:flex-end; padding-top:12px; border-top:1px solid #edf1f5; }
+.eo2-modal-backdrop { position:fixed; inset:0; z-index:2000; display:grid; place-items:center; padding:20px; background:rgba(3,16,30,.55); backdrop-filter:blur(3px); }
+.eo2-modal-card { width:min(620px,100%); overflow:hidden; border:1px solid var(--eo2-border); border-radius:18px; background:#fff; box-shadow:0 28px 80px rgba(3,18,34,.25); }
+.eo2-modal-header { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; padding:20px 22px; border-bottom:1px solid #edf1f5; }
+.eo2-modal-header h2 { margin:4px 0; color:var(--eo2-navy-900); font-size:18px; }
+.eo2-modal-header span { color:var(--eo2-muted); font-size:10px; }
+.message-editor-label { display:flex; flex-direction:column; gap:8px; padding:20px 22px 10px; color:var(--eo2-navy-900); font-size:10px; font-weight:800; }
+.message-editor-label textarea { width:100%; min-height:150px; padding:13px 14px; resize:vertical; border:1px solid var(--eo2-border); border-radius:11px; background:#fbfcfe; color:var(--eo2-text); font:inherit; font-size:12px; line-height:1.6; }
+.message-editor-label textarea:focus { outline:none; border-color:#9fd4aa; box-shadow:0 0 0 3px rgba(39,198,75,.09); background:#fff; }
+.message-editor-help { margin:0 22px 18px; padding:11px 12px; border-radius:10px; background:#f4f7fa; color:#6e7b8e; font-size:10px; line-height:1.55; }
+.message-editor-help code { color:#257b3d; font-size:9px; }
+.eo2-modal-actions { display:flex; justify-content:flex-end; gap:9px; padding:16px 22px; border-top:1px solid #edf1f5; background:#fafbfd; }
+@media(max-width:900px){.message-template-grid{grid-template-columns:1fr}.preorder-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.preorder-panel .panel-header{padding:16px;flex-direction:column}.message-template-grid{padding:12px}.message-template-head{flex-direction:column}.preorder-summary-grid{grid-template-columns:1fr}.eo2-modal-backdrop{padding:10px}.eo2-modal-actions{flex-direction:column-reverse}.eo2-modal-actions button{width:100%}}
