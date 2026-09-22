@@ -574,6 +574,7 @@ function createItem(file, index) {
     miningMinePrice: "",
     miningTakePrice: "",
     miningLockPrice: "",
+    miningEndDate: "",
   };
 }
 
@@ -982,6 +983,7 @@ export default function FacebookPostPage({
   const [errorMessage, setErrorMessage] = useState("");
   const [fieldErrors, setFieldErrors] = useState({});
   const [successPopup, setSuccessPopup] = useState(null);
+  const [confirmPopup, setConfirmPopup] = useState(null);
   const [failurePopup, setFailurePopup] = useState(null);
   const [fileInputKey, setFileInputKey] = useState(0);
 
@@ -1313,7 +1315,8 @@ export default function FacebookPostPage({
         const mine = item.miningMinePrice !== "" ? item.miningMinePrice : miningMinePrice;
         const take = item.miningTakePrice !== "" ? item.miningTakePrice : miningTakePrice;
         const lock = item.miningLockPrice !== "" ? item.miningLockPrice : miningLockPrice;
-        return [`Item: ${item.item.trim()}`, `${cmd("MINE","MINE")}: ${formatMoneyForCaption(mine)}`, `${cmd("TAKE","TAKE")}: ${formatMoneyForCaption(take)}`, `${cmd("LOCK","LOCK")}: ${formatMoneyForCaption(lock)}`, `Comment ${cmd("MINE","MINE")}, ${cmd("TAKE","TAKE")}, or ${cmd("LOCK","LOCK")} on this photo.`].join("\n");
+        const endDate = item.miningEndDate || miningEndDate;
+        return [`Item: ${item.item.trim()}`, `${cmd("MINE","MINE")}: ${formatMoneyForCaption(mine)}`, `${cmd("TAKE","TAKE")}: ${formatMoneyForCaption(take)}`, `${cmd("LOCK","LOCK")}: ${formatMoneyForCaption(lock)}`, `Mining Ends: ${formatFacebookAuctionDate(endDate)}`, `Comment ${cmd("MINE","MINE")}, ${cmd("TAKE","TAKE")}, or ${cmd("LOCK","LOCK")} on this photo.`].join("\n");
       });
     }
     if (postMode === "PREORDER") {
@@ -1346,7 +1349,7 @@ export default function FacebookPostPage({
       });
     }
     return items.map((item) => buildRuleLines(mergeRules(sharedRules, item), {includeItem:true,item:item.item}).join("\n"));
-  }, [isMultiple, postMode, items, sharedRules, preorderPrice, preorderQuantity, preorderMaxPerBuyer, preorderDownPayment, preorderDownPaymentType, preorderDeadline, preorderPaymentDeadline, preorderParticipationCommands, miningParticipationCommands, miningMinePrice, miningTakePrice, miningLockPrice]);
+  }, [isMultiple, postMode, items, sharedRules, preorderPrice, preorderQuantity, preorderMaxPerBuyer, preorderDownPayment, preorderDownPaymentType, preorderDeadline, preorderPaymentDeadline, preorderParticipationCommands, miningParticipationCommands, miningMinePrice, miningTakePrice, miningLockPrice, miningEndDate]);
 
   function changePostType(nextType) {
     setPostType(nextType);
@@ -1547,7 +1550,10 @@ export default function FacebookPostPage({
         const im=normalizeMoney(item.miningMinePrice !== "" ? item.miningMinePrice : miningMinePrice);
         const it=normalizeMoney(item.miningTakePrice !== "" ? item.miningTakePrice : miningTakePrice);
         const il=normalizeMoney(item.miningLockPrice !== "" ? item.miningLockPrice : miningLockPrice);
+        const itemMiningEnd = phDateFromLocalInput(item.miningEndDate || miningEndDate);
         if(im===null||it===null||il===null||im<=0||it<=0||il<=0||!(im<=it&&it<=il)) errors[`${prefix}.miningMinePrice`]=`Item ${index+1}: effective prices must follow MINE ≤ TAKE ≤ LOCK.`;
+        if (!itemMiningEnd) errors[`${prefix}.miningEndDate`]=`Item ${index+1}: effective Mining end date is required.`;
+        else if (itemMiningEnd.getTime() <= Date.now()) errors[`${prefix}.miningEndDate`]=`Item ${index+1}: Mining end date must be in the future.`;
       });
       return errors;
     } else if (postMode === "PREORDER") {
@@ -2029,19 +2035,23 @@ export default function FacebookPostPage({
     }
   }
 
-  async function publishMining() {
+  async function publishMining(confirmed = false) {
     const errors=validate(); if(Object.keys(errors).length){setFieldErrors(errors);setErrorMessage("Please correct the highlighted field(s) below.");focusFirstError(errors);return;}
-    setFieldErrors({}); if(!window.confirm(`Publish this ${isMultiple ? "Multiple" : "Single"} Mining post to Facebook?\n\nPage: ${getPageLabel(selectedPage)}\nImages: ${items.length}`))return;
+    setFieldErrors({});
+    if (!confirmed) {
+      setConfirmPopup({ mode: "MINING", title: `Publish ${isMultiple ? "Multiple" : "Single"} Mining post?`, page: getPageLabel(selectedPage), type: isMultiple ? "Multiple Mining" : "Single Mining", images: items.length });
+      return;
+    }
     setPublishing(true);setErrorMessage("");setFailurePopup(null);
     try{
-      const payload={client_id:client.client_id,fb_page_id:selectedPageId,post_type:isMultiple?"MULTIPLE":"SINGLE",main_caption:mainCaption,mine_price:normalizeMoney(miningMinePrice),take_price:normalizeMoney(miningTakePrice),lock_price:normalizeMoney(miningLockPrice),ends_at:phDateFromLocalInput(miningEndDate)?.toISOString(),...(isMultiple?{items:items.map(item=>({item_label:item.item.trim(),mine_price:item.miningMinePrice===""?null:normalizeMoney(item.miningMinePrice),take_price:item.miningTakePrice===""?null:normalizeMoney(item.miningTakePrice),lock_price:item.miningLockPrice===""?null:normalizeMoney(item.miningLockPrice)})),photo_captions:photoCaptions}:{item:{item_label:singleItem.trim()}})};
+      const payload={client_id:client.client_id,fb_page_id:selectedPageId,post_type:isMultiple?"MULTIPLE":"SINGLE",main_caption:mainCaption,mine_price:normalizeMoney(miningMinePrice),take_price:normalizeMoney(miningTakePrice),lock_price:normalizeMoney(miningLockPrice),ends_at:phDateFromLocalInput(miningEndDate)?.toISOString(),...(isMultiple?{items:items.map(item=>({item_label:item.item.trim(),mine_price:item.miningMinePrice===""?null:normalizeMoney(item.miningMinePrice),take_price:item.miningTakePrice===""?null:normalizeMoney(item.miningTakePrice),lock_price:item.miningLockPrice===""?null:normalizeMoney(item.miningLockPrice),ends_at:item.miningEndDate?phDateFromLocalInput(item.miningEndDate)?.toISOString():null})),photo_captions:photoCaptions}:{item:{item_label:singleItem.trim()}})};
       const formData=new FormData();formData.append("payload",JSON.stringify(payload));items.forEach((item,index)=>formData.append(`image_${index}`,item.file,item.file.name));
       const {data,error}=await supabase.functions.invoke("meta",{headers:{"x-eo2mate-meta-route":"mining-publish"},body:formData});if(error)throw error;if(!data?.success)throw new Error(data?.message||data?.error||"Mining publishing failed.");
       const successData={...data,page_name:getPageLabel(selectedPage),environment,post_type_display_name:isMultiple?"Multiple Mining":"Single Mining",mode_display_name:"Mining"};resetFormForNewPost({keepSuccessPopup:true});setSuccessPopup(successData);
     }catch(error){const resolvedMessage=await getFunctionErrorMessage(error);setErrorMessage("");setFailurePopup({message:resolvedMessage,fb_post_id:null,permalink_url:null,mode_display_name:"Mining"});}finally{setPublishing(false);}
   }
 
-  async function publishPreorder() {
+  async function publishPreorder(confirmed = false) {
     const errors = validate();
     if (Object.keys(errors).length) {
       setFieldErrors(errors);
@@ -2050,7 +2060,10 @@ export default function FacebookPostPage({
       return;
     }
     setFieldErrors({});
-    if (!window.confirm(`Publish this ${isMultiple ? "Multiple" : "Single"} Pre-Order to Facebook?\n\nPage: ${getPageLabel(selectedPage)}\nImages: ${items.length}`)) return;
+    if (!confirmed) {
+      setConfirmPopup({ mode: "PREORDER", title: `Publish ${isMultiple ? "Multiple" : "Single"} Pre-Order?`, page: getPageLabel(selectedPage), type: isMultiple ? "Multiple Pre-Order" : "Single Pre-Order", images: items.length });
+      return;
+    }
     setPublishing(true); setErrorMessage(""); setFailurePopup(null);
     try {
       const payload = {
@@ -2106,7 +2119,7 @@ export default function FacebookPostPage({
     } finally { setPublishing(false); }
   }
 
-  async function publishAuction() {
+  async function publishAuction(confirmed = false) {
     const errors = validate();
 
     if (
@@ -2125,19 +2138,10 @@ export default function FacebookPostPage({
 
     setFieldErrors({});
 
-    const confirmed =
-      window.confirm(
-        `Publish this ${
-          selectedPostType?.display_name ||
-          "Auction"
-        } to Facebook?\n\n` +
-          `Page: ${getPageLabel(
-            selectedPage
-          )}\n` +
-          `Images: ${items.length}`
-      );
-
-    if (!confirmed) return;
+    if (!confirmed) {
+      setConfirmPopup({ mode: "AUCTION", title: `Publish ${selectedPostType?.display_name || "Auction"}?`, page: getPageLabel(selectedPage), type: selectedPostType?.display_name || "Auction", images: items.length });
+      return;
+    }
 
     setPublishing(true);
     setMessage("");
@@ -2433,6 +2437,17 @@ export default function FacebookPostPage({
           border: 2px solid #dc2626 !important;
           box-shadow: 0 0 0 3px rgba(220, 38, 38, .12);
         }
+
+        .eo2-confirm-icon {
+          width: 58px; height: 58px; margin: 0 auto 14px; display: grid; place-items: center;
+          border-radius: 50%; background: rgba(37, 99, 235, .12); color: #1d4ed8;
+          font-size: 28px; font-weight: 800;
+        }
+        .eo2-confirm-summary {
+          margin: 18px 0 4px; padding: 14px 16px; border-radius: 12px;
+          background: rgba(148, 163, 184, .10); text-align: left;
+        }
+        .eo2-confirm-summary p { margin: 6px 0; }
 
         .eo2-publish-overlay {
           position: fixed;
@@ -3419,6 +3434,12 @@ export default function FacebookPostPage({
                       <label>MINE Price Override<input value={item.miningMinePrice} onChange={(e)=>updateItem(item.id,{miningMinePrice:e.target.value})} disabled={publishing} placeholder={miningMinePrice?`Inherit ${miningMinePrice}`:"Inherit main"}/><small>Blank = inherit main MINE price.</small></label>
                       <label>TAKE Price Override<input value={item.miningTakePrice} onChange={(e)=>updateItem(item.id,{miningTakePrice:e.target.value})} disabled={publishing} placeholder={miningTakePrice?`Inherit ${miningTakePrice}`:"Inherit main"}/><small>Blank = inherit main TAKE price.</small></label>
                       <label>LOCK Price Override<input value={item.miningLockPrice} onChange={(e)=>updateItem(item.id,{miningLockPrice:e.target.value})} disabled={publishing} placeholder={miningLockPrice?`Inherit ${miningLockPrice}`:"Inherit main"}/><small>Blank = inherit main LOCK price.</small></label>
+                      <div className={`eo2-rule-datetime ${fieldClass(fieldErrors, `item.${item.id}.miningEndDate`)}`}>
+                        <label>End Date Override</label>
+                        <ScrollDateTimePicker value={item.miningEndDate} onChange={(nextValue)=>{updateItem(item.id,{miningEndDate:nextValue});clearFieldError(`item.${item.id}.miningEndDate`);}} disabled={publishing} hasError={Boolean(fieldErrors[`item.${item.id}.miningEndDate`])} />
+                        <small>{item.miningEndDate ? "Overrides the main Mining end date." : `Blank = inherit main end date${miningEndDate ? ` (${formatFacebookAuctionDate(miningEndDate)})` : ""}.`}</small>
+                        {fieldErrors[`item.${item.id}.miningEndDate`] && <small className="eo2-field-error-text">{fieldErrors[`item.${item.id}.miningEndDate`]}</small>}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -3556,6 +3577,32 @@ export default function FacebookPostPage({
                   ? "Processing images…"
                   : "Loading posting setup…"}
             </h2>
+          </div>
+        </div>
+      )}
+
+      {confirmPopup && (
+        <div className="eo2-publish-overlay" role="dialog" aria-modal="true" aria-labelledby="eo2-confirm-title">
+          <div className="eo2-success-card eo2-confirm-card">
+            <div className="eo2-confirm-icon">↗</div>
+            <h2 id="eo2-confirm-title">{confirmPopup.title}</h2>
+            <p>Please review before publishing to Facebook.</p>
+            <div className="eo2-confirm-summary">
+              <p><strong>Page:</strong> {confirmPopup.page}</p>
+              <p><strong>Mode:</strong> {confirmPopup.mode === "PREORDER" ? "Pre-Order" : confirmPopup.mode === "MINING" ? "Mining" : "Auction"}</p>
+              <p><strong>Type:</strong> {confirmPopup.type}</p>
+              <p><strong>Photos:</strong> {confirmPopup.images}</p>
+            </div>
+            <div className="eo2-success-actions">
+              <button type="button" className="secondary-button" onClick={() => setConfirmPopup(null)}>Cancel</button>
+              <button type="button" className="primary-button" onClick={() => {
+                const mode = confirmPopup.mode;
+                setConfirmPopup(null);
+                if (mode === "MINING") publishMining(true);
+                else if (mode === "PREORDER") publishPreorder(true);
+                else publishAuction(true);
+              }}>Publish to Facebook</button>
+            </div>
           </div>
         </div>
       )}
