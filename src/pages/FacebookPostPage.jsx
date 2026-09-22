@@ -3049,7 +3049,7 @@ export default function FacebookPostPage({
           <h1>Create Facebook Post</h1>
 
           <p>
-            Create Auction or Pre-Order posts, preview them, and publish directly to your connected Page.
+            Create Auction, Pre-Order, or Mining posts, preview them, and publish directly to your connected Page.
           </p>
         </div>
 

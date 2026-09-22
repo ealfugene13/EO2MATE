@@ -2086,10 +2086,10 @@ export default function PortalPage({ session }) {
                 <span className="post-type-copy"><strong>Auction</strong><small>Publish a bidding post with minimum bid, increment, buyout and cutoff rules.</small></span>
                 <span className="post-type-action">Create →</span>
               </button>
-              <button type="button" className="post-type-card planned" onClick={() => navigateTo("post-mining")}>
+              <button type="button" className="post-type-card ready" onClick={() => navigateTo("mining-create")}>
                 <span className="post-type-icon"><NavIcon type="mining" /></span>
                 <span className="post-type-copy"><strong>Mining</strong><small>Fixed-price comment claiming for regular Facebook posts.</small></span>
-                <span className="post-type-action">Open →</span>
+                <span className="post-type-action">Create →</span>
               </button>
               <button type="button" className="post-type-card ready" onClick={() => navigateTo("pre-order-create")}>
                 <span className="post-type-icon"><NavIcon type="orders" /></span>
@@ -2133,6 +2133,10 @@ export default function PortalPage({ session }) {
 
         {page === "pre-order-create" && (
           <FacebookPostPage client={client} initialPostMode="PREORDER" />
+        )}
+
+        {page === "mining-create" && (
+          <FacebookPostPage client={client} initialPostMode="MINING" />
         )}
 
         {page === "facebook" && (
@@ -3086,7 +3090,7 @@ export default function PortalPage({ session }) {
               <section className="dashboard-panel">
                 <div className="panel-header">
                   <div><h2>Mining posts</h2><p>All regular Post Mining records by status.</p></div>
-                  <button className="primary-button" type="button" disabled title="Enabled after Post Mining backend integration">Create Mining Post</button>
+                  <button className="primary-button" type="button" onClick={() => navigateTo("mining-create")}>Create Mining Post</button>
                 </div>
                 <div className="table-wrapper">
                   <table>
