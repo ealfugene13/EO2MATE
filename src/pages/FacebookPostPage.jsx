@@ -568,9 +568,6 @@ function createItem(file, index) {
     bidCutoff: "",
     itemSource: "MANUAL",
     inventoryItemId: "",
-    preorderPrice: "",
-    preorderQuantity: "",
-    preorderMaxPerBuyer: "",
   };
 }
 
@@ -1484,30 +1481,17 @@ export default function FacebookPostPage({
     }
 
     if (postMode === "PREORDER") {
-      if (!["SINGLE", "MULTIPLE"].includes(String(postType).toUpperCase())) errors.postType = "Select a valid Pre-Order type.";
-      if (!isMultiple && !singleItem.trim()) errors.singleItem = "Item name is required.";
-      if (isMultiple) {
-        items.forEach((row, index) => {
-          const prefix = `preorderItem${index}`;
-          const price = normalizeMoney(row.preorderPrice);
-          const qty = Number(row.preorderQuantity);
-          const max = row.preorderMaxPerBuyer === "" ? null : Number(row.preorderMaxPerBuyer);
-          if (!String(row.item || "").trim()) errors[`${prefix}Name`] = `Item ${index + 1} name is required.`;
-          if (price === null || price <= 0) errors[`${prefix}Price`] = `Item ${index + 1} price must be greater than 0.`;
-          if (!Number.isInteger(qty) || qty <= 0) errors[`${prefix}Qty`] = `Item ${index + 1} quantity must be a positive whole number.`;
-          if (max !== null && (!Number.isInteger(max) || max <= 0 || max > qty)) errors[`${prefix}Max`] = `Item ${index + 1} max per buyer must be 1-${qty}.`;
-          if (preorderDownPaymentType === "FIXED" && price && normalizeMoney(preorderDownPayment) > price) errors.preorderDownPayment = "Fixed down payment cannot exceed any item price.";
-        });
-      }
-      const price = isMultiple ? null : normalizeMoney(preorderPrice);
-      if (!isMultiple && (price === null || price <= 0)) errors.preorderPrice = "Price must be greater than 0.";
+      if (postType !== "SINGLE") errors.postType = "Pre-Order Multiple is not enabled yet.";
+      if (!singleItem.trim()) errors.singleItem = "Item name is required.";
+      const price = normalizeMoney(preorderPrice);
+      if (price === null || price <= 0) errors.preorderPrice = "Price must be greater than 0.";
       const downPayment = normalizeMoney(preorderDownPayment);
       if (downPayment === null || downPayment <= 0) errors.preorderDownPayment = "Required down payment must be greater than 0.";
       else if (preorderDownPaymentType === "PERCENTAGE" && downPayment > 100) errors.preorderDownPayment = "Down payment percentage cannot exceed 100%.";
       else if (preorderDownPaymentType === "FIXED" && price !== null && price > 0 && downPayment > price) errors.preorderDownPayment = "Required down payment per item cannot exceed the item price.";
       const qty = Number(preorderQuantity);
-      if (!isMultiple && (!Number.isInteger(qty) || qty <= 0)) errors.preorderQuantity = "Quantity must be a whole number greater than 0.";
-      if (!isMultiple && preorderMaxPerBuyer !== "") {
+      if (!Number.isInteger(qty) || qty <= 0) errors.preorderQuantity = "Quantity must be a whole number greater than 0.";
+      if (preorderMaxPerBuyer !== "") {
         const max = Number(preorderMaxPerBuyer);
         if (!Number.isInteger(max) || max <= 0) errors.preorderMaxPerBuyer = "Max quantity per buyer must be a whole number greater than 0.";
         else if (Number.isInteger(qty) && max > qty) errors.preorderMaxPerBuyer = "Max quantity per buyer cannot exceed available quantity.";
@@ -1909,22 +1893,21 @@ export default function FacebookPostPage({
       return;
     }
     setFieldErrors({});
-    if (!window.confirm(`Publish this ${isMultiple ? "Multiple" : "Single"} Pre-Order to Facebook?\n\nPage: ${getPageLabel(selectedPage)}\nImages: ${items.length}`)) return;
+    if (!window.confirm(`Publish this Single Pre-Order to Facebook?\n\nPage: ${getPageLabel(selectedPage)}\nImages: ${items.length}`)) return;
     setPublishing(true); setErrorMessage(""); setFailurePopup(null);
     try {
       const payload = {
-        client_id: client.client_id, fb_page_id: selectedPageId, post_type: isMultiple ? "MULTIPLE" : "SINGLE",
+        client_id: client.client_id, fb_page_id: selectedPageId, post_type: "SINGLE",
         main_caption: mainCaption, ends_at: phDateFromLocalInput(preorderDeadline)?.toISOString(),
         payment_deadline_at: phDateFromLocalInput(preorderPaymentDeadline)?.toISOString(),
-        required_down_payment_type: preorderDownPaymentType,
-        required_down_payment: normalizeMoney(preorderDownPayment),
-        item: isMultiple ? undefined : {
+        item: {
           item_label: singleItem.trim(), item_source: "MANUAL",
           unit_price: normalizeMoney(preorderPrice), quantity_limit: Number(preorderQuantity),
-          required_down_payment_type: preorderDownPaymentType, required_down_payment: normalizeMoney(preorderDownPayment),
+          required_down_payment_type: preorderDownPaymentType,
+          required_down_payment: normalizeMoney(preorderDownPayment),
           max_quantity_per_buyer: preorderMaxPerBuyer === "" ? null : Number(preorderMaxPerBuyer),
+          // Inventory-backed Pre-Order UI will be enabled after the first MANUAL end-to-end flow is proven.
         },
-        items: isMultiple ? items.map((row) => ({ item_label: String(row.item || "").trim(), item_source: "MANUAL", unit_price: normalizeMoney(row.preorderPrice), quantity_limit: Number(row.preorderQuantity), max_quantity_per_buyer: row.preorderMaxPerBuyer === "" ? null : Number(row.preorderMaxPerBuyer) })) : undefined,
       };
       const formData = new FormData();
       formData.append("payload", JSON.stringify(payload));
@@ -1934,7 +1917,7 @@ export default function FacebookPostPage({
       });
       if (error) throw error;
       if (!data?.success) throw new Error(data?.message || data?.error || "Pre-Order publishing failed.");
-      const successData = { ...data, page_name: getPageLabel(selectedPage), environment, post_type_display_name: isMultiple ? "Multiple Pre-Order" : "Single Pre-Order", mode_display_name: "Pre-Order" };
+      const successData = { ...data, page_name: getPageLabel(selectedPage), environment, post_type_display_name: "Single Pre-Order", mode_display_name: "Pre-Order" };
       resetFormForNewPost({ keepSuccessPopup: true });
       setSuccessPopup(successData);
     } catch (error) {
@@ -3054,7 +3037,7 @@ export default function FacebookPostPage({
                 <option
                   key={row.post_type_code}
                   value={String(row.post_type_code).toUpperCase()}
-                  disabled={false}
+                  disabled={postMode === "PREORDER" && String(row.post_type_code).toUpperCase() === "MULTIPLE"}
                 >
                   {row.display_name}
                 </option>
@@ -3104,13 +3087,11 @@ export default function FacebookPostPage({
           <>
             <h3>Pre-Order rules</h3>
             <div className="fb-post-setup-grid">
-              {!isMultiple && (
               <label>
                 Price <span className="eo2-required">*</span>
                 <input ref={registerField("preorderPrice")} value={preorderPrice} onChange={(e)=>{setPreorderPrice(e.target.value); clearFieldError("preorderPrice");}} disabled={publishing} placeholder="100" />
                 {fieldErrors.preorderPrice && <small className="eo2-field-error-text">{fieldErrors.preorderPrice}</small>}
               </label>
-              )}
               <label>
                 Down Payment Type <span className="eo2-required">*</span>
                 <select value={preorderDownPaymentType} onChange={(e)=>{setPreorderDownPaymentType(e.target.value); clearFieldError("preorderDownPayment");}} disabled={publishing}>
@@ -3125,20 +3106,16 @@ export default function FacebookPostPage({
                 <small>{preorderDownPaymentType === "PERCENTAGE" ? "Percentage of the buyer's accepted reservation value (1-100%)." : "Exact down payment amount per accepted item. Must not exceed the item price."}</small>
                 {fieldErrors.preorderDownPayment && <small className="eo2-field-error-text">{fieldErrors.preorderDownPayment}</small>}
               </label>
-              {!isMultiple && (
               <label>
                 Available Quantity <span className="eo2-required">*</span>
                 <input ref={registerField("preorderQuantity")} type="number" min="1" step="1" value={preorderQuantity} onChange={(e)=>{setPreorderQuantity(e.target.value); clearFieldError("preorderQuantity");}} disabled={publishing} />
                 {fieldErrors.preorderQuantity && <small className="eo2-field-error-text">{fieldErrors.preorderQuantity}</small>}
               </label>
-              )}
-              {!isMultiple && (
               <label>
                 Max Qty / Buyer
                 <input ref={registerField("preorderMaxPerBuyer")} type="number" min="1" step="1" value={preorderMaxPerBuyer} onChange={(e)=>{setPreorderMaxPerBuyer(e.target.value); clearFieldError("preorderMaxPerBuyer");}} disabled={publishing} placeholder="Optional" />
                 {fieldErrors.preorderMaxPerBuyer && <small className="eo2-field-error-text">{fieldErrors.preorderMaxPerBuyer}</small>}
               </label>
-              )}
               <div className={`eo2-rule-datetime eo2-rule-auction-ends ${fieldClass(fieldErrors, "preorderDeadline")}`}>
                 <span className="eo2-rule-heading">
                   Pre-Order Deadline <span className="eo2-required">*</span>
@@ -3237,14 +3214,6 @@ export default function FacebookPostPage({
                   src={item.previewUrl}
                   alt={`Post ${index + 1}`}
                 />
-                {postMode === "PREORDER" && isMultiple && (
-                  <div className="eo2-preorder-item-fields">
-                    <label>Item name<input value={item.item} onChange={(e)=>updateItem(item.id,{item:e.target.value})} disabled={publishing} /></label>
-                    <label>Price<input type="number" min="0.01" step="0.01" value={item.preorderPrice} onChange={(e)=>updateItem(item.id,{preorderPrice:e.target.value})} disabled={publishing} /></label>
-                    <label>Quantity<input type="number" min="1" step="1" value={item.preorderQuantity} onChange={(e)=>updateItem(item.id,{preorderQuantity:e.target.value})} disabled={publishing} /></label>
-                    <label>Max / buyer<input type="number" min="1" step="1" placeholder="Unlimited" value={item.preorderMaxPerBuyer} onChange={(e)=>updateItem(item.id,{preorderMaxPerBuyer:e.target.value})} disabled={publishing} /></label>
-                  </div>
-                )}
 
                 <button
                   type="button"
