@@ -1283,9 +1283,20 @@ export default function FacebookPostPage({
       return items.map((item) => {
         const lines = [];
         if (item.item.trim()) lines.push(`Item: ${item.item.trim()}`);
-        const price = normalizeMoney(item.preorderPrice);
-        if (price !== null) lines.push(`Price: ${formatMoneyForCaption(item.preorderPrice)}`);
-        if (item.preorderQuantity) lines.push(`Available Qty: ${item.preorderQuantity}`);
+        const effectivePriceRaw =
+          item.preorderPrice !== "" ? item.preorderPrice : preorderPrice;
+        const price = normalizeMoney(effectivePriceRaw);
+        if (price !== null) {
+          lines.push(`Price: ${formatMoneyForCaption(effectivePriceRaw)}`);
+        }
+
+        const effectiveQuantity =
+          item.preorderQuantity !== ""
+            ? item.preorderQuantity
+            : preorderQuantity;
+        if (effectiveQuantity) {
+          lines.push(`Available Qty: ${effectiveQuantity}`);
+        }
         const max = item.preorderMaxPerBuyer !== "" ? item.preorderMaxPerBuyer : preorderMaxPerBuyer;
         if (max) lines.push(`Max Qty / Buyer: ${max}`);
         const dp = normalizeMoney(preorderDownPayment);
@@ -1297,7 +1308,7 @@ export default function FacebookPostPage({
       });
     }
     return items.map((item) => buildRuleLines(mergeRules(sharedRules, item), {includeItem:true,item:item.item}).join("\n"));
-  }, [isMultiple, postMode, items, sharedRules, preorderMaxPerBuyer, preorderDownPayment, preorderDownPaymentType, preorderDeadline, preorderPaymentDeadline, preorderParticipationCommands]);
+  }, [isMultiple, postMode, items, sharedRules, preorderPrice, preorderQuantity, preorderMaxPerBuyer, preorderDownPayment, preorderDownPaymentType, preorderDeadline, preorderPaymentDeadline, preorderParticipationCommands]);
 
   function changePostType(nextType) {
     setPostType(nextType);
@@ -1506,19 +1517,73 @@ export default function FacebookPostPage({
           else if (Number.isInteger(qty) && max > qty) errors.preorderMaxPerBuyer = "Max quantity per buyer cannot exceed available quantity.";
         }
       } else {
+        const defaultPrice = normalizeMoney(preorderPrice);
+        if (defaultPrice === null || defaultPrice <= 0) {
+          errors.preorderPrice = "Default price must be greater than 0.";
+        } else if (
+          preorderDownPaymentType === "FIXED" &&
+          downPayment !== null &&
+          downPayment > defaultPrice
+        ) {
+          errors.preorderPrice =
+            "Default price cannot be lower than the required down payment.";
+        }
+
+        const defaultQty = Number(preorderQuantity);
+        if (!Number.isInteger(defaultQty) || defaultQty <= 0) {
+          errors.preorderQuantity =
+            "Default available quantity must be a whole number greater than 0.";
+        }
+
         items.forEach((item, index) => {
           const prefix = `item.${item.id}`;
-          if (!item.item.trim()) errors[`${prefix}.item`] = `Item ${index + 1} name is required.`;
-          const price = normalizeMoney(item.preorderPrice);
-          if (price === null || price <= 0) errors[`${prefix}.preorderPrice`] = `Item ${index + 1}: price must be greater than 0.`;
-          else if (preorderDownPaymentType === "FIXED" && downPayment !== null && downPayment > price) errors[`${prefix}.preorderPrice`] = `Item ${index + 1}: price cannot be lower than the required down payment.`;
-          const qty = Number(item.preorderQuantity);
-          if (!Number.isInteger(qty) || qty <= 0) errors[`${prefix}.preorderQuantity`] = `Item ${index + 1}: quantity must be a whole number greater than 0.`;
-          const effectiveMax = item.preorderMaxPerBuyer !== "" ? item.preorderMaxPerBuyer : preorderMaxPerBuyer;
+
+          if (!item.item.trim()) {
+            errors[`${prefix}.item`] = `Item ${index + 1} name is required.`;
+          }
+
+          const effectivePrice =
+            item.preorderPrice !== ""
+              ? normalizeMoney(item.preorderPrice)
+              : defaultPrice;
+
+          if (effectivePrice === null || effectivePrice <= 0) {
+            errors[`${prefix}.preorderPrice`] =
+              `Item ${index + 1}: effective price must be greater than 0.`;
+          } else if (
+            preorderDownPaymentType === "FIXED" &&
+            downPayment !== null &&
+            downPayment > effectivePrice
+          ) {
+            errors[`${prefix}.preorderPrice`] =
+              `Item ${index + 1}: effective price cannot be lower than the required down payment.`;
+          }
+
+          const effectiveQtyRaw =
+            item.preorderQuantity !== ""
+              ? item.preorderQuantity
+              : preorderQuantity;
+          const effectiveQty = Number(effectiveQtyRaw);
+
+          if (!Number.isInteger(effectiveQty) || effectiveQty <= 0) {
+            errors[`${prefix}.preorderQuantity`] =
+              `Item ${index + 1}: effective quantity must be a whole number greater than 0.`;
+          }
+
+          const effectiveMax =
+            item.preorderMaxPerBuyer !== ""
+              ? item.preorderMaxPerBuyer
+              : preorderMaxPerBuyer;
+
           if (effectiveMax !== "") {
             const max = Number(effectiveMax);
-            if (!Number.isInteger(max) || max <= 0) errors[`${prefix}.preorderMaxPerBuyer`] = `Item ${index + 1}: Max Qty / Buyer must be a whole number greater than 0.`;
-            else if (Number.isInteger(qty) && max > qty) errors[`${prefix}.preorderMaxPerBuyer`] = `Item ${index + 1}: Max Qty / Buyer cannot exceed available quantity.`;
+            if (!Number.isInteger(max) || max <= 0) {
+              errors[`${prefix}.preorderMaxPerBuyer`] =
+                `Item ${index + 1}: Max Qty / Buyer must be a whole number greater than 0.`;
+            } else if (Number.isInteger(effectiveQty) && max > effectiveQty) {
+              errors[`${prefix}.preorderMaxPerBuyer`] =
+                `Item ${index + 1}: Max Qty / Buyer cannot exceed effective available quantity.`;
+            }
           }
         });
       }
@@ -1930,8 +1995,12 @@ export default function FacebookPostPage({
           items: items.map((item) => ({
             item_label: item.item.trim(),
             item_source: "MANUAL",
-            unit_price: normalizeMoney(item.preorderPrice),
-            quantity_limit: Number(item.preorderQuantity),
+            unit_price: normalizeMoney(
+              item.preorderPrice !== "" ? item.preorderPrice : preorderPrice
+            ),
+            quantity_limit: Number(
+              item.preorderQuantity !== "" ? item.preorderQuantity : preorderQuantity
+            ),
             max_quantity_per_buyer: item.preorderMaxPerBuyer === "" ? null : Number(item.preorderMaxPerBuyer),
           })),
           photo_captions: photoCaptions,
@@ -3124,11 +3193,12 @@ export default function FacebookPostPage({
           <>
             <h3>Pre-Order rules</h3>
             <div className="fb-post-setup-grid">
-              {!isMultiple && <label>
-                Price <span className="eo2-required">*</span>
+              <label>
+                {isMultiple ? "Default Price" : "Price"} <span className="eo2-required">*</span>
                 <input ref={registerField("preorderPrice")} value={preorderPrice} onChange={(e)=>{setPreorderPrice(e.target.value); clearFieldError("preorderPrice");}} disabled={publishing} placeholder="100" />
                 {fieldErrors.preorderPrice && <small className="eo2-field-error-text">{fieldErrors.preorderPrice}</small>}
-              </label>}
+                {isMultiple && <small>Inherited by an item when its item-specific price is blank.</small>}
+              </label>
               <label>
                 Down Payment Type <span className="eo2-required">*</span>
                 <select value={preorderDownPaymentType} onChange={(e)=>{setPreorderDownPaymentType(e.target.value); clearFieldError("preorderDownPayment");}} disabled={publishing}>
@@ -3143,11 +3213,12 @@ export default function FacebookPostPage({
                 <small>{preorderDownPaymentType === "PERCENTAGE" ? "Percentage of the buyer's accepted reservation value (1-100%)." : "Exact down payment amount per accepted item. Must not exceed the item price."}</small>
                 {fieldErrors.preorderDownPayment && <small className="eo2-field-error-text">{fieldErrors.preorderDownPayment}</small>}
               </label>
-              {!isMultiple && <label>
-                Available Quantity <span className="eo2-required">*</span>
+              <label>
+                {isMultiple ? "Default Available Quantity" : "Available Quantity"} <span className="eo2-required">*</span>
                 <input ref={registerField("preorderQuantity")} type="number" min="1" step="1" value={preorderQuantity} onChange={(e)=>{setPreorderQuantity(e.target.value); clearFieldError("preorderQuantity");}} disabled={publishing} />
                 {fieldErrors.preorderQuantity && <small className="eo2-field-error-text">{fieldErrors.preorderQuantity}</small>}
-              </label>}
+                {isMultiple && <small>Inherited by an item when its item-specific quantity is blank.</small>}
+              </label>
               <label>
                 {isMultiple ? "Default Max Qty / Buyer" : "Max Qty / Buyer"}
                 <input ref={registerField("preorderMaxPerBuyer")} type="number" min="1" step="1" value={preorderMaxPerBuyer} onChange={(e)=>{setPreorderMaxPerBuyer(e.target.value); clearFieldError("preorderMaxPerBuyer");}} disabled={publishing} placeholder="Optional" />
@@ -3258,18 +3329,33 @@ export default function FacebookPostPage({
                       <input value={item.item} onChange={(e)=>updateItem(item.id,{item:e.target.value})} disabled={publishing}/>
                     </label>
                     <div className="fb-post-setup-grid" style={{marginTop:12}}>
-                      <label>Price <span className="eo2-required">*</span>
-                        <input value={item.preorderPrice} onChange={(e)=>updateItem(item.id,{preorderPrice:e.target.value})} disabled={publishing} placeholder="500"/>
+                      <label>Price Override
+                        <input
+                          value={item.preorderPrice}
+                          onChange={(e)=>updateItem(item.id,{preorderPrice:e.target.value})}
+                          disabled={publishing}
+                          placeholder={preorderPrice ? `Inherit ${preorderPrice}` : "Inherit main price"}
+                        />
+                        <small>Blank = inherit Default Price.</small>
                       </label>
-                      <label>Available Quantity <span className="eo2-required">*</span>
-                        <input type="number" min="1" step="1" value={item.preorderQuantity} onChange={(e)=>updateItem(item.id,{preorderQuantity:e.target.value})} disabled={publishing}/>
+                      <label>Quantity Override
+                        <input
+                          type="number"
+                          min="1"
+                          step="1"
+                          value={item.preorderQuantity}
+                          onChange={(e)=>updateItem(item.id,{preorderQuantity:e.target.value})}
+                          disabled={publishing}
+                          placeholder={preorderQuantity ? `Inherit ${preorderQuantity}` : "Inherit main quantity"}
+                        />
+                        <small>Blank = inherit Default Available Quantity.</small>
                       </label>
                       <label>Max Qty / Buyer
                         <input type="number" min="1" step="1" value={item.preorderMaxPerBuyer} onChange={(e)=>updateItem(item.id,{preorderMaxPerBuyer:e.target.value})} disabled={publishing} placeholder={preorderMaxPerBuyer ? `Inherit ${preorderMaxPerBuyer}` : "Inherit unlimited"}/>
                         <small>Blank = inherit the main Pre-Order rule.</small>
                       </label>
                     </div>
-                    <small style={{display:"block",marginTop:10}}>Down Payment, Pre-Order Deadline, and Payment Deadline inherit from the main Pre-Order rules.</small>
+                    <small style={{display:"block",marginTop:10}}>Blank item Price, Quantity, and Max Qty / Buyer inherit from the main Pre-Order rules. Down Payment and deadlines are also shared from the main rules.</small>
                   </div>
                 )}
               </article>
