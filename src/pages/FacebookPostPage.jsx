@@ -1540,7 +1540,7 @@ export default function FacebookPostPage({
       if (mine === null || mine <= 0) errors.miningMinePrice = "MINE price must be greater than 0.";
       if (take === null || take <= 0) errors.miningTakePrice = "TAKE price must be greater than 0.";
       if (lock === null || lock <= 0) errors.miningLockPrice = "LOCK price must be greater than 0.";
-      if (mine !== null && take !== null && lock !== null && !(mine <= take && take <= lock)) errors.miningTakePrice = "Prices must follow MINE ≤ TAKE ≤ LOCK.";
+      if (mine !== null && take !== null && lock !== null && !(mine < take && take < lock)) errors.miningTakePrice = "Prices must follow MINE < TAKE < LOCK.";
       const miningEnd = phDateFromLocalInput(miningEndDate);
       if (!miningEnd) errors.miningEndDate = "Mining end date is required.";
       else if (miningEnd.getTime() <= Date.now()) errors.miningEndDate = "Mining end date must be in the future.";
@@ -1551,7 +1551,7 @@ export default function FacebookPostPage({
         const it=normalizeMoney(item.miningTakePrice !== "" ? item.miningTakePrice : miningTakePrice);
         const il=normalizeMoney(item.miningLockPrice !== "" ? item.miningLockPrice : miningLockPrice);
         const itemMiningEnd = phDateFromLocalInput(item.miningEndDate || miningEndDate);
-        if(im===null||it===null||il===null||im<=0||it<=0||il<=0||!(im<=it&&it<=il)) errors[`${prefix}.miningMinePrice`]=`Item ${index+1}: effective prices must follow MINE ≤ TAKE ≤ LOCK.`;
+        if(im===null||it===null||il===null||im<=0||it<=0||il<=0||!(im<it&&it<il)) errors[`${prefix}.miningMinePrice`]=`Item ${index+1}: effective prices must follow MINE < TAKE < LOCK.`;
         if (!itemMiningEnd) errors[`${prefix}.miningEndDate`]=`Item ${index+1}: effective Mining end date is required.`;
         else if (itemMiningEnd.getTime() <= Date.now()) errors[`${prefix}.miningEndDate`]=`Item ${index+1}: Mining end date must be in the future.`;
       });
@@ -2036,6 +2036,7 @@ export default function FacebookPostPage({
   }
 
   async function publishMining(confirmed = false) {
+    confirmed = confirmed === true;
     const errors=validate(); if(Object.keys(errors).length){setFieldErrors(errors);setErrorMessage("Please correct the highlighted field(s) below.");focusFirstError(errors);return;}
     setFieldErrors({});
     if (!confirmed) {
@@ -2052,6 +2053,7 @@ export default function FacebookPostPage({
   }
 
   async function publishPreorder(confirmed = false) {
+    confirmed = confirmed === true;
     const errors = validate();
     if (Object.keys(errors).length) {
       setFieldErrors(errors);
@@ -2120,6 +2122,7 @@ export default function FacebookPostPage({
   }
 
   async function publishAuction(confirmed = false) {
+    confirmed = confirmed === true;
     const errors = validate();
 
     if (
@@ -2646,6 +2649,30 @@ export default function FacebookPostPage({
           align-items: start;
         }
 
+        .eo2-mining-rules-grid {
+          grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+          align-items: start;
+        }
+
+        .fb-post-setup-grid .eo2-rule-datetime {
+          display: flex;
+          flex-direction: column;
+          gap: 7px;
+          min-width: 0;
+          font-size: .82rem;
+          font-weight: 700;
+          color: var(--text-color, #111827);
+        }
+
+        .fb-post-setup-grid .eo2-rule-datetime .eo2-datetime-field {
+          width: 100%;
+          min-width: 0;
+          height: 38px;
+          min-height: 38px;
+          margin: 0;
+          box-sizing: border-box;
+        }
+
         .fb-rule-grid {
           display: grid;
           grid-template-columns:
@@ -3065,6 +3092,12 @@ export default function FacebookPostPage({
           padding-top: 8px;
         }
 
+        @media (max-width: 1100px) and (min-width: 721px) {
+          .eo2-mining-rules-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+          }
+        }
+
         @media (max-width: 720px) {
           .fb-post-setup-grid,
           .fb-post-preview-layout {
@@ -3281,7 +3314,7 @@ export default function FacebookPostPage({
           <>
             <h3>Mining rules</h3>
             <p>MINE establishes the current claim, TAKE replaces the current miner, and LOCK finalizes/closes the item. Command words are loaded from configuration.</p>
-            <div className="fb-post-setup-grid">
+            <div className="fb-post-setup-grid eo2-mining-rules-grid">
               <label>Default MINE Price <span className="eo2-required">*</span><input ref={registerField("miningMinePrice")} value={miningMinePrice} onChange={(e)=>{setMiningMinePrice(e.target.value);clearFieldError("miningMinePrice");}} disabled={publishing} placeholder="100"/>{fieldErrors.miningMinePrice&&<small className="eo2-field-error-text">{fieldErrors.miningMinePrice}</small>}</label>
               <label>Default TAKE Price <span className="eo2-required">*</span><input ref={registerField("miningTakePrice")} value={miningTakePrice} onChange={(e)=>{setMiningTakePrice(e.target.value);clearFieldError("miningTakePrice");}} disabled={publishing} placeholder="150"/>{fieldErrors.miningTakePrice&&<small className="eo2-field-error-text">{fieldErrors.miningTakePrice}</small>}</label>
               <label>Default LOCK Price <span className="eo2-required">*</span><input ref={registerField("miningLockPrice")} value={miningLockPrice} onChange={(e)=>{setMiningLockPrice(e.target.value);clearFieldError("miningLockPrice");}} disabled={publishing} placeholder="200"/>{fieldErrors.miningLockPrice&&<small className="eo2-field-error-text">{fieldErrors.miningLockPrice}</small>}</label>
@@ -3548,7 +3581,11 @@ export default function FacebookPostPage({
           <button
             type="button"
             className="primary-button"
-            onClick={postMode === "PREORDER" ? publishPreorder : postMode === "MINING" ? publishMining : publishAuction}
+            onClick={() => {
+              if (postMode === "PREORDER") publishPreorder();
+              else if (postMode === "MINING") publishMining();
+              else publishAuction();
+            }}
             disabled={
               loading ||
               publishing ||
