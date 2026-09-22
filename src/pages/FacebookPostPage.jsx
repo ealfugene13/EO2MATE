@@ -967,6 +967,7 @@ export default function FacebookPostPage({
   const [miningMinePrice, setMiningMinePrice] = useState("");
   const [miningTakePrice, setMiningTakePrice] = useState("");
   const [miningLockPrice, setMiningLockPrice] = useState("");
+  const [miningEndDate, setMiningEndDate] = useState("");
   const [inventoryItems, setInventoryItems] = useState([]);
   const [sharedRules, setSharedRules] = useState({
     ...DEFAULT_RULES,
@@ -1257,6 +1258,7 @@ export default function FacebookPostPage({
       if (mine !== null) lines.push(`${cmd("MINE","MINE")}: ${formatMoneyForCaption(miningMinePrice)}`);
       if (take !== null) lines.push(`${cmd("TAKE","TAKE")}: ${formatMoneyForCaption(miningTakePrice)}`);
       if (lock !== null) lines.push(`${cmd("LOCK","LOCK")}: ${formatMoneyForCaption(miningLockPrice)}`);
+      if (miningEndDate) lines.push(`Mining Ends: ${formatFacebookAuctionDate(miningEndDate)}`);
       lines.push(`Comment ${cmd("MINE","MINE")}, ${cmd("TAKE","TAKE")}, or ${cmd("LOCK","LOCK")}${isMultiple ? " on the item photo" : ""}.`);
     } else if (postMode === "PREORDER") {
       if (singleItem.trim()) lines.push(`Item: ${singleItem.trim()}`);
@@ -1300,7 +1302,7 @@ export default function FacebookPostPage({
     preorderDeadline,
     preorderPaymentDeadline,
     preorderParticipationCommands,
-    miningParticipationCommands, miningMinePrice, miningTakePrice, miningLockPrice,
+    miningParticipationCommands, miningMinePrice, miningTakePrice, miningLockPrice, miningEndDate,
   ]);
 
   const photoCaptions = useMemo(() => {
@@ -1536,6 +1538,9 @@ export default function FacebookPostPage({
       if (take === null || take <= 0) errors.miningTakePrice = "TAKE price must be greater than 0.";
       if (lock === null || lock <= 0) errors.miningLockPrice = "LOCK price must be greater than 0.";
       if (mine !== null && take !== null && lock !== null && !(mine <= take && take <= lock)) errors.miningTakePrice = "Prices must follow MINE ≤ TAKE ≤ LOCK.";
+      const miningEnd = phDateFromLocalInput(miningEndDate);
+      if (!miningEnd) errors.miningEndDate = "Mining end date is required.";
+      else if (miningEnd.getTime() <= Date.now()) errors.miningEndDate = "Mining end date must be in the future.";
       if (!isMultiple && !singleItem.trim()) errors.singleItem = "Item name is required.";
       if (isMultiple) items.forEach((item,index)=>{
         const prefix=`item.${item.id}`; if(!item.item.trim()) errors[`${prefix}.item`]=`Item ${index+1} name is required.`;
@@ -1544,6 +1549,7 @@ export default function FacebookPostPage({
         const il=normalizeMoney(item.miningLockPrice !== "" ? item.miningLockPrice : miningLockPrice);
         if(im===null||it===null||il===null||im<=0||it<=0||il<=0||!(im<=it&&it<=il)) errors[`${prefix}.miningMinePrice`]=`Item ${index+1}: effective prices must follow MINE ≤ TAKE ≤ LOCK.`;
       });
+      return errors;
     } else if (postMode === "PREORDER") {
       const downPayment = normalizeMoney(preorderDownPayment);
       if (downPayment === null || downPayment <= 0) errors.preorderDownPayment = "Required down payment must be greater than 0.";
@@ -1980,6 +1986,7 @@ export default function FacebookPostPage({
     setMiningMinePrice("");
     setMiningTakePrice("");
     setMiningLockPrice("");
+    setMiningEndDate("");
 
     setSharedRules({
       minBid: "",
@@ -2027,7 +2034,7 @@ export default function FacebookPostPage({
     setFieldErrors({}); if(!window.confirm(`Publish this ${isMultiple ? "Multiple" : "Single"} Mining post to Facebook?\n\nPage: ${getPageLabel(selectedPage)}\nImages: ${items.length}`))return;
     setPublishing(true);setErrorMessage("");setFailurePopup(null);
     try{
-      const payload={client_id:client.client_id,fb_page_id:selectedPageId,post_type:isMultiple?"MULTIPLE":"SINGLE",main_caption:mainCaption,mine_price:normalizeMoney(miningMinePrice),take_price:normalizeMoney(miningTakePrice),lock_price:normalizeMoney(miningLockPrice),...(isMultiple?{items:items.map(item=>({item_label:item.item.trim(),mine_price:item.miningMinePrice===""?null:normalizeMoney(item.miningMinePrice),take_price:item.miningTakePrice===""?null:normalizeMoney(item.miningTakePrice),lock_price:item.miningLockPrice===""?null:normalizeMoney(item.miningLockPrice)})),photo_captions:photoCaptions}:{item:{item_label:singleItem.trim()}})};
+      const payload={client_id:client.client_id,fb_page_id:selectedPageId,post_type:isMultiple?"MULTIPLE":"SINGLE",main_caption:mainCaption,mine_price:normalizeMoney(miningMinePrice),take_price:normalizeMoney(miningTakePrice),lock_price:normalizeMoney(miningLockPrice),ends_at:phDateFromLocalInput(miningEndDate)?.toISOString(),...(isMultiple?{items:items.map(item=>({item_label:item.item.trim(),mine_price:item.miningMinePrice===""?null:normalizeMoney(item.miningMinePrice),take_price:item.miningTakePrice===""?null:normalizeMoney(item.miningTakePrice),lock_price:item.miningLockPrice===""?null:normalizeMoney(item.miningLockPrice)})),photo_captions:photoCaptions}:{item:{item_label:singleItem.trim()}})};
       const formData=new FormData();formData.append("payload",JSON.stringify(payload));items.forEach((item,index)=>formData.append(`image_${index}`,item.file,item.file.name));
       const {data,error}=await supabase.functions.invoke("meta",{headers:{"x-eo2mate-meta-route":"mining-publish"},body:formData});if(error)throw error;if(!data?.success)throw new Error(data?.message||data?.error||"Mining publishing failed.");
       const successData={...data,page_name:getPageLabel(selectedPage),environment,post_type_display_name:isMultiple?"Multiple Mining":"Single Mining",mode_display_name:"Mining"};resetFormForNewPost({keepSuccessPopup:true});setSuccessPopup(successData);
@@ -3263,6 +3270,11 @@ export default function FacebookPostPage({
               <label>Default MINE Price <span className="eo2-required">*</span><input ref={registerField("miningMinePrice")} value={miningMinePrice} onChange={(e)=>{setMiningMinePrice(e.target.value);clearFieldError("miningMinePrice");}} disabled={publishing} placeholder="100"/>{fieldErrors.miningMinePrice&&<small className="eo2-field-error-text">{fieldErrors.miningMinePrice}</small>}</label>
               <label>Default TAKE Price <span className="eo2-required">*</span><input ref={registerField("miningTakePrice")} value={miningTakePrice} onChange={(e)=>{setMiningTakePrice(e.target.value);clearFieldError("miningTakePrice");}} disabled={publishing} placeholder="150"/>{fieldErrors.miningTakePrice&&<small className="eo2-field-error-text">{fieldErrors.miningTakePrice}</small>}</label>
               <label>Default LOCK Price <span className="eo2-required">*</span><input ref={registerField("miningLockPrice")} value={miningLockPrice} onChange={(e)=>{setMiningLockPrice(e.target.value);clearFieldError("miningLockPrice");}} disabled={publishing} placeholder="200"/>{fieldErrors.miningLockPrice&&<small className="eo2-field-error-text">{fieldErrors.miningLockPrice}</small>}</label>
+              <div className={`eo2-rule-datetime ${fieldClass(fieldErrors, "miningEndDate")}`}>
+                <span className="eo2-rule-heading">Mining End Date <span className="eo2-required">*</span></span>
+                <ScrollDateTimePicker inputRef={registerField("miningEndDate")} value={miningEndDate} onChange={(nextValue)=>{setMiningEndDate(nextValue);clearFieldError("miningEndDate");}} disabled={publishing} hasError={Boolean(fieldErrors.miningEndDate)} />
+                {fieldErrors.miningEndDate && <small className="eo2-field-error-text">{fieldErrors.miningEndDate}</small>}
+              </div>
             </div>
             {isMultiple && <small>Each photo can override any of the three prices. Blank item values inherit these post defaults.</small>}
           </>
