@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "./supabase";
 import LoginPage from "./pages/LoginPage";
 import PortalPage from "./pages/PortalPage";
+import MfaGate from "./pages/MfaGate";
 
 function LoadingScreen() {
   return (
@@ -46,5 +47,9 @@ export default function App() {
 
   if (loading) return <LoadingScreen />;
   if (!session) return <LoginPage />;
-  return <PortalPage session={session} />;
+  return (
+    <MfaGate>
+      <PortalPage session={session} />
+    </MfaGate>
+  );
 }
