@@ -2590,3 +2590,23 @@ button.post-type-card:hover { transform: translateY(-2px); border-color: #bcdcc3
 .eo2-modal-actions { display:flex; justify-content:flex-end; gap:9px; padding:16px 22px; border-top:1px solid #edf1f5; background:#fafbfd; }
 @media(max-width:900px){.message-template-grid{grid-template-columns:1fr}.preorder-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.preorder-panel .panel-header{padding:16px;flex-direction:column}.message-template-grid{padding:12px}.message-template-head{flex-direction:column}.preorder-summary-grid{grid-template-columns:1fr}.eo2-modal-backdrop{padding:10px}.eo2-modal-actions{flex-direction:column-reverse}.eo2-modal-actions button{width:100%}}
+
+/* =========================================================
+   AUTOMATED MESSAGES — centralized client template manager
+   ========================================================= */
+.automated-messages-header { margin-bottom:18px; }
+.automated-messages-panel { overflow:hidden; }
+.automated-messages-panel .panel-header { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; padding:20px 22px; border-bottom:1px solid var(--eo2-border); }
+.automated-messages-panel .panel-header h2 { margin:0 0 5px; color:var(--eo2-navy-900); font-size:17px; }
+.automated-messages-panel .panel-header p { margin:0; color:var(--eo2-muted); line-height:1.5; }
+.template-count { flex:0 0 auto; padding:6px 9px; border-radius:999px; background:#f1f5f8; color:#667489; font-size:9px; font-weight:850; text-transform:uppercase; letter-spacing:.06em; }
+.automated-message-toolbar { display:grid; grid-template-columns:220px minmax(0,1fr); gap:12px; padding:16px 20px; border-bottom:1px solid var(--eo2-border); background:#fbfcfd; }
+.message-description { margin-top:10px; color:#7a8798; font-size:10px; line-height:1.5; }
+.template-variable-row { display:flex; flex-wrap:wrap; gap:6px; margin:-4px 0 14px; }
+.template-variable-row code { padding:4px 7px; border-radius:7px; background:#f1f7f2; color:#257b3d; font-size:9px; }
+.message-template-actions { gap:8px; }
+.empty-message-state { grid-column:1/-1; padding:34px; text-align:center; color:var(--eo2-muted); }
+.default-message-preview { margin:0 22px 18px; padding:12px 14px; border:1px solid #e7edf2; border-radius:10px; background:#f8fafc; }
+.default-message-preview strong { color:var(--eo2-navy-900); font-size:9px; text-transform:uppercase; letter-spacing:.07em; }
+.default-message-preview p { margin:7px 0 0; color:#667489; font-size:10px; line-height:1.55; white-space:pre-wrap; overflow-wrap:anywhere; }
+@media(max-width:700px){.automated-message-toolbar{grid-template-columns:1fr}.automated-messages-panel .panel-header{flex-direction:column}.template-count{align-self:flex-start}}
