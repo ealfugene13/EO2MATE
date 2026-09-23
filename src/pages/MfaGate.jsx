@@ -148,7 +148,8 @@ export default function MfaGate({ children }) {
           <>
             <div className="auth-heading">
               <h1>Secure your EO2MATE account</h1>
-              <p>EO2MATE requires an authenticator app as a second sign-in factor. You can use Google Authenticator, Microsoft Authenticator, 1Password, or another TOTP-compatible app.</p>
+              <p>Add EO2MATE to your authenticator app to protect your account with a second sign-in step.</p>
+              <div className="mfa-app-note">Works with Microsoft Authenticator, Google Authenticator, 1Password, Bitwarden, and other TOTP-compatible authenticator apps.</div>
             </div>
             {error && <div className="form-error">{error}</div>}
             <button className="primary-button" type="button" onClick={beginEnrollment} disabled={loading}>
@@ -161,22 +162,22 @@ export default function MfaGate({ children }) {
         {state === "enroll" && (
           <>
             <div className="auth-heading">
-              <h1>Scan the QR code</h1>
-              <p>Scan this code with your authenticator app, then enter the 6-digit code it generates.</p>
+              <h1>Connect your authenticator</h1>
+              <p>In your authenticator app, add a new account and scan this QR code. Then enter the 6-digit code shown in the app.</p>
             </div>
             <div className="mfa-qr-wrap">
               {qrCode ? <img src={qrCode} alt="EO2MATE authenticator QR code" className="mfa-qr" /> : null}
             </div>
             {secret && (
               <div className="mfa-secret">
-                <span>Can't scan?</span>
+                <span>Can't scan the QR code? Enter this setup key manually in your authenticator app.</span>
                 <code>{secret}</code>
               </div>
             )}
             <form className="login-form" onSubmit={verifyEnrollment}>
               <label>
                 6-digit authenticator code
-                <input inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(e) => setCode(normalizeCode(e.target.value))} placeholder="000000" required />
+                <input inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(e) => setCode(normalizeCode(e.target.value))} placeholder="000000" className="mfa-code-input" maxLength={6} required />
               </label>
               {error && <div className="form-error">{error}</div>}
               <button className="primary-button" type="submit" disabled={loading || code.length !== 6}>
@@ -189,13 +190,13 @@ export default function MfaGate({ children }) {
         {state === "challenge" && (
           <>
             <div className="auth-heading">
-              <h1>Authenticator verification</h1>
-              <p>Enter the current 6-digit code from your authenticator app to continue to EO2MATE.</p>
+              <h1>Verify your identity</h1>
+              <p>Enter the current 6-digit code from your authenticator app.</p>
             </div>
             <form className="login-form" onSubmit={verifyLogin}>
               <label>
                 Authenticator code
-                <input autoFocus inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(e) => setCode(normalizeCode(e.target.value))} placeholder="000000" required />
+                <input autoFocus inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(e) => setCode(normalizeCode(e.target.value))} placeholder="000000" className="mfa-code-input" maxLength={6} required />
               </label>
               {error && <div className="form-error">{error}</div>}
               <button className="primary-button" type="submit" disabled={loading || code.length !== 6}>

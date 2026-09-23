@@ -3,6 +3,7 @@ import { supabase } from "./supabase";
 import LoginPage from "./pages/LoginPage";
 import PortalPage from "./pages/PortalPage";
 import MfaGate from "./pages/MfaGate";
+import PasswordResetPage from "./pages/PasswordResetPage";
 
 function LoadingScreen() {
   return (
@@ -19,6 +20,7 @@ function LoadingScreen() {
 export default function App() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -31,8 +33,9 @@ export default function App() {
     });
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
-      (_event, newSession) => {
+      (event, newSession) => {
         if (mounted) {
+          if (event === "PASSWORD_RECOVERY") setPasswordRecovery(true);
           setSession(newSession);
           setLoading(false);
         }
@@ -46,6 +49,7 @@ export default function App() {
   }, []);
 
   if (loading) return <LoadingScreen />;
+  if (passwordRecovery && session) return <PasswordResetPage onComplete={() => setPasswordRecovery(false)} />;
   if (!session) return <LoginPage />;
   return (
     <MfaGate>
