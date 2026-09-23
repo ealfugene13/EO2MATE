@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "../supabase";
 
 export default function AccountSecurityPage({ session }) {
@@ -11,6 +11,7 @@ export default function AccountSecurityPage({ session }) {
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const emailSubmitLock = useRef(false);
 
   async function loadSecurity() {
     setError("");
@@ -28,19 +29,32 @@ export default function AccountSecurityPage({ session }) {
 
   async function changeEmail(e) {
     e.preventDefault();
+    if (emailSubmitLock.current) return;
+
     const value = newEmail.trim().toLowerCase();
     if (!value) return setError("Enter your new email address.");
     if (value === String(email).toLowerCase()) return setError("The new email is the same as your current email.");
+
+    emailSubmitLock.current = true;
     setBusy("email"); setError(""); setNotice("");
     try {
-      const { error: updateError } = await supabase.auth.updateUser({ email: value });
+      // Resolve against the deployed app directory. This works with Vite's relative
+      // base and GitHub Pages sub-path deployments such as /EO2MATE/.
+      const emailRedirectTo = new URL("./", window.location.href).href;
+      const { error: updateError } = await supabase.auth.updateUser(
+        { email: value },
+        { emailRedirectTo }
+      );
       if (updateError) throw updateError;
       setNewEmail("");
-      setNotice("Email change requested. Check the required confirmation email(s). Your current email remains active until Supabase completes the change.");
+      setNotice("Email change requested. Open the verification email to complete the change.");
       await loadSecurity();
     } catch (err) {
       setError(err?.message || "Unable to change email.");
-    } finally { setBusy(""); }
+    } finally {
+      emailSubmitLock.current = false;
+      setBusy("");
+    }
   }
 
   async function changePassword(e) {

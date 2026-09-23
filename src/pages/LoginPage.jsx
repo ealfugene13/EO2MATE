@@ -35,7 +35,7 @@ export default function LoginPage() {
     if (!address) { setErrorMessage("Enter the email address for your EO2MATE account."); return; }
     setLoading(true);
     try {
-      const redirectTo = `${window.location.origin}${import.meta.env.BASE_URL}`;
+      const redirectTo = new URL("./", window.location.href).href;
       const { error } = await supabase.auth.resetPasswordForEmail(address, { redirectTo });
       if (error) throw error;
       setInfoMessage("If an EO2MATE account exists for that email, a password-reset link has been sent. Check your inbox and spam folder.");
