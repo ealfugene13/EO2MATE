@@ -148,11 +148,15 @@ export default function MfaGate({ children }) {
           <>
             <div className="auth-heading">
               <h1>Secure your EO2MATE account</h1>
-              <p>Add EO2MATE to your authenticator app to protect your account with a second sign-in step.</p>
-              <div className="mfa-app-note">Works with Microsoft Authenticator, Google Authenticator, 1Password, Bitwarden, and other TOTP-compatible authenticator apps.</div>
+              <p>Use an authenticator app to add a second layer of protection to your EO2MATE account.</p>
+              <div className="mfa-setup-panel">
+                <div className="mfa-setup-row"><span>1</span><div><strong>Open your authenticator app</strong><small>Microsoft Authenticator, Google Authenticator, 1Password, Bitwarden, or another TOTP app.</small></div></div>
+                <div className="mfa-setup-row"><span>2</span><div><strong>Scan the EO2MATE QR code</strong><small>We’ll show it on the next screen.</small></div></div>
+                <div className="mfa-setup-row"><span>3</span><div><strong>Enter the 6-digit code</strong><small>This confirms your authenticator and completes setup.</small></div></div>
+              </div>
             </div>
             {error && <div className="form-error">{error}</div>}
-            <button className="primary-button" type="button" onClick={beginEnrollment} disabled={loading}>
+            <button className="primary-button mfa-primary-action" type="button" onClick={beginEnrollment} disabled={loading}>
               {loading ? "Preparing..." : "Set up authenticator"}
             </button>
             <button className="auth-mode-button" type="button" onClick={signOut}>Sign out</button>
@@ -180,7 +184,7 @@ export default function MfaGate({ children }) {
                 <input inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(e) => setCode(normalizeCode(e.target.value))} placeholder="000000" className="mfa-code-input" maxLength={6} required />
               </label>
               {error && <div className="form-error">{error}</div>}
-              <button className="primary-button" type="submit" disabled={loading || code.length !== 6}>
+              <button className="primary-button mfa-primary-action" type="submit" disabled={loading || code.length !== 6}>
                 {loading ? "Verifying..." : "Enable MFA"}
               </button>
             </form>
@@ -199,7 +203,7 @@ export default function MfaGate({ children }) {
                 <input autoFocus inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(e) => setCode(normalizeCode(e.target.value))} placeholder="000000" className="mfa-code-input" maxLength={6} required />
               </label>
               {error && <div className="form-error">{error}</div>}
-              <button className="primary-button" type="submit" disabled={loading || code.length !== 6}>
+              <button className="primary-button mfa-primary-action" type="submit" disabled={loading || code.length !== 6}>
                 {loading ? "Verifying..." : "Verify and continue"}
               </button>
               <button className="auth-mode-button" type="button" onClick={signOut} disabled={loading}>Sign out</button>

@@ -1869,8 +1869,20 @@ export default function PortalPage({ session }) {
         <aside className="sidebar" style={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" }}>
           <SidebarLogo admin />
           <nav className="sidebar-nav" style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", paddingBottom: 12 }}>
-            <SidebarNavButton icon="clients" className="nav-item active">
+            <SidebarNavButton
+              icon="clients"
+              className={`nav-item ${page !== "account-security" ? "active" : ""}`}
+              onClick={() => setPage("admin-clients")}
+            >
               Clients
+            </SidebarNavButton>
+            <SidebarSectionLabel>Account</SidebarSectionLabel>
+            <SidebarNavButton
+              icon="users"
+              className={`nav-item ${page === "account-security" ? "active" : ""}`}
+              onClick={() => setPage("account-security")}
+            >
+              Account &amp; Security
             </SidebarNavButton>
           </nav>
           <div className="sidebar-footer" style={{ flexShrink: 0 }}>
@@ -1878,7 +1890,13 @@ export default function PortalPage({ session }) {
             <button className="logout-button" onClick={handleLogout}>Sign out</button>
           </div>
         </aside>
-        <main className="dashboard-content"><AdminClientsPage /></main>
+        <main className="dashboard-content">
+          {page === "account-security" ? (
+            <AccountSecurityPage session={session} />
+          ) : (
+            <AdminClientsPage />
+          )}
+        </main>
       </div>
     );
   }
