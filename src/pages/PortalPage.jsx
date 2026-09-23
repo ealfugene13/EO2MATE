@@ -5,6 +5,7 @@ import OnboardingPage from "./OnboardingPage";
 import AdminClientsPage from "./AdminClientsPage";
 import FacebookPostPage from "./FacebookPostPage";
 import PreorderAdminPage from "./PreorderAdminPage";
+import AutomatedMessagesPage from "./AutomatedMessagesPage";
 
 
 function NavIcon({ type }) {
@@ -2025,6 +2026,14 @@ export default function PortalPage({ session }) {
           </SidebarNavButton>
 
           <SidebarNavButton
+            icon="chat"
+            className={`nav-item ${page === "automated-messages" ? "active" : ""}`}
+            onClick={() => navigateTo("automated-messages")}
+          >
+            Automated Messages
+          </SidebarNavButton>
+
+          <SidebarNavButton
             icon="reports"
             className={`nav-item ${page === "reports" ? "active" : ""}`}
             onClick={() => setPage("reports")}
@@ -3679,6 +3688,10 @@ export default function PortalPage({ session }) {
               </div>
             </section>
           </>
+        )}
+
+        {page === "automated-messages" && (
+          <AutomatedMessagesPage client={client} />
         )}
 
         {page === "setup" && (
