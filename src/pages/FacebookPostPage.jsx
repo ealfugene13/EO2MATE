@@ -571,6 +571,9 @@ function createItem(file, index) {
     preorderPrice: "",
     preorderQuantity: "",
     preorderMaxPerBuyer: "",
+    regularSalePrice: "",
+    regularSaleQuantity: "",
+    regularSaleMaxPerBuyer: "",
     miningMinePrice: "",
     miningTakePrice: "",
     miningLockPrice: "",
@@ -944,11 +947,12 @@ export default function FacebookPostPage({
   const [subscription, setSubscription] = useState(null);
   const [environments, setEnvironments] = useState([]);
   const [postMode, setPostMode] = useState(() =>
-    ["PREORDER", "MINING"].includes(String(initialPostMode || "AUCTION").toUpperCase()) ? String(initialPostMode).toUpperCase() : "AUCTION"
+    ["PREORDER", "MINING", "REGULAR_SALE"].includes(String(initialPostMode || "AUCTION").toUpperCase()) ? String(initialPostMode).toUpperCase() : "AUCTION"
   );
   const [postTypes, setPostTypes] = useState([]);
   const [preorderPostTypes, setPreorderPostTypes] = useState([]);
   const [miningPostTypes, setMiningPostTypes] = useState([]);
+  const [regularSalePostTypes, setRegularSalePostTypes] = useState([]);
   const [selectedPageId, setSelectedPageId] = useState("");
   const [environment, setEnvironment] = useState("");
   const [postType, setPostType] = useState("");
@@ -965,6 +969,10 @@ export default function FacebookPostPage({
   const [preorderPaymentDeadline, setPreorderPaymentDeadline] = useState("");
   const [preorderParticipationCommands, setPreorderParticipationCommands] = useState([]);
   const [miningParticipationCommands, setMiningParticipationCommands] = useState([]);
+  const [regularSaleParticipationCommands, setRegularSaleParticipationCommands] = useState([]);
+  const [regularSalePrice, setRegularSalePrice] = useState("");
+  const [regularSaleQuantity, setRegularSaleQuantity] = useState("");
+  const [regularSaleMaxPerBuyer, setRegularSaleMaxPerBuyer] = useState("");
   const [miningMinePrice, setMiningMinePrice] = useState("");
   const [miningTakePrice, setMiningTakePrice] = useState("");
   const [miningLockPrice, setMiningLockPrice] = useState("");
@@ -1127,6 +1135,16 @@ export default function FacebookPostPage({
       setMiningPostTypes(miningData.mining_post_types || []);
       setMiningParticipationCommands(miningData.participation_commands || []);
 
+      const { data: regularSaleData, error: regularSaleError } = await supabase.functions.invoke("meta", {
+        method: "POST",
+        headers: { "x-eo2mate-meta-route": "regular-sale-publish" },
+        body: { action: "LIST_SETUP", client_id: client.client_id },
+      });
+      if (regularSaleError) throw regularSaleError;
+      if (!regularSaleData?.success) throw new Error(regularSaleData?.message || "Unable to load Regular Sale setup.");
+      setRegularSalePostTypes(regularSaleData.regular_sale_post_types || []);
+      setRegularSaleParticipationCommands(regularSaleData.participation_commands || []);
+
       setPages(pageRows);
       setSubscription(data.subscription || null);
       setEnvironments(environmentRows);
@@ -1210,7 +1228,7 @@ export default function FacebookPostPage({
     }
   }
 
-  const activePostTypes = postMode === "PREORDER" ? preorderPostTypes : postMode === "MINING" ? miningPostTypes : postTypes;
+  const activePostTypes = postMode === "PREORDER" ? preorderPostTypes : postMode === "MINING" ? miningPostTypes : postMode === "REGULAR_SALE" ? regularSalePostTypes : postTypes;
 
   const selectedPostType = useMemo(
     () =>
@@ -1253,7 +1271,15 @@ export default function FacebookPostPage({
       );
     }
 
-    if (postMode === "MINING") {
+    if (postMode === "REGULAR_SALE") {
+      if (!isMultiple && singleItem.trim()) lines.push(`Item: ${singleItem.trim()}`);
+      const price = normalizeMoney(regularSalePrice);
+      if (price !== null) lines.push(`Price: ${formatMoneyForCaption(regularSalePrice)}`);
+      if (regularSaleQuantity) lines.push(`Available Qty: ${regularSaleQuantity}`);
+      if (regularSaleMaxPerBuyer) lines.push(`Max Qty / Buyer: ${regularSaleMaxPerBuyer}`);
+      const command = regularSaleParticipationCommands.find((row) => row?.command_text === "+")?.command_text || "+";
+      lines.push(`Comment ${command}<qty> to buy, e.g. ${command}1 or ${command} 1.`);
+    } else if (postMode === "MINING") {
       if (!isMultiple && singleItem.trim()) lines.push(`Item: ${singleItem.trim()}`);
       const cmd = (action, fallback) => miningParticipationCommands.find((row) => String(row?.action_code || "").toUpperCase() === action)?.command_text || fallback;
       const mine = normalizeMoney(miningMinePrice), take = normalizeMoney(miningTakePrice), lock = normalizeMoney(miningLockPrice);
@@ -1305,10 +1331,20 @@ export default function FacebookPostPage({
     preorderPaymentDeadline,
     preorderParticipationCommands,
     miningParticipationCommands, miningMinePrice, miningTakePrice, miningLockPrice, miningEndDate,
+    regularSaleParticipationCommands, regularSalePrice, regularSaleQuantity, regularSaleMaxPerBuyer,
   ]);
 
   const photoCaptions = useMemo(() => {
     if (!isMultiple) return [];
+    if (postMode === "REGULAR_SALE") {
+      const command = regularSaleParticipationCommands.find((row) => row?.command_text === "+")?.command_text || "+";
+      return items.map((item) => {
+        const price = item.regularSalePrice !== "" ? item.regularSalePrice : regularSalePrice;
+        const qty = item.regularSaleQuantity !== "" ? item.regularSaleQuantity : regularSaleQuantity;
+        const max = item.regularSaleMaxPerBuyer !== "" ? item.regularSaleMaxPerBuyer : regularSaleMaxPerBuyer;
+        return [`Item: ${item.item.trim()}`, `Price: ${formatMoneyForCaption(price)}`, `Available Qty: ${qty}`, ...(max ? [`Max Qty / Buyer: ${max}`] : []), `Comment ${command}<qty> to buy, e.g. ${command}1 or ${command} 1.`].join("\n");
+      });
+    }
     if (postMode === "MINING") {
       const cmd = (action, fallback) => miningParticipationCommands.find((row) => String(row?.action_code || "").toUpperCase() === action)?.command_text || fallback;
       return items.map((item) => {
@@ -1349,7 +1385,7 @@ export default function FacebookPostPage({
       });
     }
     return items.map((item) => buildRuleLines(mergeRules(sharedRules, item), {includeItem:true,item:item.item}).join("\n"));
-  }, [isMultiple, postMode, items, sharedRules, preorderPrice, preorderQuantity, preorderMaxPerBuyer, preorderDownPayment, preorderDownPaymentType, preorderDeadline, preorderPaymentDeadline, preorderParticipationCommands, miningParticipationCommands, miningMinePrice, miningTakePrice, miningLockPrice, miningEndDate]);
+  }, [isMultiple, postMode, items, sharedRules, preorderPrice, preorderQuantity, preorderMaxPerBuyer, preorderDownPayment, preorderDownPaymentType, preorderDeadline, preorderPaymentDeadline, preorderParticipationCommands, miningParticipationCommands, miningMinePrice, miningTakePrice, miningLockPrice, miningEndDate, regularSaleParticipationCommands, regularSalePrice, regularSaleQuantity, regularSaleMaxPerBuyer]);
 
   function changePostType(nextType) {
     setPostType(nextType);
@@ -1535,6 +1571,16 @@ export default function FacebookPostPage({
       errors.images = "Upload at least one image.";
     }
 
+    if (postMode === "REGULAR_SALE") {
+      const price = normalizeMoney(regularSalePrice);
+      const qty = Number(regularSaleQuantity);
+      if (price === null || price <= 0) errors.regularSalePrice = "Price must be greater than 0.";
+      if (!Number.isInteger(qty) || qty <= 0) errors.regularSaleQuantity = "Quantity must be a whole number greater than 0.";
+      if (regularSaleMaxPerBuyer !== "") { const max=Number(regularSaleMaxPerBuyer); if(!Number.isInteger(max)||max<=0) errors.regularSaleMaxPerBuyer="Max quantity per buyer must be greater than 0."; else if(Number.isInteger(qty)&&max>qty) errors.regularSaleMaxPerBuyer="Max quantity per buyer cannot exceed available quantity."; }
+      if (!isMultiple && !singleItem.trim()) errors.singleItem = "Item name is required.";
+      if (isMultiple) items.forEach((item,index)=>{ const prefix=`item.${item.id}`; if(!item.item.trim()) errors[`${prefix}.item`]=`Item ${index+1} name is required.`; const ep=normalizeMoney(item.regularSalePrice!==""?item.regularSalePrice:regularSalePrice); const eq=Number(item.regularSaleQuantity!==""?item.regularSaleQuantity:regularSaleQuantity); if(ep===null||ep<=0) errors[`${prefix}.regularSalePrice`]=`Item ${index+1}: effective price must be greater than 0.`; if(!Number.isInteger(eq)||eq<=0) errors[`${prefix}.regularSaleQuantity`]=`Item ${index+1}: effective quantity must be greater than 0.`; });
+      return errors;
+    }
     if (postMode === "MINING") {
       const mine = normalizeMoney(miningMinePrice), take = normalizeMoney(miningTakePrice), lock = normalizeMoney(miningLockPrice);
       if (mine === null || mine <= 0) errors.miningMinePrice = "MINE price must be greater than 0.";
@@ -1975,7 +2021,7 @@ export default function FacebookPostPage({
       }
     );
 
-    const resetTypes = postMode === "PREORDER" ? preorderPostTypes : postMode === "MINING" ? miningPostTypes : postTypes;
+    const resetTypes = postMode === "PREORDER" ? preorderPostTypes : postMode === "MINING" ? miningPostTypes : postMode === "REGULAR_SALE" ? regularSalePostTypes : postTypes;
     setPostType(resetTypes.length ? String(resetTypes[0].post_type_code).toUpperCase() : "");
 
     setSellerCaption("");
@@ -1993,6 +2039,7 @@ export default function FacebookPostPage({
     setMiningTakePrice("");
     setMiningLockPrice("");
     setMiningEndDate("");
+    setRegularSalePrice(""); setRegularSaleQuantity(""); setRegularSaleMaxPerBuyer("");
 
     setSharedRules({
       minBid: "",
@@ -2033,6 +2080,20 @@ export default function FacebookPostPage({
         )
       );
     }
+  }
+
+  async function publishRegularSale(confirmed = false) {
+    confirmed = confirmed === true;
+    const errors=validate(); if(Object.keys(errors).length){setFieldErrors(errors);setErrorMessage("Please correct the highlighted field(s) below.");focusFirstError(errors);return;}
+    setFieldErrors({});
+    if(!confirmed){setConfirmPopup({mode:"REGULAR_SALE",title:`Publish ${isMultiple?"Multiple":"Single"} Regular Sale?`,page:getPageLabel(selectedPage),type:isMultiple?"Multiple Regular Sale":"Single Regular Sale",images:items.length});return;}
+    setPublishing(true); setErrorMessage(""); setFailurePopup(null);
+    try {
+      const payload={client_id:client.client_id,fb_page_id:selectedPageId,post_type:isMultiple?"MULTIPLE":"SINGLE",main_caption:mainCaption,max_quantity_per_buyer:regularSaleMaxPerBuyer===""?null:Number(regularSaleMaxPerBuyer),...(isMultiple?{items:items.map((item)=>({item_label:item.item.trim(),item_source:"MANUAL",unit_price:normalizeMoney(item.regularSalePrice!==""?item.regularSalePrice:regularSalePrice),quantity_limit:Number(item.regularSaleQuantity!==""?item.regularSaleQuantity:regularSaleQuantity),max_quantity_per_buyer:item.regularSaleMaxPerBuyer===""?null:Number(item.regularSaleMaxPerBuyer)})),photo_captions:photoCaptions}:{item:{item_label:singleItem.trim(),item_source:singleItemSource,inventory_item_id:singleItemSource==="INVENTORY"?singleInventoryItemId:null,unit_price:normalizeMoney(regularSalePrice),quantity_limit:Number(regularSaleQuantity),max_quantity_per_buyer:regularSaleMaxPerBuyer===""?null:Number(regularSaleMaxPerBuyer)}})};
+      const formData=new FormData(); formData.append("payload",JSON.stringify(payload)); items.forEach((item,index)=>formData.append(`image_${index}`,item.file,item.file.name));
+      const {data,error}=await supabase.functions.invoke("meta",{headers:{"x-eo2mate-meta-route":"regular-sale-publish"},body:formData}); if(error)throw error; if(!data?.success)throw new Error(data?.message||data?.error||"Regular Sale publishing failed.");
+      const successData={...data,page_name:getPageLabel(selectedPage),environment,post_type_display_name:isMultiple?"Multiple Regular Sale":"Single Regular Sale",mode_display_name:"Regular Sale"}; resetFormForNewPost({keepSuccessPopup:true}); setSuccessPopup(successData);
+    } catch(error){const resolvedMessage=await getFunctionErrorMessage(error);setErrorMessage("");setFailurePopup({message:resolvedMessage,fb_post_id:null,permalink_url:null,mode_display_name:"Regular Sale"});} finally {setPublishing(false);}
   }
 
   async function publishMining(confirmed = false) {
@@ -3232,17 +3293,18 @@ export default function FacebookPostPage({
             Post Mode *
             <select value={postMode} onChange={(e) => {
               const mode = e.target.value; setPostMode(mode); setFieldErrors({});
-              const rows = mode === "PREORDER" ? preorderPostTypes : mode === "MINING" ? miningPostTypes : postTypes;
+              const rows = mode === "PREORDER" ? preorderPostTypes : mode === "MINING" ? miningPostTypes : mode === "REGULAR_SALE" ? regularSalePostTypes : postTypes;
               setPostType(rows.length ? String(rows[0].post_type_code).toUpperCase() : "");
             }} disabled={loading || publishing}>
               <option value="AUCTION">Auction</option>
               <option value="PREORDER">Pre-Order</option>
               <option value="MINING">Mining</option>
+              <option value="REGULAR_SALE">Regular Sale</option>
             </select>
           </label>
 
           <label>
-            {postMode === "PREORDER" ? "Pre-Order Type" : postMode === "MINING" ? "Mining Type" : "Auction Type"}
+            {postMode === "PREORDER" ? "Pre-Order Type" : postMode === "MINING" ? "Mining Type" : postMode === "REGULAR_SALE" ? "Regular Sale Type" : "Auction Type"}
 
             <select
               value={postType}
@@ -3277,7 +3339,7 @@ export default function FacebookPostPage({
       <section className="dashboard-panel fb-posting-panel">
         <div className="panel-header">
           <div>
-            <h2>2. {postMode === "PREORDER" ? "Pre-Order details" : postMode === "MINING" ? "Mining details" : "Auction details"}</h2>
+            <h2>2. {postMode === "PREORDER" ? "Pre-Order details" : postMode === "MINING" ? "Mining details" : postMode === "REGULAR_SALE" ? "Regular Sale details" : "Auction details"}</h2>
           </div>
         </div>
 
@@ -3310,7 +3372,16 @@ export default function FacebookPostPage({
           </>
         )}
 
-        {postMode === "MINING" ? (
+        {postMode === "REGULAR_SALE" ? (
+          <>
+            <h3>Regular Sale rules</h3>
+            <div className="fb-post-setup-grid">
+              <label>{isMultiple ? "Default Price" : "Price"} <span className="eo2-required">*</span><input ref={registerField("regularSalePrice")} value={regularSalePrice} onChange={(e)=>{setRegularSalePrice(e.target.value);clearFieldError("regularSalePrice");}} disabled={publishing} placeholder="100"/>{fieldErrors.regularSalePrice&&<small className="eo2-field-error-text">{fieldErrors.regularSalePrice}</small>}</label>
+              <label>{isMultiple ? "Default Available Quantity" : "Available Quantity"} <span className="eo2-required">*</span><input ref={registerField("regularSaleQuantity")} type="number" min="1" step="1" value={regularSaleQuantity} onChange={(e)=>{setRegularSaleQuantity(e.target.value);clearFieldError("regularSaleQuantity");}} disabled={publishing}/>{fieldErrors.regularSaleQuantity&&<small className="eo2-field-error-text">{fieldErrors.regularSaleQuantity}</small>}</label>
+              <label>{isMultiple ? "Default Max Qty / Buyer" : "Max Qty / Buyer"}<input ref={registerField("regularSaleMaxPerBuyer")} type="number" min="1" step="1" value={regularSaleMaxPerBuyer} onChange={(e)=>{setRegularSaleMaxPerBuyer(e.target.value);clearFieldError("regularSaleMaxPerBuyer");}} disabled={publishing} placeholder="Optional"/>{fieldErrors.regularSaleMaxPerBuyer&&<small className="eo2-field-error-text">{fieldErrors.regularSaleMaxPerBuyer}</small>}</label>
+            </div>
+          </>
+        ) : postMode === "MINING" ? (
           <>
             <h3>Mining rules</h3>
             <p>MINE establishes the current claim, TAKE replaces the current miner, and LOCK finalizes/closes the item. Command words are loaded from configuration.</p>
@@ -3399,7 +3470,7 @@ export default function FacebookPostPage({
       <section className="dashboard-panel fb-posting-panel">
         <div className="panel-header">
           <div>
-            <h2>3. {postMode === "PREORDER" ? "Pre-Order photos" : postMode === "MINING" ? "Mining photos" : "Auction photos"}</h2>
+            <h2>3. {postMode === "PREORDER" ? "Pre-Order photos" : postMode === "MINING" ? "Mining photos" : postMode === "REGULAR_SALE" ? "Regular Sale photos" : "Auction photos"}</h2>
 
             <p>
               Upload up to {MAX_IMAGES} JPG/PNG images.
@@ -3460,6 +3531,16 @@ export default function FacebookPostPage({
                 />
 
                 <button type="button" onClick={() => removeItem(item.id)}>Remove</button>
+                {postMode === "REGULAR_SALE" && isMultiple && (
+                  <div className="fb-item-editor">
+                    <label>Item Name <span className="eo2-required">*</span><input value={item.item} onChange={(e)=>updateItem(item.id,{item:e.target.value})} disabled={publishing}/></label>
+                    <div className="fb-post-setup-grid" style={{marginTop:12}}>
+                      <label>Price Override<input value={item.regularSalePrice} onChange={(e)=>updateItem(item.id,{regularSalePrice:e.target.value})} disabled={publishing} placeholder={regularSalePrice?`Inherit ${regularSalePrice}`:"Inherit main"}/></label>
+                      <label>Quantity Override<input type="number" min="1" step="1" value={item.regularSaleQuantity} onChange={(e)=>updateItem(item.id,{regularSaleQuantity:e.target.value})} disabled={publishing} placeholder={regularSaleQuantity?`Inherit ${regularSaleQuantity}`:"Inherit main"}/></label>
+                      <label>Max Qty / Buyer<input type="number" min="1" step="1" value={item.regularSaleMaxPerBuyer} onChange={(e)=>updateItem(item.id,{regularSaleMaxPerBuyer:e.target.value})} disabled={publishing} placeholder={regularSaleMaxPerBuyer?`Inherit ${regularSaleMaxPerBuyer}`:"Inherit unlimited"}/></label>
+                    </div>
+                  </div>
+                )}
                 {postMode === "MINING" && isMultiple && (
                   <div className="fb-item-editor">
                     <label>Item Name <span className="eo2-required">*</span><input value={item.item} onChange={(e)=>updateItem(item.id,{item:e.target.value})} disabled={publishing}/></label>
@@ -3584,6 +3665,7 @@ export default function FacebookPostPage({
             onClick={() => {
               if (postMode === "PREORDER") publishPreorder();
               else if (postMode === "MINING") publishMining();
+              else if (postMode === "REGULAR_SALE") publishRegularSale();
               else publishAuction();
             }}
             disabled={
@@ -3609,7 +3691,7 @@ export default function FacebookPostPage({
 
             <h2>
               {publishing
-                ? `Publishing ${postMode === "PREORDER" ? "Pre-Order" : postMode === "MINING" ? "Mining" : "auction"}…`
+                ? `Publishing ${postMode === "PREORDER" ? "Pre-Order" : postMode === "MINING" ? "Mining" : postMode === "REGULAR_SALE" ? "Regular Sale" : "auction"}…`
                 : processingFiles
                   ? "Processing images…"
                   : "Loading posting setup…"}
@@ -3626,7 +3708,7 @@ export default function FacebookPostPage({
             <p>Please review before publishing to Facebook.</p>
             <div className="eo2-confirm-summary">
               <p><strong>Page:</strong> {confirmPopup.page}</p>
-              <p><strong>Mode:</strong> {confirmPopup.mode === "PREORDER" ? "Pre-Order" : confirmPopup.mode === "MINING" ? "Mining" : "Auction"}</p>
+              <p><strong>Mode:</strong> {confirmPopup.mode === "PREORDER" ? "Pre-Order" : confirmPopup.mode === "MINING" ? "Mining" : confirmPopup.mode === "REGULAR_SALE" ? "Regular Sale" : "Auction"}</p>
               <p><strong>Type:</strong> {confirmPopup.type}</p>
               <p><strong>Photos:</strong> {confirmPopup.images}</p>
             </div>
@@ -3637,6 +3719,7 @@ export default function FacebookPostPage({
                 setConfirmPopup(null);
                 if (mode === "MINING") publishMining(true);
                 else if (mode === "PREORDER") publishPreorder(true);
+                else if (mode === "REGULAR_SALE") publishRegularSale(true);
                 else publishAuction(true);
               }}>Publish to Facebook</button>
             </div>
