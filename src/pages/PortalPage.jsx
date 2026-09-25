@@ -2132,10 +2132,10 @@ export default function PortalPage({ session }) {
                 <span className="post-type-copy"><strong>Pre-Order</strong><small>Reserve upcoming products with allocation, cutoff, ETA and optional down payment.</small></span>
                 <span className="post-type-action">Create →</span>
               </button>
-              <button type="button" className="post-type-card planned" onClick={() => navigateTo("regular-sale")}>
+              <button type="button" className="post-type-card ready" onClick={() => navigateTo("regular-sale")}>
                 <span className="post-type-icon"><NavIcon type="sales" /></span>
-                <span className="post-type-copy"><strong>Regular Sale</strong><small>Simple fixed-price Facebook selling without auction or mining rules.</small></span>
-                <span className="coming-soon-pill">UI first</span>
+                <span className="post-type-copy"><strong>Regular Sale</strong><small>Simple fixed-price Facebook selling with Single and Multiple item support.</small></span>
+                <span className="post-type-action">Create →</span>
               </button>
               <div className="post-type-card disabled-card">
                 <span className="post-type-icon"><NavIcon type="facebook" /></span>
@@ -2147,16 +2147,7 @@ export default function PortalPage({ session }) {
         )}
 
         {page === "regular-sale" && (
-          <section className="post-placeholder">
-            <button type="button" className="back-link-button" onClick={() => navigateTo("posts")}>← Back to Create Post</button>
-            <div className="dashboard-panel post-placeholder-card">
-              <span className="post-type-icon"><NavIcon type="sales" /></span>
-              <p className="eyebrow">SELLING · POSTS</p>
-              <h1>Regular Sale</h1>
-              <p>The Regular Sale workspace is now reserved in the UI for simple fixed-price Facebook selling.</p>
-              <span className="coming-soon-pill">UI ready · backend pending</span>
-            </div>
-          </section>
+          <FacebookPostPage client={client} initialPostMode="REGULAR_SALE" />
         )}
 
         {page === "pre-order" && (
