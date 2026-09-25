@@ -132,7 +132,7 @@ export default function OnboardingPage({ session, initialStatus = null, onComple
         {client && !pages.length && (
           <section className="onboarding-stage-card active-stage">
             <div className="onboarding-stage-heading"><span>Step 3</span><div><strong>Connect Facebook Page</strong><small>Sign in with a Facebook account that has the required access to the Page.</small></div></div>
-            <div className="onboarding-permission-note">EO2MATE uses the Page connection for supported selling automation such as Auction, Mining and Pre-Order. Facebook authorization remains managed through Meta.</div>
+            <div className="onboarding-permission-note">EO2MATE uses the Page connection for supported selling automation such as Auction, Mining, Pre-Order and Regular Sale. EO2MATE uses the connection only for the Page features you enable. Facebook authorization remains managed through Meta.</div>
             <div className="wizard-action-buttons">
               <button className="secondary-button danger-outline-button" type="button" onClick={cancelOnboarding} disabled={loading}>Cancel onboarding</button>
               <button className="primary-button" type="button" onClick={connectFacebook} disabled={loading}>Connect Facebook Page</button>
@@ -150,7 +150,7 @@ export default function OnboardingPage({ session, initialStatus = null, onComple
 
         <div className="wizard-fyi onboarding-fyi">
           <strong>Current client workspace</strong>
-          <span>Auction, Mining and Pre-Order automation are available in the current Posts workflow. Payment remains manual while payment-provider integration is being finalized.</span>
+          <span>Auction, Mining, Pre-Order and Regular Sale automation are available in the current Posts workflow. Payment remains manual while payment-provider integration is being finalized.</span>
         </div>
       </main>
     </div>

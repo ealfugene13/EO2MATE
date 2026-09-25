@@ -755,7 +755,7 @@ export default function PortalPage({ session }) {
     }
 
     const baseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const connectUrl = `${baseUrl}/functions/v1/meta?route=oauth-start&?client_id=${encodeURIComponent(client.client_id)}`;
+    const connectUrl = `${baseUrl}/functions/v1/meta?route=oauth-start&client_id=${encodeURIComponent(client.client_id)}`;
     window.location.assign(connectUrl);
   }
 
