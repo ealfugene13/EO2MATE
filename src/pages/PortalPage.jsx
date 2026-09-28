@@ -713,7 +713,7 @@ export default function PortalPage({ session }) {
     }
   }
 
-  async function markPayMongoAccountCreated() {
+  async function markOnline PaymentsAccountCreated() {
     setPaymentAccountLoading(true);
     setPaymentAccountMessage("");
 
@@ -725,21 +725,21 @@ export default function PortalPage({ session }) {
 
       if (error) throw error;
       if (!data?.success) {
-        throw new Error(data?.message || "Unable to update PayMongo setup status.");
+        throw new Error(data?.message || "Unable to update Online Payments setup status.");
       }
 
       setPaymentAccountStatus(data);
       setPaymentAccountMessage(
-        "PayMongo account recorded. Online checkout remains disabled until the account is linked and activated for this client."
+        "Online Payments account recorded. Online checkout remains disabled until the account is linked and activated for this client."
       );
     } catch (error) {
-      setPaymentAccountMessage(error.message || "Unable to update PayMongo setup status.");
+      setPaymentAccountMessage(error.message || "Unable to update Online Payments setup status.");
     } finally {
       setPaymentAccountLoading(false);
     }
   }
 
-  function openPayMongo() {
+  function openOnline Payments() {
     const status = String(paymentAccountStatus?.account_status || "NOT_CONFIGURED").toUpperCase();
     const url = status === "NOT_CONFIGURED"
       ? (paymentAccountStatus?.setup_url || "https://dashboard.paymongo.com/signup")
@@ -1968,7 +1968,7 @@ export default function PortalPage({ session }) {
             className={`nav-item ${page.includes("payment") ? "active" : ""}`}
             onClick={() => paymentAccountStatus?.payment_enabled && goToPayments("ALL")}
             disabled={!paymentAccountStatus?.payment_enabled}
-            title={paymentAccountStatus?.payment_enabled ? "Payments" : "Set up and activate PayMongo to enable online payments"}
+            title={paymentAccountStatus?.payment_enabled ? "Payments" : "Set up and activate Online Payments to enable online payments"}
           >
             Payments
           </SidebarNavButton>
@@ -2196,7 +2196,7 @@ export default function PortalPage({ session }) {
               </div>
               <div className="onboarding-step">
                 <span>4</span>
-                <div><strong>Optional Services</strong><small>Facebook and PayMongo can be configured anytime</small></div>
+                <div><strong>Optional Services</strong><small>Facebook and Online Payments can be configured anytime</small></div>
               </div>
             </section>
 
@@ -3229,13 +3229,13 @@ export default function PortalPage({ session }) {
               <div className="payment-setup-copy">
                 <div className="payment-logo">P</div>
                 <div>
-                  <strong>PayMongo</strong>
+                  <strong>Online Payments</strong>
                   <span>
                     {paymentAccountStatus?.payment_enabled
                       ? "Online checkout is active for this client."
                       : String(paymentAccountStatus?.account_status || "NOT_CONFIGURED").toUpperCase() === "NOT_CONFIGURED"
-                        ? "Optional: create a PayMongo account to enable automated online payments later."
-                        : "PayMongo account exists, but automated checkout is not active yet."}
+                        ? "Optional: create a Online Payments account to enable automated online payments later."
+                        : "Online Payments account exists, but automated checkout is not active yet."}
                   </span>
                   <small>Status: {statusLabel(paymentAccountStatus?.account_status || "NOT_CONFIGURED")}</small>
                 </div>
@@ -3245,22 +3245,22 @@ export default function PortalPage({ session }) {
                 <button
                   className="primary-button"
                   type="button"
-                  onClick={openPayMongo}
+                  onClick={openOnline Payments}
                   disabled={paymentAccountLoading}
                 >
                   {String(paymentAccountStatus?.account_status || "NOT_CONFIGURED").toUpperCase() === "NOT_CONFIGURED"
-                    ? "Set Up PayMongo"
-                    : "Open PayMongo Dashboard"}
+                    ? "Set Up Online Payments"
+                    : "Open Online Payments Dashboard"}
                 </button>
 
                 {String(paymentAccountStatus?.account_status || "NOT_CONFIGURED").toUpperCase() === "NOT_CONFIGURED" && (
                   <button
                     className="secondary-button"
                     type="button"
-                    onClick={markPayMongoAccountCreated}
+                    onClick={markOnline PaymentsAccountCreated}
                     disabled={paymentAccountLoading}
                   >
-                    I Already Have PayMongo
+                    I Already Have Online Payments
                   </button>
                 )}
 
@@ -3297,7 +3297,7 @@ export default function PortalPage({ session }) {
               {paymentAccountStatus?.payment_enabled ? (
                 <MetricCard title="Pending payments" value={paymentMetrics.pending} subtitle="Awaiting settlement" onClick={() => goToPayments("pending")} />
               ) : (
-                <MetricCard title="Online payments" value="Off" subtitle="PayMongo not active" onClick={openPayMongo} />
+                <MetricCard title="Online payments" value="Off" subtitle="Online Payments not active" onClick={openOnline Payments} />
               )}
               <MetricCard title="Ready for booking" value={deliveryMetrics.ready} subtitle="Paid and ready" onClick={() => goToDeliveries("READY_FOR_BOOKING")} />
               <MetricCard title="Delivered" value={deliveryMetrics.delivered} subtitle="Completed deliveries" onClick={() => goToDeliveries("DELIVERED")} />
@@ -3522,7 +3522,7 @@ export default function PortalPage({ session }) {
               <div>
                 <p className="eyebrow">PAYMENT MANAGEMENT</p>
                 <h1>Payments</h1>
-                <p>Monitor PayMongo transactions, payment deadlines and manual payment extensions.</p>
+                <p>Monitor Online Payments transactions, payment deadlines and manual payment extensions.</p>
               </div>
               <button className="icon-button refresh-icon-button" onClick={loadPortal} title="Refresh" aria-label="Refresh">
           <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -3923,7 +3923,7 @@ export default function PortalPage({ session }) {
                   </div>
 
                   <div className="detail-card">
-                    <div className="detail-card-header"><h2>PayMongo</h2></div>
+                    <div className="detail-card-header"><h2>Online Payments</h2></div>
                     <DetailRow label="Checkout session" value={paymentDetail.checkout_session_id || "-"} />
                     <DetailRow label="Reference" value={paymentDetail.payment_reference || "-"} />
                     <DetailRow label="Paid at" value={formatDateTime(paymentDetail.paid_at)} />
