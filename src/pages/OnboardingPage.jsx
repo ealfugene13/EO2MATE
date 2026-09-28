@@ -44,7 +44,7 @@ export default function OnboardingPage({ session, initialStatus = null, onComple
         timezone: "Asia/Manila",
       });
       setStatus(data);
-      setMessage("Business profile created. Continue by connecting the Facebook Page you want EO2MATE to manage.");
+      setMessage("Business profile created. You can activate your workspace now and connect Facebook later from Facebook Setup.");
     } catch (error) { setErrorMessage(error.message || "Unable to create client profile."); }
     finally { setLoading(false); }
   }
@@ -96,14 +96,14 @@ export default function OnboardingPage({ session, initialStatus = null, onComple
         <div className="wizard-heading">
           <p className="eyebrow">GET STARTED</p>
           <h1>Set up your EO2MATE workspace</h1>
-          <p>Your account is secured with MFA. Add your business details, connect your Facebook Page, then activate your client workspace.</p>
+          <p>Your account is secured with MFA. Add your business details and activate your workspace. Facebook can be connected later when you are ready to use Facebook selling automation.</p>
         </div>
 
         <div className="wizard-stepper wizard-stepper-four">
           <div className="wizard-step done"><span>✓</span><div><strong>Security</strong><small>MFA enabled</small></div></div>
           <div className={`wizard-step ${client ? "done" : "current"}`}><span>2</span><div><strong>Business</strong><small>{client ? "Complete" : "Required"}</small></div></div>
-          <div className={`wizard-step ${pages.length ? "done" : client ? "current" : ""}`}><span>3</span><div><strong>Facebook</strong><small>{pages.length ? "Connected" : "Connect Page"}</small></div></div>
-          <div className={`wizard-step ${status?.onboarding_complete ? "done" : pages.length ? "current" : ""}`}><span>4</span><div><strong>Workspace</strong><small>{status?.onboarding_complete ? "Ready" : "Activate"}</small></div></div>
+          <div className={`wizard-step ${pages.length ? "done" : client ? "optional" : ""}`}><span>3</span><div><strong>Facebook</strong><small>{pages.length ? "Connected" : "Optional / later"}</small></div></div>
+          <div className={`wizard-step ${status?.onboarding_complete ? "done" : client ? "current" : ""}`}><span>4</span><div><strong>Workspace</strong><small>{status?.onboarding_complete ? "Ready" : "Activate"}</small></div></div>
         </div>
 
         {message && <div className="success-message">{message}</div>}
@@ -129,28 +129,32 @@ export default function OnboardingPage({ session, initialStatus = null, onComple
           </div>
         )}
 
-        {client && !pages.length && (
-          <section className="onboarding-stage-card active-stage">
-            <div className="onboarding-stage-heading"><span>Step 3</span><div><strong>Connect Facebook Page</strong><small>Sign in with a Facebook account that has the required access to the Page.</small></div></div>
-            <div className="onboarding-permission-note">EO2MATE uses the Page connection for supported selling automation such as Auction, Mining, Pre-Order and Regular Sale. EO2MATE uses the connection only for the Page features you enable. Facebook authorization remains managed through Meta.</div>
-            <div className="wizard-action-buttons">
-              <button className="secondary-button danger-outline-button" type="button" onClick={cancelOnboarding} disabled={loading}>Cancel onboarding</button>
-              <button className="primary-button" type="button" onClick={connectFacebook} disabled={loading}>Connect Facebook Page</button>
-            </div>
-          </section>
-        )}
-
-        {pages.length > 0 && !status?.onboarding_complete && (
-          <section className="onboarding-stage-card active-stage ready">
-            <div className="onboarding-stage-heading"><span>Step 4</span><div><strong>Activate workspace</strong><small>Your Facebook connection is ready.</small></div></div>
-            <div className="connected-page-row"><span>Connected Page</span><strong>{pageNames}</strong></div>
-            <button className="primary-button onboarding-primary-action" type="button" onClick={finishOnboarding} disabled={loading}>{loading ? "Activating..." : "Activate EO2MATE Workspace"}</button>
-          </section>
+        {client && !status?.onboarding_complete && (
+          <>
+            <section className="onboarding-stage-card">
+              <div className="onboarding-stage-heading"><span>Step 3</span><div><strong>Facebook Page (optional)</strong><small>{pages.length ? "Connected" : "You can connect this later from Facebook Setup."}</small></div></div>
+              {pages.length ? (
+                <div className="connected-page-row"><span>Connected Page</span><strong>{pageNames}</strong></div>
+              ) : (
+                <>
+                  <div className="onboarding-permission-note">Facebook is not required to activate EO2MATE. Connect a Page now only if you want to start using Facebook selling automation immediately.</div>
+                  <button className="secondary-button" type="button" onClick={connectFacebook} disabled={loading}>Connect Facebook Page Now</button>
+                </>
+              )}
+            </section>
+            <section className="onboarding-stage-card active-stage ready">
+              <div className="onboarding-stage-heading"><span>Step 4</span><div><strong>Activate workspace</strong><small>Facebook can be connected now or later.</small></div></div>
+              <div className="wizard-action-buttons">
+                <button className="secondary-button danger-outline-button" type="button" onClick={cancelOnboarding} disabled={loading}>Cancel onboarding</button>
+                <button className="primary-button onboarding-primary-action" type="button" onClick={finishOnboarding} disabled={loading}>{loading ? "Activating..." : "Activate EO2MATE Workspace"}</button>
+              </div>
+            </section>
+          </>
         )}
 
         <div className="wizard-fyi onboarding-fyi">
           <strong>Current client workspace</strong>
-          <span>Auction, Mining, Pre-Order and Regular Sale automation are available in the current Posts workflow. Payment remains manual while payment-provider integration is being finalized.</span>
+          <span>Auction, Mining, Pre-Order and Regular Sale automation are available in the current Posts workflow. Manual payment remains available, and enabled online payment providers can be used from the buyer checkout.</span>
         </div>
       </main>
     </div>

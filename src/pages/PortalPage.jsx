@@ -1246,15 +1246,12 @@ export default function PortalPage({ session }) {
       setDeliveries(deliveryResult.data || []);
 
       /*
-       * First-time onboarding gate.
-       *
-       * A client with no ACTIVE Facebook Page is sent to
-       * Facebook Setup automatically. Connected returning
-       * clients continue to the Dashboard.
+       * Facebook is optional for workspace access.
+       * Load its status for the Facebook feature area without gating the portal.
        */
       await Promise.all([
         loadFacebookStatus({
-          applyOnboardingGate: true,
+          applyOnboardingGate: false,
         }),
         loadPaymentAccountStatus(),
       ]);
