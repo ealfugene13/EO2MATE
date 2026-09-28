@@ -827,7 +827,7 @@
           </div>
 
           <div class="muted">
-            This seller has not enabled PayMongo.
+            This seller has not enabled online payment.
             Please coordinate payment directly with the seller.
           </div>
 
@@ -2005,21 +2005,25 @@ payButton.addEventListener(
 
       const response =
         await fetch(
-          `${FUNCTION_BASE}/buyer-create-payment`,
+          `${FUNCTION_BASE}/eo2mate`,
           {
             method:
               "POST",
 
             headers: {
               "Content-Type":
-                "application/json"
+                "application/json",
+              "x-eo2mate-route":
+                "buyer-payment"
             },
 
             body:
               JSON.stringify(
                 {
                   checkout_token:
-                    token
+                    token,
+                  provider:
+                    "MAYA"
                 }
               )
           }
@@ -2080,6 +2084,7 @@ payButton.addEventListener(
        */
 
       const checkoutUrl =
+        result.redirect_url ||
         result.checkout_url;
 
 
@@ -2104,7 +2109,7 @@ payButton.addEventListener(
 
 
       /*
-       * Redirect buyer to PayMongo.
+       * Redirect buyer to the configured online payment provider.
        */
 
       window.location.href =
