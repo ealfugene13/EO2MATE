@@ -713,7 +713,7 @@ export default function PortalPage({ session }) {
     }
   }
 
-  async function markOnline PaymentsAccountCreated() {
+  async function markPayMongoAccountCreated() {
     setPaymentAccountLoading(true);
     setPaymentAccountMessage("");
 
@@ -3257,7 +3257,7 @@ export default function PortalPage({ session }) {
                   <button
                     className="secondary-button"
                     type="button"
-                    onClick={markOnline PaymentsAccountCreated}
+                    onClick={markPayMongoAccountCreated}
                     disabled={paymentAccountLoading}
                   >
                     I Already Have Online Payments
