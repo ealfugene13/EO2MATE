@@ -739,7 +739,7 @@ export default function PortalPage({ session }) {
     }
   }
 
-  function openOnline Payments() {
+  function openOnlinePayments() {
     const status = String(paymentAccountStatus?.account_status || "NOT_CONFIGURED").toUpperCase();
     const url = status === "NOT_CONFIGURED"
       ? (paymentAccountStatus?.setup_url || "https://dashboard.paymongo.com/signup")
