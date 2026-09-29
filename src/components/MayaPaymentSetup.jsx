@@ -52,13 +52,18 @@ export default function MayaPaymentSetup({
       .json()
       .catch(() => ({}));
 
-    if (
-      !response.ok ||
-      data?.success === false
-    ) {
+    if (!response.ok || data?.success === false) {
+      const backendError =
+        typeof data?.message === "string"
+          ? data.message
+          : typeof data?.error === "string"
+            ? data.error
+            : data?.error
+              ? JSON.stringify(data.error)
+              : JSON.stringify(data);
+    
       throw new Error(
-        data?.message ||
-          data?.error ||
+        backendError ||
           `Maya request failed (${response.status})`
       );
     }
