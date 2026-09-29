@@ -3245,7 +3245,7 @@ export default function PortalPage({ session }) {
                 <button
                   className="primary-button"
                   type="button"
-                  onClick={openOnline Payments}
+                  onClick={openOnlinePayments}
                   disabled={paymentAccountLoading}
                 >
                   {String(paymentAccountStatus?.account_status || "NOT_CONFIGURED").toUpperCase() === "NOT_CONFIGURED"
@@ -3297,7 +3297,7 @@ export default function PortalPage({ session }) {
               {paymentAccountStatus?.payment_enabled ? (
                 <MetricCard title="Pending payments" value={paymentMetrics.pending} subtitle="Awaiting settlement" onClick={() => goToPayments("pending")} />
               ) : (
-                <MetricCard title="Online payments" value="Off" subtitle="Online Payments not active" onClick={openOnline Payments} />
+                <MetricCard title="Online payments" value="Off" subtitle="Online Payments not active" onClick={openOnlinePayments} />
               )}
               <MetricCard title="Ready for booking" value={deliveryMetrics.ready} subtitle="Paid and ready" onClick={() => goToDeliveries("READY_FOR_BOOKING")} />
               <MetricCard title="Delivered" value={deliveryMetrics.delivered} subtitle="Completed deliveries" onClick={() => goToDeliveries("DELIVERED")} />
