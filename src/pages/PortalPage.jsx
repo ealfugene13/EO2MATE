@@ -7,6 +7,7 @@ import FacebookPostPage from "./FacebookPostPage";
 import PreorderAdminPage from "./PreorderAdminPage";
 import AutomatedMessagesPage from "./AutomatedMessagesPage";
 import AccountSecurityPage from "./AccountSecurityPage";
+import MayaPaymentSetup from "../components/MayaPaymentSetup";
 
 
 function NavIcon({ type }) {
@@ -3280,8 +3281,17 @@ export default function PortalPage({ session }) {
               </div>
             </section>
 
+            {client?.client_id && (
+              <MayaPaymentSetup
+                clientId={client.client_id}
+                onChanged={loadPaymentAccountStatus}
+              />
+            )}
+
             {paymentAccountMessage && (
-              <div className="success-message global-error">{paymentAccountMessage}</div>
+              <div className="success-message global-error">
+                {paymentAccountMessage}
+              </div>
             )}
 
             <section className="metrics-grid">
