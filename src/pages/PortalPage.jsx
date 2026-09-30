@@ -2141,7 +2141,7 @@ export default function PortalPage({ session }) {
                 <span className="post-type-copy"><strong>Pre-Order</strong><small>Reserve upcoming products with allocation, cutoff, ETA and optional down payment.</small></span>
                 <span className="post-type-action">Create →</span>
               </button>
-              <button type="button" className="post-type-card ready" onClick={() => { setRegularSaleWorkspaceTab("SUMMARY"); navigateTo("regular-sale"); }}>
+              <button type="button" className="post-type-card ready" onClick={() => { setRegularSaleWorkspaceTab("POSTING"); navigateTo("regular-sale"); }}>
                 <span className="post-type-icon"><NavIcon type="sales" /></span>
                 <span className="post-type-copy"><strong>Regular Sale</strong><small>Simple fixed-price Facebook selling with Single and Multiple item support.</small></span>
                 <span className="post-type-action">Create →</span>
