@@ -551,6 +551,7 @@ export default function PortalPage({ session }) {
   // UI-first operational dashboards. Data wiring follows after UI approval.
   const [auctionWorkspaceTab, setAuctionWorkspaceTab] = useState("SUMMARY");
   const [miningWorkspaceTab, setMiningWorkspaceTab] = useState("SUMMARY");
+  const [regularSaleWorkspaceTab, setRegularSaleWorkspaceTab] = useState("SUMMARY");
   const [miningStatusFilter, setMiningStatusFilter] = useState("ALL");
   const [inventoryTab, setInventoryTab] = useState("SUMMARY");
   const [salesTab, setSalesTab] = useState("SUMMARY");
@@ -1949,7 +1950,7 @@ export default function PortalPage({ session }) {
               <button type="button" className={`nav-subitem ${page.includes("auction") ? "active" : ""}`} onClick={() => { goToAuctions("ALL"); setMobileMenuOpen(false); }}>Auctions</button>
               <button type="button" className={`nav-subitem ${page === "post-mining" ? "active" : ""}`} onClick={() => navigateTo("post-mining")}>Mining</button>
               <button type="button" className={`nav-subitem ${page === "pre-order" ? "active" : ""}`} onClick={() => navigateTo("pre-order")}>Pre-Orders</button>
-              <button type="button" className={`nav-subitem ${page === "regular-sale" ? "active" : ""}`} onClick={() => navigateTo("regular-sale")}>Regular Sales</button>
+              <button type="button" className={`nav-subitem ${page === "regular-sale" ? "active" : ""}`} onClick={() => { setRegularSaleWorkspaceTab("SUMMARY"); navigateTo("regular-sale"); }}>Regular Sales</button>
               <button type="button" className="nav-subitem" disabled title="Coming soon">Live Selling <span className="coming-soon-pill">Soon</span></button>
             </div>
           )}
@@ -2140,7 +2141,7 @@ export default function PortalPage({ session }) {
                 <span className="post-type-copy"><strong>Pre-Order</strong><small>Reserve upcoming products with allocation, cutoff, ETA and optional down payment.</small></span>
                 <span className="post-type-action">Create →</span>
               </button>
-              <button type="button" className="post-type-card ready" onClick={() => navigateTo("regular-sale")}>
+              <button type="button" className="post-type-card ready" onClick={() => { setRegularSaleWorkspaceTab("SUMMARY"); navigateTo("regular-sale"); }}>
                 <span className="post-type-icon"><NavIcon type="sales" /></span>
                 <span className="post-type-copy"><strong>Regular Sale</strong><small>Simple fixed-price Facebook selling with Single and Multiple item support.</small></span>
                 <span className="post-type-action">Create →</span>
@@ -2155,7 +2156,90 @@ export default function PortalPage({ session }) {
         )}
 
         {page === "regular-sale" && (
-          <FacebookPostPage client={client} initialPostMode="REGULAR_SALE" />
+          <>
+            <header className="dashboard-header">
+              <div>
+                <p className="eyebrow">FACEBOOK SELLING</p>
+                <h1>Regular Sales</h1>
+                <p>Manage fixed-price Facebook sales, posts and selling performance from one workspace.</p>
+              </div>
+            </header>
+
+            <section className="metrics-grid">
+              <MetricCard title="Total posts" value="0" subtitle="All Regular Sale posts" />
+              <MetricCard title="Active" value="0" subtitle="Currently accepting orders" />
+              <MetricCard title="Sold out" value="0" subtitle="Closed after stock sold out" />
+              <MetricCard title="Orders" value="0" subtitle="Accepted customer orders" />
+              <MetricCard title="Items sold" value="0" subtitle="Total allocated quantity" />
+              <MetricCard title="Sales value" value={formatCurrency(0)} subtitle="Gross Regular Sale value" />
+            </section>
+
+            <section className="dashboard-panel" style={{ marginBottom: 18 }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {["SUMMARY", "POSTS", "POSTING"].map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    className={regularSaleWorkspaceTab === tab ? "primary-button" : "secondary-button"}
+                    onClick={() => setRegularSaleWorkspaceTab(tab)}
+                  >
+                    {tab === "POSTING" ? "Create Post" : tab.charAt(0) + tab.slice(1).toLowerCase()}
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            {regularSaleWorkspaceTab === "SUMMARY" && (
+              <>
+                <section className="toolbar-card">
+                  <select className="filter-select" defaultValue="ALL">
+                    <option value="ALL">All statuses</option>
+                    <option value="ACTIVE">Active</option>
+                    <option value="SOLD_OUT">Sold out</option>
+                    <option value="CANCELLED">Cancelled</option>
+                  </select>
+                  <select className="filter-select" defaultValue="30D">
+                    <option value="TODAY">Today</option>
+                    <option value="7D">Last 7 days</option>
+                    <option value="30D">Last 30 days</option>
+                    <option value="MONTH">This month</option>
+                  </select>
+                </section>
+                <section className="dashboard-panel">
+                  <div className="panel-header">
+                    <div><h2>Regular Sale summary</h2><p>Orders, inventory movement, buyers and sales value for fixed-price selling.</p></div>
+                  </div>
+                  <div className="metrics-grid">
+                    <MetricCard title="Sell-through rate" value="—" subtitle="Sold quantity versus offered stock" />
+                    <MetricCard title="Unique buyers" value="0" subtitle="Regular Sale customers" />
+                    <MetricCard title="Remaining items" value="0" subtitle="Available quantity" />
+                    <MetricCard title="Paid value" value={formatCurrency(0)} subtitle="Collected Regular Sale sales" />
+                    <MetricCard title="Pending value" value={formatCurrency(0)} subtitle="Awaiting payment" />
+                    <MetricCard title="Average order" value={formatCurrency(0)} subtitle="Average accepted order value" />
+                  </div>
+                </section>
+              </>
+            )}
+
+            {regularSaleWorkspaceTab === "POSTS" && (
+              <section className="dashboard-panel">
+                <div className="panel-header">
+                  <div><h2>Regular Sale posts</h2><p>Single and Multiple Regular Sale posts by status.</p></div>
+                  <button className="primary-button" type="button" onClick={() => setRegularSaleWorkspaceTab("POSTING")}>Create Regular Sale Post</button>
+                </div>
+                <div className="table-wrapper">
+                  <table>
+                    <thead><tr><th>Post</th><th>Facebook Page</th><th>Status</th><th>Items</th><th>Orders</th><th>Buyers</th><th>Value</th><th>Created</th></tr></thead>
+                    <tbody><tr><td colSpan="8">No Regular Sale records yet.</td></tr></tbody>
+                  </table>
+                </div>
+              </section>
+            )}
+
+            {regularSaleWorkspaceTab === "POSTING" && (
+              <FacebookPostPage client={client} initialPostMode="REGULAR_SALE" />
+            )}
+          </>
         )}
 
         {page === "pre-order" && (
