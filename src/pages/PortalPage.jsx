@@ -2243,7 +2243,7 @@ export default function PortalPage({ session }) {
         )}
 
         {page === "pre-order" && (
-          <PreorderAdminPage client={client} />
+          <PreorderAdminPage client={client} onCreatePost={() => navigateTo("pre-order-create")} />
         )}
 
         {page === "facebook-post" && (
