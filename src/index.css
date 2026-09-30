@@ -2624,3 +2624,14 @@ button.post-type-card:hover { transform: translateY(-2px); border-color: #bcdcc3
 
 /* MFA UI polish */
 .mfa-page{padding:28px 20px}.mfa-card{width:min(480px,100%);max-width:480px;padding:36px;border-radius:22px}.mfa-card .auth-brand{margin-bottom:30px}.mfa-card .auth-heading h1{font-size:28px;line-height:1.12;letter-spacing:-.025em}.mfa-card .auth-heading p{font-size:14px;line-height:1.55;margin:10px 0 22px}.mfa-setup-panel{display:flex;flex-direction:column;gap:0;margin:0 0 22px;border:1px solid #e4e9f0;border-radius:14px;background:#f8fafc;overflow:hidden}.mfa-setup-row{display:grid;grid-template-columns:30px 1fr;gap:11px;align-items:start;padding:13px 14px}.mfa-setup-row+.mfa-setup-row{border-top:1px solid #e8edf3}.mfa-setup-row>span{width:26px;height:26px;display:grid;place-items:center;border-radius:50%;background:#e8eef6;color:#1d3557;font-size:11px;font-weight:800}.mfa-setup-row>div{display:flex;flex-direction:column;gap:3px}.mfa-setup-row strong{font-size:12px;color:#24364d}.mfa-setup-row small{font-size:11px;line-height:1.45;color:#6f7d90}.mfa-primary-action{width:100%;min-height:46px}.mfa-card .auth-mode-button{margin-top:8px;font-size:12px}.mfa-card .login-form{gap:16px}.mfa-code-input{min-height:52px}.mfa-qr-wrap{margin:0 0 18px;padding:18px}.mfa-secret{font-size:11px;line-height:1.45}.mfa-secret code{font-size:12px}@media(max-width:520px){.mfa-page{align-items:flex-start;padding:18px 14px}.mfa-card{padding:26px 22px;border-radius:18px;margin:auto 0}.mfa-card .auth-heading h1{font-size:24px}.mfa-card .auth-brand{margin-bottom:24px}}
+
+/* PARAMETERIZED CLIENT PAYMENT METHODS */
+.payment-provider-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:14px; margin-top:16px; }
+.payment-provider-card { border:1px solid #dfe6ee; border-radius:14px; padding:16px; background:#fff; display:flex; flex-direction:column; gap:14px; }
+.payment-provider-card.active { border-color:#bfe6d1; background:#f6fcf8; }
+.payment-provider-card p { margin:6px 0; color:#687386; font-size:12px; line-height:1.5; }
+.payment-provider-card small { color:#7a8594; }
+.payment-provider-actions { display:flex; gap:18px; align-items:center; flex-wrap:wrap; }
+.payment-provider-actions label { display:flex; gap:7px; align-items:center; font-size:12px; font-weight:700; }
+.payment-provider-warning { color:#9a6b18 !important; }
+.payment-instructions-input { width:100%; box-sizing:border-box; border:1px solid #dfe6ee; border-radius:12px; padding:12px; resize:vertical; font:inherit; }
