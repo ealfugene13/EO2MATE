@@ -7,7 +7,7 @@ import FacebookPostPage from "./FacebookPostPage";
 import PreorderAdminPage from "./PreorderAdminPage";
 import AutomatedMessagesPage from "./AutomatedMessagesPage";
 import AccountSecurityPage from "./AccountSecurityPage";
-import MayaPaymentSetup from "../components/MayaPaymentSetup";
+import PaymentMethodsSettings from "../components/PaymentMethodsSettings";
 
 
 function NavIcon({ type }) {
@@ -2024,6 +2024,16 @@ export default function PortalPage({ session }) {
             Facebook Setup
           </SidebarNavButton>
 
+          <SidebarSectionLabel>Shared</SidebarSectionLabel>
+
+          <SidebarNavButton
+            icon="payments"
+            className={`nav-item ${page === "payment-settings" ? "active" : ""}`}
+            onClick={() => navigateTo("payment-settings")}
+          >
+            Payment Settings
+          </SidebarNavButton>
+
           <SidebarSectionLabel>Maintenance</SidebarSectionLabel>
 
           <SidebarNavButton
@@ -3282,10 +3292,19 @@ export default function PortalPage({ session }) {
             </section>
 
             {client?.client_id && (
-              <MayaPaymentSetup
-                clientId={client.client_id}
-                onChanged={loadPaymentAccountStatus}
-              />
+              <section className="payment-setup-card">
+                <div className="payment-setup-copy">
+                  <div className="payment-logo">P</div>
+                  <div>
+                    <strong>Client Payment Methods</strong>
+                    <span>Manual, Maya and other supported providers are configured per client.</span>
+                    <small>Manage enabled methods and the default provider in Payment Methods.</small>
+                  </div>
+                </div>
+                <div className="payment-setup-actions">
+                  <button className="primary-button" type="button" onClick={() => setPage("payment-settings")}>Manage Payment Methods</button>
+                </div>
+              </section>
             )}
 
             {paymentAccountMessage && (
@@ -3713,6 +3732,10 @@ export default function PortalPage({ session }) {
               </div>
             </section>
           </>
+        )}
+
+        {page === "payment-settings" && (
+          <PaymentMethodsSettings clientId={client?.client_id} onChanged={loadPortal} />
         )}
 
         {page === "automated-messages" && (
