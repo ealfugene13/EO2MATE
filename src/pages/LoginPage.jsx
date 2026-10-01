@@ -15,7 +15,12 @@ export default function LoginPage() {
     event.preventDefault(); clearMessages(); setLoading(true);
     try {
       if (mode === "signup") {
-        const { data, error } = await supabase.auth.signUp({ email: email.trim(), password });
+        const emailRedirectTo = new URL("./", window.location.href).href;
+        const { data, error } = await supabase.auth.signUp({
+          email: email.trim(),
+          password,
+          options: { emailRedirectTo },
+        });
         if (error) throw error;
         if (!data?.session) {
           setInfoMessage("Account created. Confirm your email, then sign in to continue onboarding.");
