@@ -1,4 +1,4 @@
-import InventoryPage from "../InventoryPage";
+import InventoryPage from "./InventoryPage";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../supabase";
 import SetupPage from "./SetupPage";
