@@ -1,3 +1,4 @@
+import InventoryPage from "../InventoryPage";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../supabase";
 import SetupPage from "./SetupPage";
@@ -3590,12 +3591,7 @@ export default function PortalPage({ session }) {
         )}
 
         {page === "inventory" && (
-          <>
-            <header className="dashboard-header"><div><p className="eyebrow">INVENTORY</p><h1>Inventory</h1><p>Track products, stock availability, reservations and stock movement.</p></div></header>
-            <section className="metrics-grid"><MetricCard title="Products" value="0" subtitle="Active inventory items" /><MetricCard title="Stock on hand" value="0" subtitle="Physical quantity" /><MetricCard title="Reserved" value="0" subtitle="Allocated to selling/orders" /><MetricCard title="Available" value="0" subtitle="Ready to sell" /><MetricCard title="Low stock" value="0" subtitle="Needs replenishment" /><MetricCard title="Inventory value" value={formatCurrency(0)} subtitle="Estimated stock cost" /></section>
-            <section className="dashboard-panel" style={{ marginBottom: 18 }}><div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>{["SUMMARY", "PRODUCTS", "STOCK", "MOVEMENTS"].map((tab) => <button key={tab} type="button" className={inventoryTab === tab ? "primary-button" : "secondary-button"} onClick={() => setInventoryTab(tab)}>{tab.charAt(0)+tab.slice(1).toLowerCase()}</button>)}</div></section>
-            <section className="dashboard-panel"><div className="panel-header"><div><h2>{inventoryTab === "SUMMARY" ? "Inventory summary" : inventoryTab.charAt(0)+inventoryTab.slice(1).toLowerCase()}</h2><p>Inventory remains optional; Auction and Post Mining can continue to support manual items.</p></div>{inventoryTab === "PRODUCTS" && <button className="primary-button" type="button" disabled>Add Product</button>}</div><div className="table-wrapper"><table><thead><tr><th>SKU</th><th>Product / Item</th><th>On Hand</th><th>Reserved</th><th>Available</th><th>Unit Cost</th><th>Selling Price</th><th>Status</th></tr></thead><tbody><tr><td colSpan="8">No inventory records yet.</td></tr></tbody></table></div></section>
-          </>
+          <InventoryPage client={client} />
         )}
 
         {page === "sales" && (
