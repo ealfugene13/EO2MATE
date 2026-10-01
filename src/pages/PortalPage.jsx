@@ -458,6 +458,21 @@ function DetailRow({ label, value }) {
   );
 }
 
+const META_OPERATIONAL_PAGES = new Set([
+  "posts",
+  "facebook-post",
+  "post-mining",
+  "mining-create",
+  "pre-order",
+  "pre-order-create",
+  "regular-sale",
+  "facebook-chats",
+]);
+
+function isMetaOperationalPage(page) {
+  return META_OPERATIONAL_PAGES.has(page) || String(page || "").includes("auction");
+}
+
 export default function PortalPage({ session }) {
   const [client, setClient] = useState(null);
   const [platformAdmin, setPlatformAdmin] = useState(null);
@@ -514,6 +529,16 @@ export default function PortalPage({ session }) {
   const [facebookLoading, setFacebookLoading] = useState(false);
   const [facebookMessage, setFacebookMessage] = useState("");
   const [onboardingChecked, setOnboardingChecked] = useState(false);
+
+  // Meta/Facebook is an optional integration. Operational Meta features are
+  // exposed only after the backend confirms an active connection.
+  const metaConnected = facebookStatus?.connected === true;
+
+  useEffect(() => {
+    if (onboardingChecked && !metaConnected && isMetaOperationalPage(page)) {
+      setPage("dashboard");
+    }
+  }, [onboardingChecked, metaConnected, page]);
 
   const [paymentAccountStatus, setPaymentAccountStatus] = useState(null);
   const [paymentAccountLoading, setPaymentAccountLoading] = useState(false);
@@ -1933,26 +1958,31 @@ export default function PortalPage({ session }) {
             Dashboard
           </SidebarNavButton>
 
-          <SidebarSectionLabel>Selling</SidebarSectionLabel>
+          {metaConnected && (
+            <>
+              <SidebarSectionLabel>Selling</SidebarSectionLabel>
 
-          <SidebarNavButton
-            icon="create"
-            className={`nav-item ${page === "posts" || page === "facebook-post" || page === "post-mining" || page === "pre-order" || page === "regular-sale" || page.includes("auction") ? "active" : ""}`}
-            onClick={() => setPostsExpanded((value) => !value)}
-            aria-expanded={postsExpanded}
-          >
-            <span className="nav-parent-label">Posts <span className="nav-chevron">{postsExpanded ? "▾" : "›"}</span></span>
-          </SidebarNavButton>
+              <SidebarNavButton
+                icon="create"
+                className={`nav-item ${page === "posts" || page === "facebook-post" || page === "post-mining" || page === "pre-order" || page === "regular-sale" || page.includes("auction") ? "active" : ""}`}
+                onClick={() => setPostsExpanded((value) => !value)}
+                aria-expanded={postsExpanded}
+              >
+                <span className="nav-parent-label">Posts <span className="nav-chevron">{postsExpanded ? "▾" : "›"}</span></span>
+              </SidebarNavButton>
 
-          {postsExpanded && (
-            <div className="nav-submenu">
-              <button type="button" className={`nav-subitem ${page === "posts" ? "active" : ""}`} onClick={() => navigateTo("posts")}>Create Post</button>
-              <button type="button" className={`nav-subitem ${page.includes("auction") ? "active" : ""}`} onClick={() => { goToAuctions("ALL"); setMobileMenuOpen(false); }}>Auctions</button>
-              <button type="button" className={`nav-subitem ${page === "post-mining" ? "active" : ""}`} onClick={() => navigateTo("post-mining")}>Mining</button>
-              <button type="button" className={`nav-subitem ${page === "pre-order" ? "active" : ""}`} onClick={() => navigateTo("pre-order")}>Pre-Orders</button>
-              <button type="button" className={`nav-subitem ${page === "regular-sale" ? "active" : ""}`} onClick={() => { setRegularSaleWorkspaceTab("SUMMARY"); navigateTo("regular-sale"); }}>Regular Sales</button>
-              <button type="button" className="nav-subitem" disabled title="Coming soon">Live Selling <span className="coming-soon-pill">Soon</span></button>
-            </div>
+              {postsExpanded && (
+                <div className="nav-submenu">
+                  <button type="button" className={`nav-subitem ${page === "posts" ? "active" : ""}`} onClick={() => navigateTo("posts")}>Create Post</button>
+                  <button type="button" className={`nav-subitem ${page.includes("auction") ? "active" : ""}`} onClick={() => { goToAuctions("ALL"); setMobileMenuOpen(false); }}>Auctions</button>
+                  <button type="button" className={`nav-subitem ${page === "post-mining" ? "active" : ""}`} onClick={() => navigateTo("post-mining")}>Mining</button>
+                  <button type="button" className={`nav-subitem ${page === "pre-order" ? "active" : ""}`} onClick={() => navigateTo("pre-order")}>Pre-Orders</button>
+                  <button type="button" className={`nav-subitem ${page === "regular-sale" ? "active" : ""}`} onClick={() => { setRegularSaleWorkspaceTab("SUMMARY"); navigateTo("regular-sale"); }}>Regular Sales</button>
+                  <button type="button" className="nav-subitem" disabled title="Coming soon">Live Selling <span className="coming-soon-pill">Soon</span></button>
+                </div>
+              )}
+
+            </>
           )}
 
           <SidebarSectionLabel>Operations</SidebarSectionLabel>
@@ -2007,23 +2037,38 @@ export default function PortalPage({ session }) {
             Purchases
           </SidebarNavButton>
 
-          <SidebarSectionLabel>Facebook</SidebarSectionLabel>
+          {metaConnected ? (
+            <>
+              <SidebarSectionLabel>Facebook</SidebarSectionLabel>
 
-          <SidebarNavButton
-            icon="chat"
-            className={`nav-item ${page === "facebook-chats" ? "active" : ""}`}
-            onClick={openFacebookChats}
-          >
-            Facebook Chats
-          </SidebarNavButton>
+              <SidebarNavButton
+                icon="chat"
+                className={`nav-item ${page === "facebook-chats" ? "active" : ""}`}
+                onClick={openFacebookChats}
+              >
+                Facebook Chats
+              </SidebarNavButton>
 
-          <SidebarNavButton
-            icon="facebook"
-            className={`nav-item ${page === "facebook" ? "active" : ""}`}
-            onClick={openFacebookSetup}
-          >
-            Facebook Setup
-          </SidebarNavButton>
+              <SidebarNavButton
+                icon="facebook"
+                className={`nav-item ${page === "facebook" ? "active" : ""}`}
+                onClick={openFacebookSetup}
+              >
+                Facebook Setup
+              </SidebarNavButton>
+            </>
+          ) : (
+            <>
+              <SidebarSectionLabel>Integrations</SidebarSectionLabel>
+              <SidebarNavButton
+                icon="facebook"
+                className={`nav-item ${page === "facebook" ? "active" : ""}`}
+                onClick={openFacebookSetup}
+              >
+                Connect Facebook
+              </SidebarNavButton>
+            </>
+          )}
 
           <SidebarSectionLabel>Shared</SidebarSectionLabel>
 
@@ -2115,7 +2160,7 @@ export default function PortalPage({ session }) {
           <AdminClientsPage />
         )}
 
-        {page === "posts" && (
+        {metaConnected && page === "posts" && (
           <section className="post-hub">
             <header className="dashboard-header post-hub-header">
               <div>
@@ -2155,7 +2200,7 @@ export default function PortalPage({ session }) {
           </section>
         )}
 
-        {page === "regular-sale" && (
+        {metaConnected && page === "regular-sale" && (
           <>
             <header className="dashboard-header">
               <div>
@@ -2242,11 +2287,11 @@ export default function PortalPage({ session }) {
           </>
         )}
 
-        {page === "pre-order" && (
+        {metaConnected && page === "pre-order" && (
           <PreorderAdminPage client={client} onCreatePost={() => navigateTo("pre-order-create")} />
         )}
 
-        {page === "facebook-post" && (
+        {metaConnected && page === "facebook-post" && (
           <FacebookPostPage client={client} initialPostMode="AUCTION" />
         )}
 
@@ -2371,7 +2416,7 @@ export default function PortalPage({ session }) {
           </>
         )}
 
-        {page === "facebook-chats" && (
+        {metaConnected && page === "facebook-chats" && (
           <>
             <header className="dashboard-header">
               <div>
@@ -3132,7 +3177,7 @@ export default function PortalPage({ session }) {
           </>
         )}
 
-        {page === "post-mining" && (
+        {metaConnected && page === "post-mining" && (
           <>
             <header className="dashboard-header">
               <div>
@@ -3276,7 +3321,7 @@ export default function PortalPage({ session }) {
                   <span> {client?.name || "EO2MATE Client"}</span>
                 </h1>
                 <p>
-                  Manage posts, orders, payments and deliveries — all in one place.
+                  Manage orders, payments, deliveries and connected sales channels — all in one place.
                 </p>
               </div>
 
@@ -3288,7 +3333,7 @@ export default function PortalPage({ session }) {
               <div>
                 <p className="eyebrow">CLIENT DASHBOARD</p>
                 <h1>{client?.name ? `Welcome, ${client.name}` : "Dashboard"}</h1>
-                <p>Create and monitor selling posts, orders, payments and deliveries.</p>
+                <p>Manage your EO2MATE operations and enable sales-channel integrations whenever you need them.</p>
               </div>
 
               <button className="icon-button refresh-icon-button" onClick={loadPortal} title="Refresh" aria-label="Refresh">
@@ -3304,9 +3349,9 @@ export default function PortalPage({ session }) {
             {onboardingChecked && facebookStatus && !facebookStatus.connected && (
               <section className="connection-warning-card">
                 <div>
-                  <strong>Facebook auction automation is not configured</strong>
+                  <strong>Facebook is optional</strong>
                   <span>
-                    You can use the portal now and connect a Facebook Page whenever you are ready to automate auctions.
+                    Your EO2MATE workspace is ready. Connect Facebook only when you want to enable Facebook selling and Messenger features.
                   </span>
                 </div>
 
