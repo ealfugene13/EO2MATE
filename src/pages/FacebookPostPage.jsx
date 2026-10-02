@@ -558,6 +558,8 @@ function createItem(file, index) {
       .slice(2)}`,
     file,
     previewUrl: URL.createObjectURL(file),
+    focalX: 50,
+    focalY: 50,
     item: "",
     minBid: "",
     increment: "",
@@ -1505,6 +1507,38 @@ export default function FacebookPostPage({
           : item
       )
     );
+  }
+
+  function updateImageFocalFromPointer(id, event) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+
+    const focalX = Math.max(0, Math.min(100, ((event.clientX - rect.left) / rect.width) * 100));
+    const focalY = Math.max(0, Math.min(100, ((event.clientY - rect.top) / rect.height) * 100));
+
+    updateItem(id, {
+      focalX: Math.round(focalX),
+      focalY: Math.round(focalY),
+    });
+  }
+
+  function beginImageFocalDrag(id, event) {
+    if (publishing) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    updateImageFocalFromPointer(id, event);
+  }
+
+  function moveImageFocalDrag(id, event) {
+    if (publishing || !event.currentTarget.hasPointerCapture?.(event.pointerId)) return;
+    event.preventDefault();
+    updateImageFocalFromPointer(id, event);
+  }
+
+  function endImageFocalDrag(event) {
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+      event.currentTarget.releasePointerCapture?.(event.pointerId);
+    }
   }
 
   function moveItem(
@@ -3061,6 +3095,41 @@ export default function FacebookPostPage({
           border: 1px solid rgba(148, 163, 184, .20);
         }
 
+        .fb-photo-positioner {
+          position: relative;
+          overflow: hidden;
+          cursor: grab;
+          touch-action: none;
+          user-select: none;
+          background: #f4f6f8;
+        }
+
+        .fb-photo-positioner:active {
+          cursor: grabbing;
+        }
+
+        .fb-photo-positioner > img {
+          display: block;
+          width: 100%;
+          pointer-events: none;
+          user-select: none;
+        }
+
+        .fb-photo-position-hint {
+          position: absolute;
+          left: 50%;
+          bottom: 10px;
+          transform: translateX(-50%);
+          padding: 5px 9px;
+          border-radius: 999px;
+          background: rgba(15, 23, 42, .72);
+          color: #fff;
+          font-size: 11px;
+          font-weight: 700;
+          pointer-events: none;
+          white-space: nowrap;
+        }
+
         .primary-button,
         .secondary-button,
         .icon-button {
@@ -3525,10 +3594,30 @@ export default function FacebookPostPage({
                 key={item.id}
                 className="fb-photo-card"
               >
-                <img
-                  src={item.previewUrl}
-                  alt={`Post ${index + 1}`}
-                />
+                <div
+                  className="fb-photo-positioner"
+                  role="application"
+                  aria-label={`Reposition post image ${index + 1}`}
+                  title="Drag on the image to choose the visible area"
+                  onPointerDown={(event) => beginImageFocalDrag(item.id, event)}
+                  onPointerMove={(event) => moveImageFocalDrag(item.id, event)}
+                  onPointerUp={endImageFocalDrag}
+                  onPointerCancel={endImageFocalDrag}
+                >
+                  <img
+                    src={item.previewUrl}
+                    alt={`Post ${index + 1}`}
+                    draggable="false"
+                    style={{ objectPosition: `${item.focalX ?? 50}% ${item.focalY ?? 50}%`, background: "#f4f6f8" }}
+                  />
+                  <span className="fb-photo-position-hint">Drag to reposition</span>
+                </div>
+
+                <div style={{ display: "grid", gap: 4, margin: "8px 0" }}>
+                  <label style={{ fontSize: 11 }}>Horizontal alignment ({Math.round(item.focalX ?? 50)}%)<input type="range" min="0" max="100" value={item.focalX ?? 50} onChange={(e) => updateItem(item.id, { focalX: Number(e.target.value) })} disabled={publishing} /></label>
+                  <label style={{ fontSize: 11 }}>Vertical alignment ({Math.round(item.focalY ?? 50)}%)<input type="range" min="0" max="100" value={item.focalY ?? 50} onChange={(e) => updateItem(item.id, { focalY: Number(e.target.value) })} disabled={publishing} /></label>
+                  <button type="button" className="secondary-button" onClick={() => updateItem(item.id, { focalX: 50, focalY: 50 })} disabled={publishing}>Center / Reset</button>
+                </div>
 
                 <button type="button" onClick={() => removeItem(item.id)}>Remove</button>
                 {postMode === "REGULAR_SALE" && isMultiple && (
