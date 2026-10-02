@@ -578,6 +578,7 @@ export default function PortalPage({ session }) {
   const [auctionWorkspaceTab, setAuctionWorkspaceTab] = useState("SUMMARY");
   const [miningWorkspaceTab, setMiningWorkspaceTab] = useState("SUMMARY");
   const [regularSaleWorkspaceTab, setRegularSaleWorkspaceTab] = useState("SUMMARY");
+  const [liveSellingWorkspaceTab, setLiveSellingWorkspaceTab] = useState("DASHBOARD");
   const [miningStatusFilter, setMiningStatusFilter] = useState("ALL");
   const [inventoryTab, setInventoryTab] = useState("SUMMARY");
   const [salesTab, setSalesTab] = useState("SUMMARY");
@@ -1975,11 +1976,26 @@ export default function PortalPage({ session }) {
               {postsExpanded && (
                 <div className="nav-submenu">
                   <button type="button" className={`nav-subitem ${page === "posts" ? "active" : ""}`} onClick={() => navigateTo("posts")}>Create Post</button>
-                  <button type="button" className={`nav-subitem ${page.includes("auction") ? "active" : ""}`} onClick={() => { goToAuctions("ALL"); setMobileMenuOpen(false); }}>Auctions</button>
-                  <button type="button" className={`nav-subitem ${page === "post-mining" ? "active" : ""}`} onClick={() => navigateTo("post-mining")}>Mining</button>
-                  <button type="button" className={`nav-subitem ${page === "pre-order" ? "active" : ""}`} onClick={() => navigateTo("pre-order")}>Pre-Orders</button>
-                  <button type="button" className={`nav-subitem ${page === "regular-sale" ? "active" : ""}`} onClick={() => { setRegularSaleWorkspaceTab("SUMMARY"); navigateTo("regular-sale"); }}>Regular Sales</button>
-                  <button type="button" className="nav-subitem" disabled title="Coming soon">Live Selling <span className="coming-soon-pill">Soon</span></button>
+
+                  <div className="nav-subgroup-label" style={{ margin: "10px 12px 4px", fontSize: 10, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", opacity: .65 }}>Auctions</div>
+                  <button type="button" className={`nav-subitem ${page === "auctions" ? "active" : ""}`} onClick={() => { setAuctionWorkspaceTab("SUMMARY"); goToAuctions("ALL"); setMobileMenuOpen(false); }}>Dashboard / Summary</button>
+                  <button type="button" className={`nav-subitem ${page === "facebook-post" ? "active" : ""}`} onClick={() => navigateTo("facebook-post")}>Create Post</button>
+
+                  <div className="nav-subgroup-label" style={{ margin: "10px 12px 4px", fontSize: 10, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", opacity: .65 }}>Mining</div>
+                  <button type="button" className={`nav-subitem ${page === "post-mining" ? "active" : ""}`} onClick={() => { setMiningWorkspaceTab("SUMMARY"); navigateTo("post-mining"); }}>Dashboard / Summary</button>
+                  <button type="button" className={`nav-subitem ${page === "mining-create" ? "active" : ""}`} onClick={() => navigateTo("mining-create")}>Create Post</button>
+
+                  <div className="nav-subgroup-label" style={{ margin: "10px 12px 4px", fontSize: 10, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", opacity: .65 }}>Pre-Orders</div>
+                  <button type="button" className={`nav-subitem ${page === "pre-order" ? "active" : ""}`} onClick={() => navigateTo("pre-order")}>Dashboard / Summary</button>
+                  <button type="button" className={`nav-subitem ${page === "pre-order-create" ? "active" : ""}`} onClick={() => navigateTo("pre-order-create")}>Create Post</button>
+
+                  <div className="nav-subgroup-label" style={{ margin: "10px 12px 4px", fontSize: 10, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", opacity: .65 }}>Regular Sales</div>
+                  <button type="button" className={`nav-subitem ${page === "regular-sale" ? "active" : ""}`} onClick={() => { setRegularSaleWorkspaceTab("SUMMARY"); navigateTo("regular-sale"); }}>Dashboard / Summary</button>
+                  <button type="button" className={`nav-subitem ${page === "regular-sale" && regularSaleWorkspaceTab === "POSTING" ? "active" : ""}`} onClick={() => { setRegularSaleWorkspaceTab("POSTING"); navigateTo("regular-sale"); }}>Create Post</button>
+
+                  <div className="nav-subgroup-label" style={{ margin: "10px 12px 4px", fontSize: 10, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", opacity: .65 }}>Live Selling</div>
+                  <button type="button" className={`nav-subitem ${page === "live-selling" ? "active" : ""}`} onClick={() => { setLiveSellingWorkspaceTab("DASHBOARD"); navigateTo("live-selling"); }}>Dashboard / Summary</button>
+                  <button type="button" className="nav-subitem" disabled title="Live Selling post creation is coming soon">Create Post <span className="coming-soon-pill">Soon</span></button>
                 </div>
               )}
 
@@ -2151,6 +2167,20 @@ export default function PortalPage({ session }) {
           <span>{client?.name || "Portal"}</span>
         </div>
 
+        {page !== "dashboard" && (
+          <div style={{ display: "flex", justifyContent: "flex-start", marginBottom: 14 }}>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => navigateTo("dashboard")}
+              aria-label="Back to main dashboard"
+              title="Back to main dashboard"
+            >
+              ← Main Dashboard
+            </button>
+          </div>
+        )}
+
         {errorMessage && (
           <div className="dashboard-error global-error">
             {errorMessage}
@@ -2289,7 +2319,15 @@ export default function PortalPage({ session }) {
         )}
 
         {metaConnected && page === "pre-order" && (
-          <PreorderAdminPage client={client} onCreatePost={() => navigateTo("pre-order-create")} />
+          <>
+            <section className="dashboard-panel" style={{ marginBottom: 18 }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                <button type="button" className="primary-button">Dashboard / Summary</button>
+                <button type="button" className="secondary-button" onClick={() => navigateTo("pre-order-create")}>Create Post</button>
+              </div>
+            </section>
+            <PreorderAdminPage client={client} onCreatePost={() => navigateTo("pre-order-create")} />
+          </>
         )}
 
         {metaConnected && page === "facebook-post" && (
@@ -2302,6 +2340,41 @@ export default function PortalPage({ session }) {
 
         {page === "mining-create" && (
           <FacebookPostPage client={client} initialPostMode="MINING" />
+        )}
+
+
+        {metaConnected && page === "live-selling" && (
+          <>
+            <header className="dashboard-header">
+              <div>
+                <p className="eyebrow">FACEBOOK SELLING</p>
+                <h1>Live Selling</h1>
+                <p>Live-selling dashboard for sessions, claims, buyers and sales performance. Transaction processing will activate when the Live Selling module is enabled.</p>
+              </div>
+            </header>
+            <section className="metrics-grid">
+              <MetricCard title="Live sessions" value="0" subtitle="Sessions in selected period" />
+              <MetricCard title="Active session" value="0" subtitle="Currently live" />
+              <MetricCard title="Claims" value="0" subtitle="Live comment claims" />
+              <MetricCard title="Unique buyers" value="0" subtitle="Live customers" />
+              <MetricCard title="Items sold" value="0" subtitle="Allocated quantity" />
+              <MetricCard title="Sales value" value={formatCurrency(0)} subtitle="Gross live-selling value" />
+            </section>
+            <section className="dashboard-panel" style={{ marginBottom: 18 }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {["DASHBOARD", "SUMMARY", "POSTS"].map((tab) => (
+                  <button key={tab} type="button" className={liveSellingWorkspaceTab === tab ? "primary-button" : "secondary-button"} onClick={() => setLiveSellingWorkspaceTab(tab)}>
+                    {tab.charAt(0) + tab.slice(1).toLowerCase()}
+                  </button>
+                ))}
+                <button type="button" className="secondary-button" disabled title="Coming soon">Create Post · Soon</button>
+              </div>
+            </section>
+            <section className="dashboard-panel">
+              <div className="panel-header"><div><h2>{liveSellingWorkspaceTab === "POSTS" ? "Live Selling posts" : liveSellingWorkspaceTab === "SUMMARY" ? "Live Selling summary" : "Live Selling dashboard"}</h2><p>Ready for the Live Selling backend connection without exposing placeholder data as real activity.</p></div></div>
+              <div className="table-wrapper"><table><thead><tr><th>Session / Post</th><th>Status</th><th>Claims</th><th>Buyers</th><th>Items</th><th>Sales</th></tr></thead><tbody><tr><td colSpan="6">No Live Selling records yet.</td></tr></tbody></table></div>
+            </section>
+          </>
         )}
 
         {page === "facebook" && (
@@ -3211,6 +3284,7 @@ export default function PortalPage({ session }) {
                     {tab === "LIVE MINING" ? "Live Mining" : tab.charAt(0) + tab.slice(1).toLowerCase()}
                   </button>
                 ))}
+                <button type="button" className="secondary-button" onClick={() => navigateTo("mining-create")}>Create Post</button>
               </div>
             </section>
 
@@ -3475,6 +3549,7 @@ export default function PortalPage({ session }) {
                     {tab.charAt(0) + tab.slice(1).toLowerCase()}
                   </button>
                 ))}
+                <button type="button" className="secondary-button" onClick={() => navigateTo("facebook-post")}>Create Post</button>
               </div>
             </section>
 
