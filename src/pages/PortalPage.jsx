@@ -3314,199 +3314,134 @@ export default function PortalPage({ session }) {
 
         {page === "dashboard" && (
           <>
-            <section className="eo2-dashboard-hero">
-              <div>
-                <p className="eyebrow">CLIENT DASHBOARD</p>
-                <h1>
-                  Welcome back,
-                  <span> {client?.name || "EO2MATE Client"}</span>
+            <section style={{
+              background: "linear-gradient(135deg, #08233f 0%, #0f3558 62%, #17623a 140%)",
+              borderRadius: 24,
+              padding: "28px clamp(20px, 4vw, 38px)",
+              color: "#fff",
+              marginBottom: 20,
+              boxShadow: "0 18px 45px rgba(8,35,63,.14)",
+              display: "flex",
+              justifyContent: "space-between",
+              gap: 20,
+              alignItems: "center",
+              flexWrap: "wrap",
+            }}>
+              <div style={{ minWidth: 260, flex: "1 1 520px" }}>
+                <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: ".14em", opacity: .72, marginBottom: 8 }}>EO2MATE CONTROL CENTER</div>
+                <h1 style={{ margin: 0, fontSize: "clamp(26px, 4vw, 38px)", lineHeight: 1.08 }}>
+                  {client?.name ? `Welcome, ${client.name}` : "Business dashboard"}
                 </h1>
-                <p>
-                  Manage orders, payments, deliveries and connected sales channels — all in one place.
+                <p style={{ margin: "10px 0 0", maxWidth: 720, color: "rgba(255,255,255,.78)", lineHeight: 1.55 }}>
+                  Sales, orders, payments, inventory and fulfillment — one operational view of your EO2MATE workspace.
                 </p>
               </div>
-
-              <div className="eo2-dashboard-code-badge" aria-hidden="true">
-                &lt;/&gt;
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <button className="secondary-button" type="button" onClick={() => setPage("reports")} style={{ background: "rgba(255,255,255,.1)", borderColor: "rgba(255,255,255,.18)", color: "#fff" }}>
+                  <NavIcon type="reports" /> Reports
+                </button>
+                <button className="primary-button" type="button" onClick={() => navigateTo("posts")}>
+                  <NavIcon type="create" /> Create Post
+                </button>
+                <button className="icon-button refresh-icon-button" onClick={loadPortal} title="Refresh dashboard" aria-label="Refresh dashboard" style={{ background: "rgba(255,255,255,.1)", borderColor: "rgba(255,255,255,.18)", color: "#fff" }}>
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v5h-5"/><path d="M4 18v-5h5"/><path d="M6.1 9a7 7 0 0 1 11.3-2.1L20 9"/><path d="M4 15l2.6 2.1A7 7 0 0 0 17.9 15"/></svg>
+                </button>
               </div>
             </section>
-            <header className="dashboard-header">
-              <div>
-                <p className="eyebrow">CLIENT DASHBOARD</p>
-                <h1>{client?.name ? `Welcome, ${client.name}` : "Dashboard"}</h1>
-                <p>Manage your EO2MATE operations and enable sales-channel integrations whenever you need them.</p>
-              </div>
-
-              <button className="icon-button refresh-icon-button" onClick={loadPortal} title="Refresh" aria-label="Refresh">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M20 6v5h-5" />
-            <path d="M4 18v-5h5" />
-            <path d="M6.1 9a7 7 0 0 1 11.3-2.1L20 9" />
-            <path d="M4 15l2.6 2.1A7 7 0 0 0 17.9 15" />
-          </svg>
-        </button>
-            </header>
 
             {onboardingChecked && facebookStatus && !facebookStatus.connected && (
               <section className="connection-warning-card">
-                <div>
-                  <strong>Facebook is optional</strong>
-                  <span>
-                    Your EO2MATE workspace is ready. Connect Facebook only when you want to enable Facebook selling and Messenger features.
-                  </span>
-                </div>
-
-                <button
-                  className="primary-button"
-                  type="button"
-                  onClick={openFacebookSetup}
-                >
-                  Connect Facebook
-                </button>
+                <div><strong>Facebook is optional</strong><span>Your EO2MATE workspace is ready. Connect Facebook only when you want Facebook selling and Messenger features.</span></div>
+                <button className="primary-button" type="button" onClick={openFacebookSetup}>Connect Facebook</button>
               </section>
             )}
 
-            <section className={`payment-setup-card ${paymentAccountStatus?.payment_enabled ? "active" : ""}`}>
-              <div className="payment-setup-copy">
-                <div className="payment-logo">P</div>
-                <div>
-                  <strong>Online Payments</strong>
-                  <span>
-                    {paymentAccountStatus?.payment_enabled
-                      ? "Online checkout is active for this client."
-                      : String(paymentAccountStatus?.account_status || "NOT_CONFIGURED").toUpperCase() === "NOT_CONFIGURED"
-                        ? "Optional: create a Online Payments account to enable automated online payments later."
-                        : "Online Payments account exists, but automated checkout is not active yet."}
-                  </span>
-                  <small>Status: {statusLabel(paymentAccountStatus?.account_status || "NOT_CONFIGURED")}</small>
-                </div>
-              </div>
-
-              <div className="payment-setup-actions">
-                <button
-                  className="primary-button"
-                  type="button"
-                  onClick={openOnlinePayments}
-                  disabled={paymentAccountLoading}
-                >
-                  {String(paymentAccountStatus?.account_status || "NOT_CONFIGURED").toUpperCase() === "NOT_CONFIGURED"
-                    ? "Set Up Online Payments"
-                    : "Open Online Payments Dashboard"}
+            <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 14, marginBottom: 20 }}>
+              {[
+                { icon: "orders", label: "Orders", value: orders.length, note: `${orderMetrics.pending} awaiting payment`, action: () => goToOrders("ALL") },
+                { icon: "payments", label: "Paid payments", value: paymentMetrics.paid, note: `${paymentMetrics.pending} pending`, action: () => goToPayments("all") },
+                { icon: "auction", label: "Active auctions", value: auctionMetrics.active, note: `${auctions.length} total`, action: () => goToAuctions("ACTIVE"), meta: true },
+                { icon: "delivery", label: "Ready to ship", value: deliveryMetrics.ready, note: `${deliveryMetrics.inTransit} in transit`, action: () => goToDeliveries("READY_FOR_BOOKING") },
+                { icon: "delivery", label: "Delivered", value: deliveryMetrics.delivered, note: "Completed fulfillment", action: () => goToDeliveries("DELIVERED") },
+              ].filter((item) => !item.meta || facebookStatus?.connected).map((item) => (
+                <button key={item.label} type="button" onClick={item.action} style={{ textAlign: "left", border: "1px solid #e5ebf1", borderRadius: 18, padding: 18, background: "#fff", cursor: "pointer", boxShadow: "0 8px 24px rgba(15,35,55,.055)" }}>
+                  <div style={{ width: 38, height: 38, borderRadius: 12, background: "#eef8f1", color: "#258c43", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 14 }}><NavIcon type={item.icon} /></div>
+                  <div style={{ color: "#66788a", fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".05em" }}>{item.label}</div>
+                  <div style={{ color: "#14283d", fontSize: 30, fontWeight: 900, margin: "5px 0 3px" }}>{item.value}</div>
+                  <div style={{ color: "#7b8b9b", fontSize: 12 }}>{item.note}</div>
                 </button>
+              ))}
+            </section>
 
-                {String(paymentAccountStatus?.account_status || "NOT_CONFIGURED").toUpperCase() === "NOT_CONFIGURED" && (
-                  <button
-                    className="secondary-button"
-                    type="button"
-                    onClick={markPayMongoAccountCreated}
-                    disabled={paymentAccountLoading}
-                  >
-                    I Already Have Online Payments
-                  </button>
-                )}
+            <section style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.55fr) minmax(280px, .8fr)", gap: 18, marginBottom: 20 }} className="eo2-dashboard-report-grid">
+              <div className="dashboard-panel" style={{ margin: 0, overflow: "hidden" }}>
+                <div className="panel-header">
+                  <div><h2>Order activity</h2><p>Orders created during the last 7 days.</p></div>
+                  <button className="secondary-button" type="button" onClick={() => setPage("reports")}>Full reports</button>
+                </div>
+                {(() => {
+                  const days = Array.from({ length: 7 }, (_, index) => {
+                    const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate() - (6-index)); return d;
+                  });
+                  const points = days.map((day) => {
+                    const next = new Date(day); next.setDate(next.getDate()+1);
+                    return { label: day.toLocaleDateString("en-PH", { weekday: "short" }), count: orders.filter((o) => { const d = new Date(o.created_at || o.order_created_at || 0); return d >= day && d < next; }).length };
+                  });
+                  const max = Math.max(1, ...points.map((p) => p.count));
+                  const poly = points.map((p, i) => `${8 + i*(84/6)},${82 - (p.count/max)*64}`).join(" ");
+                  return <div style={{ padding: "4px 4px 0" }}>
+                    <svg viewBox="0 0 100 92" preserveAspectRatio="none" style={{ width: "100%", height: 230, display: "block" }} aria-label="Seven day order activity chart">
+                      {[18,34,50,66,82].map((y) => <line key={y} x1="7" y1={y} x2="94" y2={y} stroke="#edf1f5" strokeWidth=".6" />)}
+                      <polyline points={poly} fill="none" stroke="#2b9a4b" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                      {points.map((p,i) => <circle key={i} cx={8+i*(84/6)} cy={82-(p.count/max)*64} r="1.7" fill="#2b9a4b" />)}
+                    </svg>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 2, padding: "0 3% 8px", color: "#7b8b9b", fontSize: 11, textAlign: "center" }}>{points.map((p) => <span key={p.label}>{p.label}</span>)}</div>
+                  </div>;
+                })()}
+              </div>
 
-                <button
-                  className="icon-button refresh-icon-button"
-                  type="button"
-                  onClick={loadPaymentAccountStatus}
-                  disabled={paymentAccountLoading}
-                 title="Refresh" aria-label="Refresh">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M20 6v5h-5" />
-            <path d="M4 18v-5h5" />
-            <path d="M6.1 9a7 7 0 0 1 11.3-2.1L20 9" />
-            <path d="M4 15l2.6 2.1A7 7 0 0 0 17.9 15" />
-          </svg>
-        </button>
+              <div className="dashboard-panel" style={{ margin: 0 }}>
+                <div className="panel-header"><div><h2>Attention</h2><p>Items that may need action.</p></div></div>
+                <div style={{ display: "grid", gap: 10 }}>
+                  {[
+                    { label: "Awaiting payment", value: orderMetrics.pending, action: () => goToOrders("PAYMENT_PENDING") },
+                    { label: "Pending settlement", value: paymentMetrics.pending, action: () => goToPayments("pending") },
+                    { label: "Ready for booking", value: deliveryMetrics.ready, action: () => goToDeliveries("READY_FOR_BOOKING") },
+                    ...(facebookStatus?.connected ? [{ label: "Active auctions", value: auctionMetrics.active, action: () => goToAuctions("ACTIVE") }] : []),
+                  ].map((item) => <button key={item.label} type="button" onClick={item.action} style={{ border: "1px solid #e8edf2", background: "#fbfcfd", borderRadius: 13, padding: "13px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", color: "#263b50" }}><span style={{ fontWeight: 700 }}>{item.label}</span><strong style={{ fontSize: 18 }}>{item.value}</strong></button>)}
+                </div>
               </div>
             </section>
 
-            {client?.client_id && (
-              <section className="payment-setup-card">
-                <div className="payment-setup-copy">
-                  <div className="payment-logo">P</div>
-                  <div>
-                    <strong>Client Payment Methods</strong>
-                    <span>Manual, Maya and other supported providers are configured per client.</span>
-                    <small>Manage enabled methods and the default provider in Payment Methods.</small>
-                  </div>
-                </div>
-                <div className="payment-setup-actions">
-                  <button className="primary-button" type="button" onClick={() => setPage("payment-settings")}>Manage Payment Methods</button>
-                </div>
-              </section>
-            )}
-
-            {paymentAccountMessage && (
-              <div className="success-message global-error">
-                {paymentAccountMessage}
+            <section className="dashboard-panel" style={{ marginBottom: 20 }}>
+              <div className="panel-header"><div><h2>Quick actions</h2><p>Jump directly to your most-used EO2MATE workspaces.</p></div></div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
+                {[
+                  { icon: "create", label: "Create Post", action: () => navigateTo("posts"), meta: true },
+                  { icon: "inventory", label: "Inventory", action: () => setPage("inventory") },
+                  { icon: "sales", label: "Sales", action: () => setPage("sales") },
+                  { icon: "orders", label: "Orders", action: () => goToOrders("ALL") },
+                  { icon: "payments", label: "Payment Methods", action: () => setPage("payment-settings") },
+                  { icon: "reports", label: "Reports", action: () => setPage("reports") },
+                ].filter((item) => !item.meta || facebookStatus?.connected).map((item) => <button key={item.label} className="secondary-button" type="button" onClick={item.action} style={{ minHeight: 48, justifyContent: "flex-start", gap: 9 }}><NavIcon type={item.icon}/>{item.label}</button>)}
               </div>
-            )}
-
-            <section className="metrics-grid">
-              <MetricCard title="Create Post" value="Sell" subtitle="Auction · Mining · Pre-Order · Sale" onClick={() => navigateTo("posts")} />
-              <MetricCard title="Active auctions" value={auctionMetrics.active} subtitle="Currently open" onClick={() => goToAuctions("ACTIVE")} />
-              <MetricCard title="Post Mining" value="Open" subtitle="Manage MINE posts" onClick={() => setPage("post-mining")} />
-              <MetricCard title="Facebook Chats" value="Inbox" subtitle="Buyer conversations" onClick={() => setPage("facebook-chats")} />
-              <MetricCard title="Reports & Insights" value="View" subtitle="Sales and opportunities" onClick={() => setPage("reports")} />
-              <MetricCard title="Inventory" value="View" subtitle="Products and stock" onClick={() => setPage("inventory")} />
-              <MetricCard title="Sales" value="View" subtitle="Consolidated selling" onClick={() => setPage("sales")} />
-              <MetricCard title="Purchases" value="View" subtitle="Suppliers and receiving" onClick={() => setPage("purchases")} />
-              <MetricCard title="Pending orders" value={orderMetrics.pending} subtitle="Awaiting payment" onClick={() => goToOrders("PAYMENT_PENDING")} />
-              {paymentAccountStatus?.payment_enabled ? (
-                <MetricCard title="Pending payments" value={paymentMetrics.pending} subtitle="Awaiting settlement" onClick={() => goToPayments("pending")} />
-              ) : (
-                <MetricCard title="Online payments" value="Off" subtitle="Online Payments not active" onClick={openOnlinePayments} />
-              )}
-              <MetricCard title="Ready for booking" value={deliveryMetrics.ready} subtitle="Paid and ready" onClick={() => goToDeliveries("READY_FOR_BOOKING")} />
-              <MetricCard title="Delivered" value={deliveryMetrics.delivered} subtitle="Completed deliveries" onClick={() => goToDeliveries("DELIVERED")} />
             </section>
+
+            <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 18, marginBottom: 20 }}>
+              <div className={`payment-setup-card ${paymentAccountStatus?.payment_enabled ? "active" : ""}`} style={{ margin: 0 }}>
+                <div className="payment-setup-copy"><div className="payment-logo">P</div><div><strong>Online Payments</strong><span>{paymentAccountStatus?.payment_enabled ? "Online checkout is active." : "Configure online checkout when you're ready."}</span><small>Status: {statusLabel(paymentAccountStatus?.account_status || "NOT_CONFIGURED")}</small></div></div>
+                <div className="payment-setup-actions"><button className="primary-button" type="button" onClick={openOnlinePayments} disabled={paymentAccountLoading}>{String(paymentAccountStatus?.account_status || "NOT_CONFIGURED").toUpperCase() === "NOT_CONFIGURED" ? "Set Up" : "Open Dashboard"}</button></div>
+              </div>
+              {client?.client_id && <div className="payment-setup-card" style={{ margin: 0 }}><div className="payment-setup-copy"><div className="payment-logo">P</div><div><strong>Payment Methods</strong><span>Manual, Maya and other supported providers are configured per client.</span><small>Manage enabled methods and your default provider.</small></div></div><div className="payment-setup-actions"><button className="primary-button" type="button" onClick={() => setPage("payment-settings")}>Manage</button></div></div>}
+            </section>
+
+            {paymentAccountMessage && <div className="success-message global-error">{paymentAccountMessage}</div>}
 
             <section className="dashboard-panel">
-              <div className="panel-header">
-                <div>
-                  <h2>Recent deliveries</h2>
-                  <p>Latest paid-order delivery activity.</p>
-                </div>
-
-                <button className="secondary-button" onClick={() => goToDeliveries("ALL")}>
-                  View all
-                </button>
-              </div>
-
-              <div className="table-wrapper">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Order</th>
-                      <th>Item</th>
-                      <th>Recipient</th>
-                      <th>Courier</th>
-                      <th>Tracking</th>
-                      <th>Status</th>
-                      <th>Created</th>
-                    </tr>
-                  </thead>
-
-                  <tbody>
-                    {deliveries.slice(0, 10).map((delivery) => (
-                      <tr
-                        key={delivery.delivery_id}
-                        className="clickable-row"
-                        onClick={() => openDelivery(delivery.delivery_id)}
-                      >
-                        <td>{delivery.order_number}</td>
-                        <td>{delivery.item_label}</td>
-                        <td>{delivery.recipient_name || delivery.buyer_name || "-"}</td>
-                        <td>{delivery.courier_name || "-"}</td>
-                        <td>{delivery.tracking_number || "-"}</td>
-                        <td><StatusBadge status={delivery.delivery_status} /></td>
-                        <td>{formatDateTime(delivery.created_at)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <div className="panel-header"><div><h2>Recent deliveries</h2><p>Latest paid-order fulfillment activity.</p></div><button className="secondary-button" onClick={() => goToDeliveries("ALL")}>View all</button></div>
+              <div className="table-wrapper"><table><thead><tr><th>Order</th><th>Item</th><th>Recipient</th><th>Courier</th><th>Tracking</th><th>Status</th><th>Created</th></tr></thead><tbody>
+                {deliveries.length ? deliveries.slice(0, 8).map((delivery) => <tr key={delivery.delivery_id} className="clickable-row" onClick={() => openDelivery(delivery.delivery_id)}><td>{delivery.order_number}</td><td>{delivery.item_label}</td><td>{delivery.recipient_name || delivery.buyer_name || "-"}</td><td>{delivery.courier_name || "-"}</td><td>{delivery.tracking_number || "-"}</td><td><StatusBadge status={delivery.delivery_status}/></td><td>{formatDateTime(delivery.created_at)}</td></tr>) : <tr><td colSpan="7">No delivery activity yet.</td></tr>}
+              </tbody></table></div>
             </section>
           </>
         )}
