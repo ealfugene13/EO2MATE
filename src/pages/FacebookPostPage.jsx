@@ -551,6 +551,101 @@ function mergeRules(shared, item) {
   };
 }
 
+const META_POST_IMAGE_SIZE = 1080;
+
+async function loadImageForRender(file) {
+  if (typeof createImageBitmap === "function") {
+    try {
+      return await createImageBitmap(file, { imageOrientation: "from-image" });
+    } catch (_) {
+      // Fall back to HTMLImageElement below.
+    }
+  }
+
+  return await new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error(`Unable to read image: ${file.name}`));
+    };
+    image.src = url;
+  });
+}
+
+function canvasToBlob(canvas, type = "image/jpeg", quality = 0.92) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => blob ? resolve(blob) : reject(new Error("Unable to render the positioned image.")),
+      type,
+      quality
+    );
+  });
+}
+
+async function renderPositionedImageForMeta(item) {
+  const source = await loadImageForRender(item.file);
+  const sourceWidth = source.width || source.naturalWidth;
+  const sourceHeight = source.height || source.naturalHeight;
+
+  if (!sourceWidth || !sourceHeight) {
+    source.close?.();
+    throw new Error(`Unable to determine image dimensions: ${item.file.name}`);
+  }
+
+  // Facebook receives the same square crop shown in EO2MATE. The original
+  // upload remains untouched; this rendered copy exists only for this post.
+  const cropSize = Math.min(sourceWidth, sourceHeight);
+  const focalX = Math.max(0, Math.min(100, Number(item.focalX ?? 50))) / 100;
+  const focalY = Math.max(0, Math.min(100, Number(item.focalY ?? 50))) / 100;
+  const maxSourceX = Math.max(0, sourceWidth - cropSize);
+  const maxSourceY = Math.max(0, sourceHeight - cropSize);
+  const sourceX = maxSourceX * focalX;
+  const sourceY = maxSourceY * focalY;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = META_POST_IMAGE_SIZE;
+  canvas.height = META_POST_IMAGE_SIZE;
+  const context = canvas.getContext("2d", { alpha: false });
+  if (!context) {
+    source.close?.();
+    throw new Error("Image rendering is not supported by this browser.");
+  }
+
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.drawImage(
+    source,
+    sourceX,
+    sourceY,
+    cropSize,
+    cropSize,
+    0,
+    0,
+    canvas.width,
+    canvas.height
+  );
+  source.close?.();
+
+  const blob = await canvasToBlob(canvas);
+  const baseName = (item.file.name || "eo2mate-post-image").replace(/\.[^.]+$/, "");
+  return new File([blob], `${baseName}-eo2mate.jpg`, {
+    type: "image/jpeg",
+    lastModified: Date.now(),
+  });
+}
+
+async function appendRenderedPostImages(formData, items) {
+  const renderedFiles = await Promise.all(items.map(renderPositionedImageForMeta));
+  renderedFiles.forEach((file, index) => {
+    formData.append(`image_${index}`, file, file.name);
+  });
+}
+
 function createItem(file, index) {
   return {
     id: `${Date.now()}-${index}-${Math.random()
@@ -2124,7 +2219,7 @@ export default function FacebookPostPage({
     setPublishing(true); setErrorMessage(""); setFailurePopup(null);
     try {
       const payload={client_id:client.client_id,fb_page_id:selectedPageId,post_type:isMultiple?"MULTIPLE":"SINGLE",main_caption:mainCaption,max_quantity_per_buyer:regularSaleMaxPerBuyer===""?null:Number(regularSaleMaxPerBuyer),...(isMultiple?{items:items.map((item)=>({item_label:item.item.trim(),item_source:"MANUAL",unit_price:normalizeMoney(item.regularSalePrice!==""?item.regularSalePrice:regularSalePrice),quantity_limit:Number(item.regularSaleQuantity!==""?item.regularSaleQuantity:regularSaleQuantity),max_quantity_per_buyer:item.regularSaleMaxPerBuyer===""?null:Number(item.regularSaleMaxPerBuyer)})),photo_captions:photoCaptions}:{item:{item_label:singleItem.trim(),item_source:singleItemSource,inventory_item_id:singleItemSource==="INVENTORY"?singleInventoryItemId:null,unit_price:normalizeMoney(regularSalePrice),quantity_limit:Number(regularSaleQuantity),max_quantity_per_buyer:regularSaleMaxPerBuyer===""?null:Number(regularSaleMaxPerBuyer)}})};
-      const formData=new FormData(); formData.append("payload",JSON.stringify(payload)); items.forEach((item,index)=>formData.append(`image_${index}`,item.file,item.file.name));
+      const formData=new FormData(); formData.append("payload",JSON.stringify(payload)); await appendRenderedPostImages(formData, items);
       const {data,error}=await supabase.functions.invoke("meta",{headers:{"x-eo2mate-meta-route":"regular-sale-publish"},body:formData}); if(error)throw error; if(!data?.success)throw new Error(data?.message||data?.error||"Regular Sale publishing failed.");
       const successData={...data,page_name:getPageLabel(selectedPage),environment,post_type_display_name:isMultiple?"Multiple Regular Sale":"Single Regular Sale",mode_display_name:"Regular Sale"}; resetFormForNewPost({keepSuccessPopup:true}); setSuccessPopup(successData);
     } catch(error){const resolvedMessage=await getFunctionErrorMessage(error);setErrorMessage("");setFailurePopup({message:resolvedMessage,fb_post_id:null,permalink_url:null,mode_display_name:"Regular Sale"});} finally {setPublishing(false);}
@@ -2141,7 +2236,7 @@ export default function FacebookPostPage({
     setPublishing(true);setErrorMessage("");setFailurePopup(null);
     try{
       const payload={client_id:client.client_id,fb_page_id:selectedPageId,post_type:isMultiple?"MULTIPLE":"SINGLE",main_caption:mainCaption,mine_price:normalizeMoney(miningMinePrice),take_price:normalizeMoney(miningTakePrice),lock_price:normalizeMoney(miningLockPrice),ends_at:phDateFromLocalInput(miningEndDate)?.toISOString(),...(isMultiple?{items:items.map(item=>({item_label:item.item.trim(),mine_price:item.miningMinePrice===""?null:normalizeMoney(item.miningMinePrice),take_price:item.miningTakePrice===""?null:normalizeMoney(item.miningTakePrice),lock_price:item.miningLockPrice===""?null:normalizeMoney(item.miningLockPrice),ends_at:item.miningEndDate?phDateFromLocalInput(item.miningEndDate)?.toISOString():null})),photo_captions:photoCaptions}:{item:{item_label:singleItem.trim()}})};
-      const formData=new FormData();formData.append("payload",JSON.stringify(payload));items.forEach((item,index)=>formData.append(`image_${index}`,item.file,item.file.name));
+      const formData=new FormData();formData.append("payload",JSON.stringify(payload));await appendRenderedPostImages(formData, items);
       const {data,error}=await supabase.functions.invoke("meta",{headers:{"x-eo2mate-meta-route":"mining-publish"},body:formData});if(error)throw error;if(!data?.success)throw new Error(data?.message||data?.error||"Mining publishing failed.");
       const successData={...data,page_name:getPageLabel(selectedPage),environment,post_type_display_name:isMultiple?"Multiple Mining":"Single Mining",mode_display_name:"Mining"};resetFormForNewPost({keepSuccessPopup:true});setSuccessPopup(successData);
     }catch(error){const resolvedMessage=await getFunctionErrorMessage(error);setErrorMessage("");setFailurePopup({message:resolvedMessage,fb_post_id:null,permalink_url:null,mode_display_name:"Mining"});}finally{setPublishing(false);}
@@ -2200,7 +2295,7 @@ export default function FacebookPostPage({
       };
       const formData = new FormData();
       formData.append("payload", JSON.stringify(payload));
-      items.forEach((item, index) => formData.append(`image_${index}`, item.file, item.file.name));
+      await appendRenderedPostImages(formData, items);
       const { data, error } = await supabase.functions.invoke("meta", {
         headers: { "x-eo2mate-meta-route": "preorder-publish" }, body: formData,
       });
@@ -2397,15 +2492,7 @@ export default function FacebookPostPage({
         JSON.stringify(payload)
       );
 
-      items.forEach(
-        (item, index) => {
-          formData.append(
-            `image_${index}`,
-            item.file,
-            item.file.name
-          );
-        }
-      );
+      await appendRenderedPostImages(formData, items);
 
       const { data, error } =
         await supabase.functions.invoke(
@@ -3098,6 +3185,7 @@ export default function FacebookPostPage({
         .fb-photo-positioner {
           position: relative;
           overflow: hidden;
+          aspect-ratio: 1 / 1;
           cursor: grab;
           touch-action: none;
           user-select: none;
@@ -3111,6 +3199,8 @@ export default function FacebookPostPage({
         .fb-photo-positioner > img {
           display: block;
           width: 100%;
+          height: 100%;
+          object-fit: cover;
           pointer-events: none;
           user-select: none;
         }
@@ -3610,7 +3700,7 @@ export default function FacebookPostPage({
                     draggable="false"
                     style={{ objectPosition: `${item.focalX ?? 50}% ${item.focalY ?? 50}%`, background: "#f4f6f8" }}
                   />
-                  <span className="fb-photo-position-hint">Drag to reposition</span>
+                  <span className="fb-photo-position-hint">Drag to reposition · Facebook output 1:1</span>
                 </div>
 
                 <div style={{ display: "grid", gap: 4, margin: "8px 0" }}>
