@@ -1348,6 +1348,9 @@ export default function FacebookPostPage({
 
   const pageInventoryItems = useMemo(() =>
     inventoryItems.filter((row) => {
+      const available = Number(row.available_quantity ?? row.qty_available ?? 0);
+      if (!(available > 0)) return false;
+      if (String(row.status || "ACTIVE").toUpperCase() !== "ACTIVE") return false;
       const mode = String(row.page_scope_mode || "ALL").toUpperCase();
       if (mode !== "SELECTED") return true;
       return (row.page_ids || []).some((pageId) => String(pageId) === String(selectedPageId));
@@ -1604,13 +1607,16 @@ export default function FacebookPostPage({
       if (inventory.default_selling_price != null) setRegularSalePrice(String(inventory.default_selling_price));
       if (inventory.available_quantity != null) setRegularSaleQuantity(String(Math.max(1, Number(inventory.available_quantity) || 1)));
     }
+    // Inventory-derived image must always follow the newly selected item.
+    // Clear the previous item's image first, including when the new item has no image.
+    setItems((current) => {
+      current.forEach((entry) => URL.revokeObjectURL(entry.previewUrl));
+      return [];
+    });
     try {
       const file = await inventoryImageToPostFile(inventory);
       if (!file) return;
-      setItems((current) => {
-        current.forEach((entry) => URL.revokeObjectURL(entry.previewUrl));
-        return [createItem(file, 0)];
-      });
+      setItems([createItem(file, 0)]);
     } catch (error) {
       setErrorMessage(error?.message || "Unable to load Inventory image.");
     }
@@ -1629,12 +1635,18 @@ export default function FacebookPostPage({
       regularSalePrice: inventory.default_selling_price != null ? String(inventory.default_selling_price) : "",
       regularSaleQuantity: inventory.available_quantity != null ? String(Math.max(1, Number(inventory.available_quantity) || 1)) : "",
     });
+    // MULTIPLE: clear only this item's previous inventory-derived image first.
+    // If the newly selected inventory item has no image, its photo stays blank.
+    setItems((current) => current.map((entry) => {
+      if (entry.id !== itemId) return entry;
+      URL.revokeObjectURL(entry.previewUrl);
+      return { ...entry, file: null, previewUrl: "" };
+    }));
     try {
       const file = await inventoryImageToPostFile(inventory);
       if (!file) return;
       setItems((current) => current.map((entry) => {
         if (entry.id !== itemId) return entry;
-        URL.revokeObjectURL(entry.previewUrl);
         return { ...entry, file, previewUrl: URL.createObjectURL(file) };
       }));
     } catch (error) {
