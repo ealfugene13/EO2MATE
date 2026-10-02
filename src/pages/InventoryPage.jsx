@@ -24,6 +24,8 @@ const EMPTY_ITEM = {
   default_selling_price: "",
   opening_quantity: "",
   status: "ACTIVE",
+  page_scope_mode: "ALL",
+  page_ids: [],
 };
 
 
@@ -220,6 +222,9 @@ export default function InventoryPage({
     categories,
     setCategories,
   ] = useState([]);
+
+  const [pages, setPages] = useState([]);
+  const [pageFilter, setPageFilter] = useState("ALL");
 
   const [
     items,
@@ -494,6 +499,7 @@ export default function InventoryPage({
       );
 
       setCategories(setup.categories || []);
+      setPages(setup.pages || []);
 
       await loadItems();
     } catch (
@@ -526,6 +532,8 @@ export default function InventoryPage({
         .status ??
       statusFilter;
 
+    const activePage = overrides.page ?? pageFilter;
+
     const data =
       await invoke(
         {
@@ -541,6 +549,9 @@ export default function InventoryPage({
 
           status:
             activeStatus,
+
+          fb_page_id:
+            activePage === "ALL" ? null : activePage,
         },
       );
 
@@ -732,10 +743,14 @@ export default function InventoryPage({
         opening_quantity:
           "",
 
-        status:
-          item
-            .status ||
-          "ACTIVE",
+        inventory_category_id: item.inventory_category_id || "",
+        variant_label: item.variant_label || "",
+        barcode: item.barcode || "",
+        unit_cost: String(item.unit_cost ?? ""),
+        product_group_code: item.product_group_code || "",
+        status: item.status || "ACTIVE",
+        page_scope_mode: item.page_scope_mode || "ALL",
+        page_ids: item.page_ids || [],
       },
     );
 
@@ -1283,6 +1298,8 @@ export default function InventoryPage({
           inventory_item_id: "",
           is_primary: false,
           display_order: 1,
+          focal_x: 50,
+          focal_y: 50,
         };
       }
 
@@ -1322,6 +1339,30 @@ export default function InventoryPage({
   }
 
 
+  function updateImageFocalFromPointer(event, imageId) {
+    if (processing) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const focalX = Math.max(0, Math.min(100, ((event.clientX - rect.left) / rect.width) * 100));
+    const focalY = Math.max(0, Math.min(100, ((event.clientY - rect.top) / rect.height) * 100));
+    updateImageAssignment(imageId, { focal_x: Math.round(focalX), focal_y: Math.round(focalY) });
+  }
+
+  function beginImageFocalDrag(event, imageId) {
+    if (processing) return;
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    updateImageFocalFromPointer(event, imageId);
+  }
+
+  function moveImageFocalDrag(event, imageId) {
+    if (processing || !event.currentTarget.hasPointerCapture?.(event.pointerId)) return;
+    updateImageFocalFromPointer(event, imageId);
+  }
+
+  function endImageFocalDrag(event) {
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture?.(event.pointerId);
+  }
+
   async function saveImageAssignments() {
     if (!imageBatch?.inventory_image_upload_batch_id) {
       return;
@@ -1342,6 +1383,8 @@ export default function InventoryPage({
               current.is_primary === true,
             display_order:
               Math.max(1, Number(current.display_order || 1)),
+            focal_x: Math.min(100, Math.max(0, Number(current.focal_x ?? 50))),
+            focal_y: Math.min(100, Math.max(0, Number(current.focal_y ?? 50))),
           };
         })
         .filter((assignment) => assignment.inventory_item_id);
@@ -1615,6 +1658,32 @@ export default function InventoryPage({
   }
 
 
+  function updateImportPreviewRow(rowNo, changes) {
+    setImportPreview((current) => {
+      if (!current) return current;
+      return { ...current, rows: (current.rows || []).map((row) => row.row_no === rowNo ? { ...row, ...changes } : row) };
+    });
+  }
+
+  async function syncImportPreviewEdits() {
+    if (!importPreview?.batch?.inventory_import_batch_id) return importPreview;
+    const result = await invoke({
+      action: "IMPORT_UPDATE_ROWS", client_id: client.client_id,
+      inventory_import_batch_id: importPreview.batch.inventory_import_batch_id,
+      rows: (importPreview.rows || []).map((row) => ({
+        row_no: row.row_no, item_code: row.item_code || "", item_name: row.item_name || "",
+        owner_type_code: row.owner_type_code || "OWN", owner_code: row.owner_code || "", owner_name: row.owner_name || "",
+        default_selling_price: row.default_selling_price ?? 0, opening_quantity: row.opening_quantity ?? 0,
+        category_name: row.category_name || "General", variant_label: row.variant_label || "", barcode: row.barcode || "",
+        unit_cost: row.unit_cost ?? 0, product_group_code: row.product_group_code || "", description: row.description || "",
+        attribute_values: row.attribute_values || {},
+      })),
+    });
+    const next = { batch: result.batch, rows: result.rows };
+    setImportPreview(next);
+    return next;
+  }
+
   async function commitImport() {
     if (
       !importPreview
@@ -1624,9 +1693,13 @@ export default function InventoryPage({
       return;
     }
 
+    let previewToCommit = importPreview;
+    try { previewToCommit = await syncImportPreviewEdits(); }
+    catch (error) { setErrorMessage(error?.message || "Unable to validate edited import rows."); return; }
+
     if (
       Number(
-        importPreview
+        previewToCommit
           .batch
           .error_rows ||
         0,
@@ -1664,7 +1737,7 @@ export default function InventoryPage({
                 .client_id,
 
             inventory_import_batch_id:
-              importPreview
+              previewToCommit
                 .batch
                 .inventory_import_batch_id,
           },
@@ -2528,6 +2601,25 @@ export default function InventoryPage({
               </select>
             </label>
 
+            <label>
+              Facebook Page
+              <select
+                value={pageFilter}
+                onChange={async (event) => {
+                  const next = event.target.value;
+                  setPageFilter(next);
+                  setProcessing(true);
+                  try { await loadItems({ page: next }); }
+                  finally { setProcessing(false); }
+                }}
+              >
+                <option value="ALL">All client inventory</option>
+                {pages.map((page) => (
+                  <option key={page.fb_page_id} value={page.fb_page_id}>{page.page_nm}</option>
+                ))}
+              </select>
+            </label>
+
             <button
               type="submit"
               className="secondary-button"
@@ -2887,6 +2979,35 @@ export default function InventoryPage({
                   Product Group
                   <input value={itemForm.product_group_code || ""} onChange={(event) => setItemForm((current) => ({ ...current, product_group_code: event.target.value }))} placeholder="Groups related variants under one product" />
                 </label>
+
+                <label>
+                  Inventory Scope
+                  <select value={itemForm.page_scope_mode || "ALL"} onChange={(event) => setItemForm((current) => ({ ...current, page_scope_mode: event.target.value, page_ids: event.target.value === "ALL" ? [] : current.page_ids }))}>
+                    <option value="ALL">All Client Pages</option>
+                    <option value="SELECTED">Selected Facebook Pages</option>
+                  </select>
+                </label>
+
+                {itemForm.page_scope_mode === "SELECTED" && (
+                  <div className="inventory-form-wide" style={{ display: "grid", gap: 8 }}>
+                    <strong>Available on</strong>
+                    {pages.length ? pages.map((page) => (
+                      <label key={page.fb_page_id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <input
+                          type="checkbox"
+                          checked={(itemForm.page_ids || []).includes(page.fb_page_id)}
+                          onChange={(event) => setItemForm((current) => ({
+                            ...current,
+                            page_ids: event.target.checked
+                              ? [...new Set([...(current.page_ids || []), page.fb_page_id])]
+                              : (current.page_ids || []).filter((id) => id !== page.fb_page_id),
+                          }))}
+                        />
+                        {page.page_nm}
+                      </label>
+                    )) : <span>No active Facebook Pages are connected to this client.</span>}
+                  </div>
+                )}
 
                 <div className="inventory-owner-row inventory-form-wide">
                   <label>
@@ -3672,10 +3793,21 @@ export default function InventoryPage({
                       style={{ padding: 12 }}
                     >
                       {image.signed_url ? (
-                        <img
-                          src={image.signed_url}
-                          alt={image.original_file_name || `Upload ${index + 1}`}
-                        />
+                        <div
+                          onPointerDown={(event) => beginImageFocalDrag(event, image.inventory_image_upload_item_id)}
+                          onPointerMove={(event) => moveImageFocalDrag(event, image.inventory_image_upload_item_id)}
+                          onPointerUp={endImageFocalDrag}
+                          onPointerCancel={endImageFocalDrag}
+                          style={{ overflow: "hidden", cursor: processing ? "default" : "grab", touchAction: "none", borderRadius: 10, background: "#f4f6f8" }}
+                          title="Drag anywhere on the preview to reposition the image"
+                        >
+                          <img
+                            src={image.signed_url}
+                            alt={image.original_file_name || `Upload ${index + 1}`}
+                            draggable={false}
+                            style={{ width: "100%", height: 220, display: "block", objectFit: "cover", objectPosition: `${assignment.focal_x ?? 50}% ${assignment.focal_y ?? 50}%`, background: "#f4f6f8", pointerEvents: "none", userSelect: "none" }}
+                          />
+                        </div>
                       ) : (
                         <div className="inventory-image-placeholder">
                           Image unavailable
@@ -3684,6 +3816,11 @@ export default function InventoryPage({
 
                       <div className="inventory-image-meta">
                         {image.original_file_name || `Image ${index + 1}`}
+                      </div>
+                      <div style={{ display: "grid", gap: 6, marginBottom: 10 }}>
+                        <label>Horizontal alignment ({Math.round(assignment.focal_x ?? 50)}%)<input type="range" min="0" max="100" value={assignment.focal_x ?? 50} onChange={(e) => updateImageAssignment(image.inventory_image_upload_item_id, { focal_x: Number(e.target.value) })} disabled={processing} /></label>
+                        <label>Vertical alignment ({Math.round(assignment.focal_y ?? 50)}%)<input type="range" min="0" max="100" value={assignment.focal_y ?? 50} onChange={(e) => updateImageAssignment(image.inventory_image_upload_item_id, { focal_y: Number(e.target.value) })} disabled={processing} /></label>
+                        <button type="button" className="secondary-button" onClick={() => updateImageAssignment(image.inventory_image_upload_item_id, { focal_x: 50, focal_y: 50 })} disabled={processing}>Center image</button>
                       </div>
 
                       <label>
@@ -4095,55 +4232,15 @@ export default function InventoryPage({
                               </span>
                             </td>
 
-                            <td>
-                              {
-                                row
-                                  .item_code ||
-                                "—"
-                              }
-                            </td>
+                            <td><input value={row.item_code || ""} onChange={(e) => updateImportPreviewRow(row.row_no, { item_code: e.target.value })} /></td>
 
-                            <td>
-                              {
-                                row
-                                  .item_name ||
-                                "—"
-                              }
-                            </td>
+                            <td><input value={row.item_name || ""} onChange={(e) => updateImportPreviewRow(row.row_no, { item_name: e.target.value })} /></td>
 
-                            <td>
-                              {
-                                row
-                                  .owner_type_code ===
-                                "CONSIGNOR"
-                                  ? (
-                                    row
-                                      .owner_name ||
-                                    row
-                                      .owner_code ||
-                                    "Consignor"
-                                  )
-                                  : "Own Stock"
-                              }
-                            </td>
+                            <td><select value={row.owner_type_code || "OWN"} onChange={(e) => updateImportPreviewRow(row.row_no, { owner_type_code: e.target.value })}><option value="OWN">Own Stock</option><option value="CONSIGNOR">Consignor</option></select>{row.owner_type_code === "CONSIGNOR" && <input value={row.owner_name || row.owner_code || ""} placeholder="Owner name/code" onChange={(e) => updateImportPreviewRow(row.row_no, { owner_name: e.target.value, owner_code: e.target.value })} />}</td>
 
-                            <td>
-                              {
-                                money(
-                                  row
-                                    .default_selling_price,
-                                )
-                              }
-                            </td>
+                            <td><input type="number" min="0" step="0.01" value={row.default_selling_price ?? 0} onChange={(e) => updateImportPreviewRow(row.row_no, { default_selling_price: e.target.value })} /></td>
 
-                            <td>
-                              {
-                                qty(
-                                  row
-                                    .opening_quantity,
-                                )
-                              }
-                            </td>
+                            <td><input type="number" min="0" step="1" value={row.opening_quantity ?? 0} onChange={(e) => updateImportPreviewRow(row.row_no, { opening_quantity: e.target.value })} /></td>
 
                             <td>
                               {
@@ -4192,15 +4289,7 @@ export default function InventoryPage({
                   onClick={
                     commitImport
                   }
-                  disabled={
-                    Number(
-                      importPreview
-                        .batch
-                        .error_rows ||
-                      0,
-                    ) >
-                    0
-                  }
+                  disabled={processing}
                 >
                   Confirm Import
                 </button>
