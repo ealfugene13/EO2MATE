@@ -1298,8 +1298,6 @@ export default function InventoryPage({
           inventory_item_id: "",
           is_primary: false,
           display_order: 1,
-          focal_x: 50,
-          focal_y: 50,
         };
       }
 
@@ -1339,30 +1337,6 @@ export default function InventoryPage({
   }
 
 
-  function updateImageFocalFromPointer(event, imageId) {
-    if (processing) return;
-    const rect = event.currentTarget.getBoundingClientRect();
-    if (!rect.width || !rect.height) return;
-    const focalX = Math.max(0, Math.min(100, ((event.clientX - rect.left) / rect.width) * 100));
-    const focalY = Math.max(0, Math.min(100, ((event.clientY - rect.top) / rect.height) * 100));
-    updateImageAssignment(imageId, { focal_x: Math.round(focalX), focal_y: Math.round(focalY) });
-  }
-
-  function beginImageFocalDrag(event, imageId) {
-    if (processing) return;
-    event.currentTarget.setPointerCapture?.(event.pointerId);
-    updateImageFocalFromPointer(event, imageId);
-  }
-
-  function moveImageFocalDrag(event, imageId) {
-    if (processing || !event.currentTarget.hasPointerCapture?.(event.pointerId)) return;
-    updateImageFocalFromPointer(event, imageId);
-  }
-
-  function endImageFocalDrag(event) {
-    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture?.(event.pointerId);
-  }
-
   async function saveImageAssignments() {
     if (!imageBatch?.inventory_image_upload_batch_id) {
       return;
@@ -1383,8 +1357,6 @@ export default function InventoryPage({
               current.is_primary === true,
             display_order:
               Math.max(1, Number(current.display_order || 1)),
-            focal_x: Math.min(100, Math.max(0, Number(current.focal_x ?? 50))),
-            focal_y: Math.min(100, Math.max(0, Number(current.focal_y ?? 50))),
           };
         })
         .filter((assignment) => assignment.inventory_item_id);
@@ -3793,35 +3765,14 @@ export default function InventoryPage({
                       style={{ padding: 12 }}
                     >
                       {image.signed_url ? (
-                        <div
-                          onPointerDown={(event) => beginImageFocalDrag(event, image.inventory_image_upload_item_id)}
-                          onPointerMove={(event) => moveImageFocalDrag(event, image.inventory_image_upload_item_id)}
-                          onPointerUp={endImageFocalDrag}
-                          onPointerCancel={endImageFocalDrag}
-                          style={{ overflow: "hidden", cursor: processing ? "default" : "grab", touchAction: "none", borderRadius: 10, background: "#f4f6f8" }}
-                          title="Drag anywhere on the preview to reposition the image"
-                        >
+                        <div className="inventory-image-assignment-preview" style={{ marginBottom: 10 }}>
                           <img
                             src={image.signed_url}
-                            alt={image.original_file_name || `Upload ${index + 1}`}
-                            draggable={false}
-                            style={{ width: "100%", height: 220, display: "block", objectFit: "cover", objectPosition: `${assignment.focal_x ?? 50}% ${assignment.focal_y ?? 50}%`, background: "#f4f6f8", pointerEvents: "none", userSelect: "none" }}
+                            alt={image.original_file_name || "Inventory upload preview"}
+                            style={{ width: "100%", height: 220, display: "block", objectFit: "contain", background: "#f4f6f8" }}
                           />
                         </div>
-                      ) : (
-                        <div className="inventory-image-placeholder">
-                          Image unavailable
-                        </div>
-                      )}
-
-                      <div className="inventory-image-meta">
-                        {image.original_file_name || `Image ${index + 1}`}
-                      </div>
-                      <div style={{ display: "grid", gap: 6, marginBottom: 10 }}>
-                        <label>Horizontal alignment ({Math.round(assignment.focal_x ?? 50)}%)<input type="range" min="0" max="100" value={assignment.focal_x ?? 50} onChange={(e) => updateImageAssignment(image.inventory_image_upload_item_id, { focal_x: Number(e.target.value) })} disabled={processing} /></label>
-                        <label>Vertical alignment ({Math.round(assignment.focal_y ?? 50)}%)<input type="range" min="0" max="100" value={assignment.focal_y ?? 50} onChange={(e) => updateImageAssignment(image.inventory_image_upload_item_id, { focal_y: Number(e.target.value) })} disabled={processing} /></label>
-                        <button type="button" className="secondary-button" onClick={() => updateImageAssignment(image.inventory_image_upload_item_id, { focal_x: 50, focal_y: 50 })} disabled={processing}>Center image</button>
-                      </div>
+                      ) : null}
 
                       <label>
                         Product / SKU

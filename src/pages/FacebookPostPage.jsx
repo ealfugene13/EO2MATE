@@ -600,12 +600,10 @@ async function renderPositionedImageForMeta(item) {
   // Facebook receives the same square crop shown in EO2MATE. The original
   // upload remains untouched; this rendered copy exists only for this post.
   const cropSize = Math.min(sourceWidth, sourceHeight);
-  const focalX = Math.max(0, Math.min(100, Number(item.focalX ?? 50))) / 100;
-  const focalY = Math.max(0, Math.min(100, Number(item.focalY ?? 50))) / 100;
-  const maxSourceX = Math.max(0, sourceWidth - cropSize);
-  const maxSourceY = Math.max(0, sourceHeight - cropSize);
-  const sourceX = maxSourceX * focalX;
-  const sourceY = maxSourceY * focalY;
+  // EO2MATE automatically uses a centered square crop and renders a
+  // 1080x1080 copy for Meta. No alignment/focal-position UI is exposed.
+  const sourceX = Math.max(0, (sourceWidth - cropSize) / 2);
+  const sourceY = Math.max(0, (sourceHeight - cropSize) / 2);
 
   const canvas = document.createElement("canvas");
   canvas.width = META_POST_IMAGE_SIZE;
@@ -653,8 +651,6 @@ function createItem(file, index) {
       .slice(2)}`,
     file,
     previewUrl: URL.createObjectURL(file),
-    focalX: 50,
-    focalY: 50,
     item: "",
     minBid: "",
     increment: "",
@@ -1350,6 +1346,15 @@ export default function FacebookPostPage({
     [pages, selectedPageId]
   );
 
+  const pageInventoryItems = useMemo(() =>
+    inventoryItems.filter((row) => {
+      const mode = String(row.page_scope_mode || "ALL").toUpperCase();
+      if (mode !== "SELECTED") return true;
+      return (row.page_ids || []).some((pageId) => String(pageId) === String(selectedPageId));
+    }),
+    [inventoryItems, selectedPageId]
+  );
+
   const mainCaption = useMemo(() => {
     const lines = [];
 
@@ -1572,6 +1577,71 @@ export default function FacebookPostPage({
     }
   }
 
+  function getInventoryPrimaryImage(inventory) {
+    const images = inventory?.images || [];
+    return images.find((image) => image.is_primary === true) || images[0] || null;
+  }
+
+  async function inventoryImageToPostFile(inventory) {
+    const image = getInventoryPrimaryImage(inventory);
+    if (!image?.signed_url) return null;
+    const response = await fetch(image.signed_url);
+    if (!response.ok) throw new Error("Unable to load the selected Inventory image.");
+    const blob = await response.blob();
+    const extension = blob.type === "image/png" ? "png" : blob.type === "image/webp" ? "webp" : "jpg";
+    return new File([blob], `${inventory.item_code || "inventory-item"}.${extension}`, {
+      type: blob.type || "image/jpeg",
+      lastModified: Date.now(),
+    });
+  }
+
+  async function selectSingleInventoryItem(inventoryItemId) {
+    setSingleInventoryItemId(inventoryItemId);
+    const inventory = pageInventoryItems.find((row) => String(row.inventory_item_id) === String(inventoryItemId));
+    if (!inventory) return;
+    setSingleItem(inventory.item_name || "");
+    if (postMode === "REGULAR_SALE") {
+      if (inventory.default_selling_price != null) setRegularSalePrice(String(inventory.default_selling_price));
+      if (inventory.available_quantity != null) setRegularSaleQuantity(String(Math.max(1, Number(inventory.available_quantity) || 1)));
+    }
+    try {
+      const file = await inventoryImageToPostFile(inventory);
+      if (!file) return;
+      setItems((current) => {
+        current.forEach((entry) => URL.revokeObjectURL(entry.previewUrl));
+        return [createItem(file, 0)];
+      });
+    } catch (error) {
+      setErrorMessage(error?.message || "Unable to load Inventory image.");
+    }
+  }
+
+  async function selectItemInventory(itemId, inventoryItemId) {
+    const inventory = pageInventoryItems.find((row) => String(row.inventory_item_id) === String(inventoryItemId));
+    if (!inventory) {
+      updateItem(itemId, { itemSource: "MANUAL", inventoryItemId: "" });
+      return;
+    }
+    updateItem(itemId, {
+      itemSource: "INVENTORY",
+      inventoryItemId: inventory.inventory_item_id,
+      item: inventory.item_name || "",
+      regularSalePrice: inventory.default_selling_price != null ? String(inventory.default_selling_price) : "",
+      regularSaleQuantity: inventory.available_quantity != null ? String(Math.max(1, Number(inventory.available_quantity) || 1)) : "",
+    });
+    try {
+      const file = await inventoryImageToPostFile(inventory);
+      if (!file) return;
+      setItems((current) => current.map((entry) => {
+        if (entry.id !== itemId) return entry;
+        URL.revokeObjectURL(entry.previewUrl);
+        return { ...entry, file, previewUrl: URL.createObjectURL(file) };
+      }));
+    } catch (error) {
+      setErrorMessage(error?.message || "Unable to load Inventory image.");
+    }
+  }
+
   function removeItem(id) {
     setItems((current) => {
       const target =
@@ -1602,38 +1672,6 @@ export default function FacebookPostPage({
           : item
       )
     );
-  }
-
-  function updateImageFocalFromPointer(id, event) {
-    const rect = event.currentTarget.getBoundingClientRect();
-    if (!rect.width || !rect.height) return;
-
-    const focalX = Math.max(0, Math.min(100, ((event.clientX - rect.left) / rect.width) * 100));
-    const focalY = Math.max(0, Math.min(100, ((event.clientY - rect.top) / rect.height) * 100));
-
-    updateItem(id, {
-      focalX: Math.round(focalX),
-      focalY: Math.round(focalY),
-    });
-  }
-
-  function beginImageFocalDrag(id, event) {
-    if (publishing) return;
-    event.preventDefault();
-    event.currentTarget.setPointerCapture?.(event.pointerId);
-    updateImageFocalFromPointer(id, event);
-  }
-
-  function moveImageFocalDrag(id, event) {
-    if (publishing || !event.currentTarget.hasPointerCapture?.(event.pointerId)) return;
-    event.preventDefault();
-    updateImageFocalFromPointer(id, event);
-  }
-
-  function endImageFocalDrag(event) {
-    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
-      event.currentTarget.releasePointerCapture?.(event.pointerId);
-    }
   }
 
   function moveItem(
@@ -2218,7 +2256,7 @@ export default function FacebookPostPage({
     if(!confirmed){setConfirmPopup({mode:"REGULAR_SALE",title:`Publish ${isMultiple?"Multiple":"Single"} Regular Sale?`,page:getPageLabel(selectedPage),type:isMultiple?"Multiple Regular Sale":"Single Regular Sale",images:items.length});return;}
     setPublishing(true); setErrorMessage(""); setFailurePopup(null);
     try {
-      const payload={client_id:client.client_id,fb_page_id:selectedPageId,post_type:isMultiple?"MULTIPLE":"SINGLE",main_caption:mainCaption,max_quantity_per_buyer:regularSaleMaxPerBuyer===""?null:Number(regularSaleMaxPerBuyer),...(isMultiple?{items:items.map((item)=>({item_label:item.item.trim(),item_source:"MANUAL",unit_price:normalizeMoney(item.regularSalePrice!==""?item.regularSalePrice:regularSalePrice),quantity_limit:Number(item.regularSaleQuantity!==""?item.regularSaleQuantity:regularSaleQuantity),max_quantity_per_buyer:item.regularSaleMaxPerBuyer===""?null:Number(item.regularSaleMaxPerBuyer)})),photo_captions:photoCaptions}:{item:{item_label:singleItem.trim(),item_source:singleItemSource,inventory_item_id:singleItemSource==="INVENTORY"?singleInventoryItemId:null,unit_price:normalizeMoney(regularSalePrice),quantity_limit:Number(regularSaleQuantity),max_quantity_per_buyer:regularSaleMaxPerBuyer===""?null:Number(regularSaleMaxPerBuyer)}})};
+      const payload={client_id:client.client_id,fb_page_id:selectedPageId,post_type:isMultiple?"MULTIPLE":"SINGLE",main_caption:mainCaption,max_quantity_per_buyer:regularSaleMaxPerBuyer===""?null:Number(regularSaleMaxPerBuyer),...(isMultiple?{items:items.map((item)=>({item_label:item.item.trim(),item_source:item.itemSource||"MANUAL",inventory_item_id:(item.itemSource||"MANUAL")==="INVENTORY"?item.inventoryItemId:null,unit_price:normalizeMoney(item.regularSalePrice!==""?item.regularSalePrice:regularSalePrice),quantity_limit:Number(item.regularSaleQuantity!==""?item.regularSaleQuantity:regularSaleQuantity),max_quantity_per_buyer:item.regularSaleMaxPerBuyer===""?null:Number(item.regularSaleMaxPerBuyer)})),photo_captions:photoCaptions}:{item:{item_label:singleItem.trim(),item_source:singleItemSource,inventory_item_id:singleItemSource==="INVENTORY"?singleInventoryItemId:null,unit_price:normalizeMoney(regularSalePrice),quantity_limit:Number(regularSaleQuantity),max_quantity_per_buyer:regularSaleMaxPerBuyer===""?null:Number(regularSaleMaxPerBuyer)}})};
       const formData=new FormData(); formData.append("payload",JSON.stringify(payload)); await appendRenderedPostImages(formData, items);
       const {data,error}=await supabase.functions.invoke("meta",{headers:{"x-eo2mate-meta-route":"regular-sale-publish"},body:formData}); if(error)throw error; if(!data?.success)throw new Error(data?.message||data?.error||"Regular Sale publishing failed.");
       const successData={...data,page_name:getPageLabel(selectedPage),environment,post_type_display_name:isMultiple?"Multiple Regular Sale":"Single Regular Sale",mode_display_name:"Regular Sale"}; resetFormForNewPost({keepSuccessPopup:true}); setSuccessPopup(successData);
@@ -2365,7 +2403,7 @@ export default function FacebookPostPage({
                   index
                 ) => {
                   const inventory =
-                    inventoryItems.find(
+                    pageInventoryItems.find(
                       (row) =>
                         String(
                           row.inventory_item_id
@@ -2424,7 +2462,7 @@ export default function FacebookPostPage({
               )
             : (() => {
                 const inventory =
-                  inventoryItems.find(
+                  pageInventoryItems.find(
                     (row) =>
                       String(
                         row.inventory_item_id
@@ -3517,17 +3555,29 @@ export default function FacebookPostPage({
 
         {!isMultiple && (
           <>
-            <label>
-              Item Name *
-
-              <input
-                value={singleItem}
-                onChange={(e) =>
-                  setSingleItem(e.target.value)
-                }
-                disabled={publishing}
-              />
-            </label>
+            <div className="fb-post-setup-grid">
+              <label>Item Source
+                <select value={singleItemSource} onChange={(e) => { const value=e.target.value; setSingleItemSource(value); if(value === "MANUAL") setSingleInventoryItemId(""); }} disabled={publishing}>
+                  <option value="MANUAL">Manual</option>
+                  <option value="INVENTORY">Master Inventory</option>
+                </select>
+              </label>
+              {singleItemSource === "INVENTORY" && (
+                <label>Inventory Item *
+                  <select value={singleInventoryItemId} onChange={(e) => selectSingleInventoryItem(e.target.value)} disabled={publishing}>
+                    <option value="">Select inventory item</option>
+                    {pageInventoryItems.map((row) => (
+                      <option key={row.inventory_item_id} value={row.inventory_item_id}>
+                        {row.item_code ? `${row.item_code} — ` : ""}{row.item_name} ({Number(row.available_quantity || 0)} available)
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              <label>Item Name *
+                <input value={singleItem} onChange={(e) => setSingleItem(e.target.value)} disabled={publishing || singleItemSource === "INVENTORY"} />
+              </label>
+            </div>
           </>
         )}
 
@@ -3684,32 +3734,43 @@ export default function FacebookPostPage({
                 key={item.id}
                 className="fb-photo-card"
               >
-                <div
-                  className="fb-photo-positioner"
-                  role="application"
-                  aria-label={`Reposition post image ${index + 1}`}
-                  title="Drag on the image to choose the visible area"
-                  onPointerDown={(event) => beginImageFocalDrag(item.id, event)}
-                  onPointerMove={(event) => moveImageFocalDrag(item.id, event)}
-                  onPointerUp={endImageFocalDrag}
-                  onPointerCancel={endImageFocalDrag}
-                >
+                <div className="fb-photo-positioner" aria-label={`Post image ${index + 1}`}>
                   <img
                     src={item.previewUrl}
                     alt={`Post ${index + 1}`}
                     draggable="false"
-                    style={{ objectPosition: `${item.focalX ?? 50}% ${item.focalY ?? 50}%`, background: "#f4f6f8" }}
+                    style={{ objectPosition: "50% 50%", background: "#f4f6f8" }}
                   />
-                  <span className="fb-photo-position-hint">Drag to reposition · Facebook output 1:1</span>
-                </div>
-
-                <div style={{ display: "grid", gap: 4, margin: "8px 0" }}>
-                  <label style={{ fontSize: 11 }}>Horizontal alignment ({Math.round(item.focalX ?? 50)}%)<input type="range" min="0" max="100" value={item.focalX ?? 50} onChange={(e) => updateItem(item.id, { focalX: Number(e.target.value) })} disabled={publishing} /></label>
-                  <label style={{ fontSize: 11 }}>Vertical alignment ({Math.round(item.focalY ?? 50)}%)<input type="range" min="0" max="100" value={item.focalY ?? 50} onChange={(e) => updateItem(item.id, { focalY: Number(e.target.value) })} disabled={publishing} /></label>
-                  <button type="button" className="secondary-button" onClick={() => updateItem(item.id, { focalX: 50, focalY: 50 })} disabled={publishing}>Center / Reset</button>
+                  <span className="fb-photo-position-hint">EO2MATE automatically prepares a centered 1080×1080 image for Meta</span>
                 </div>
 
                 <button type="button" onClick={() => removeItem(item.id)}>Remove</button>
+                {isMultiple && (
+                  <div className="fb-item-editor" style={{ marginTop: 8 }}>
+                    <label>Item Source
+                      <select value={item.itemSource || "MANUAL"} onChange={(e) => {
+                        const value = e.target.value;
+                        if (value === "MANUAL") updateItem(item.id, { itemSource: "MANUAL", inventoryItemId: "" });
+                        else updateItem(item.id, { itemSource: "INVENTORY" });
+                      }} disabled={publishing}>
+                        <option value="MANUAL">Manual</option>
+                        <option value="INVENTORY">Master Inventory</option>
+                      </select>
+                    </label>
+                    {(item.itemSource || "MANUAL") === "INVENTORY" && (
+                      <label>Inventory Item *
+                        <select value={item.inventoryItemId || ""} onChange={(e) => selectItemInventory(item.id, e.target.value)} disabled={publishing}>
+                          <option value="">Select inventory item</option>
+                          {pageInventoryItems.map((row) => (
+                            <option key={row.inventory_item_id} value={row.inventory_item_id}>
+                              {row.item_code ? `${row.item_code} — ` : ""}{row.item_name} ({Number(row.available_quantity || 0)} available)
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
+                  </div>
+                )}
                 {postMode === "REGULAR_SALE" && isMultiple && (
                   <div className="fb-item-editor">
                     <label>Item Name <span className="eo2-required">*</span><input value={item.item} onChange={(e)=>updateItem(item.id,{item:e.target.value})} disabled={publishing}/></label>
