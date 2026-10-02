@@ -1966,38 +1966,51 @@ export default function PortalPage({ session }) {
 
               <SidebarNavButton
                 icon="create"
-                className={`nav-item ${page === "posts" || page === "facebook-post" || page === "post-mining" || page === "pre-order" || page === "regular-sale" || page.includes("auction") ? "active" : ""}`}
-                onClick={() => setPostsExpanded((value) => !value)}
-                aria-expanded={postsExpanded}
+                className={`nav-item ${page === "posts" ? "active" : ""}`}
+                onClick={() => navigateTo("posts")}
               >
-                <span className="nav-parent-label">Posts <span className="nav-chevron">{postsExpanded ? "▾" : "›"}</span></span>
+                Create Post
               </SidebarNavButton>
 
-              {postsExpanded && (
-                <div className="nav-submenu">
-                  <button type="button" className={`nav-subitem ${page === "posts" ? "active" : ""}`} onClick={() => navigateTo("posts")}>Create Post</button>
+              <SidebarNavButton
+                icon="auction"
+                className={`nav-item ${page === "auctions" ? "active" : ""}`}
+                onClick={() => { setAuctionWorkspaceTab("SUMMARY"); goToAuctions("ALL"); setMobileMenuOpen(false); }}
+              >
+                Auctions
+              </SidebarNavButton>
 
-                  <div className="nav-subgroup-label" style={{ margin: "10px 12px 4px", fontSize: 10, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", opacity: .65 }}>Auctions</div>
-                  <button type="button" className={`nav-subitem ${page === "auctions" ? "active" : ""}`} onClick={() => { setAuctionWorkspaceTab("SUMMARY"); goToAuctions("ALL"); setMobileMenuOpen(false); }}>Dashboard / Summary</button>
-                  <button type="button" className={`nav-subitem ${page === "facebook-post" ? "active" : ""}`} onClick={() => navigateTo("facebook-post")}>Create Post</button>
+              <SidebarNavButton
+                icon="mining"
+                className={`nav-item ${page === "post-mining" ? "active" : ""}`}
+                onClick={() => { setMiningWorkspaceTab("SUMMARY"); navigateTo("post-mining"); }}
+              >
+                Mining
+              </SidebarNavButton>
 
-                  <div className="nav-subgroup-label" style={{ margin: "10px 12px 4px", fontSize: 10, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", opacity: .65 }}>Mining</div>
-                  <button type="button" className={`nav-subitem ${page === "post-mining" ? "active" : ""}`} onClick={() => { setMiningWorkspaceTab("SUMMARY"); navigateTo("post-mining"); }}>Dashboard / Summary</button>
-                  <button type="button" className={`nav-subitem ${page === "mining-create" ? "active" : ""}`} onClick={() => navigateTo("mining-create")}>Create Post</button>
+              <SidebarNavButton
+                icon="preorder"
+                className={`nav-item ${page === "pre-order" ? "active" : ""}`}
+                onClick={() => navigateTo("pre-order")}
+              >
+                Pre-Orders
+              </SidebarNavButton>
 
-                  <div className="nav-subgroup-label" style={{ margin: "10px 12px 4px", fontSize: 10, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", opacity: .65 }}>Pre-Orders</div>
-                  <button type="button" className={`nav-subitem ${page === "pre-order" ? "active" : ""}`} onClick={() => navigateTo("pre-order")}>Dashboard / Summary</button>
-                  <button type="button" className={`nav-subitem ${page === "pre-order-create" ? "active" : ""}`} onClick={() => navigateTo("pre-order-create")}>Create Post</button>
+              <SidebarNavButton
+                icon="sales"
+                className={`nav-item ${page === "regular-sale" ? "active" : ""}`}
+                onClick={() => { setRegularSaleWorkspaceTab("SUMMARY"); navigateTo("regular-sale"); }}
+              >
+                Regular Sales
+              </SidebarNavButton>
 
-                  <div className="nav-subgroup-label" style={{ margin: "10px 12px 4px", fontSize: 10, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", opacity: .65 }}>Regular Sales</div>
-                  <button type="button" className={`nav-subitem ${page === "regular-sale" ? "active" : ""}`} onClick={() => { setRegularSaleWorkspaceTab("SUMMARY"); navigateTo("regular-sale"); }}>Dashboard / Summary</button>
-                  <button type="button" className={`nav-subitem ${page === "regular-sale" && regularSaleWorkspaceTab === "POSTING" ? "active" : ""}`} onClick={() => { setRegularSaleWorkspaceTab("POSTING"); navigateTo("regular-sale"); }}>Create Post</button>
-
-                  <div className="nav-subgroup-label" style={{ margin: "10px 12px 4px", fontSize: 10, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", opacity: .65 }}>Live Selling</div>
-                  <button type="button" className={`nav-subitem ${page === "live-selling" ? "active" : ""}`} onClick={() => { setLiveSellingWorkspaceTab("DASHBOARD"); navigateTo("live-selling"); }}>Dashboard / Summary</button>
-                  <button type="button" className="nav-subitem" disabled title="Live Selling post creation is coming soon">Create Post <span className="coming-soon-pill">Soon</span></button>
-                </div>
-              )}
+              <SidebarNavButton
+                icon="live"
+                className={`nav-item ${page === "live-selling" ? "active" : ""}`}
+                onClick={() => { setLiveSellingWorkspaceTab("DASHBOARD"); navigateTo("live-selling"); }}
+              >
+                Live Selling
+              </SidebarNavButton>
 
             </>
           )}
@@ -2176,7 +2189,7 @@ export default function PortalPage({ session }) {
               aria-label="Back to main dashboard"
               title="Back to main dashboard"
             >
-              ← Main Dashboard
+              <span aria-hidden="true" style={{ fontSize: 18, lineHeight: 1 }}>⌂</span>
             </button>
           </div>
         )}
