@@ -1561,6 +1561,7 @@ export default function InventoryPage({
           .invoke(
             "eo2mate",
             {
+              headers: { "x-eo2mate-route": "inventory-admin" },
               body:
                 form,
             },
