@@ -580,6 +580,9 @@ export default function PortalPage({ session }) {
   const [regularSaleWorkspaceTab, setRegularSaleWorkspaceTab] = useState("DASHBOARD");
   const [liveSellingWorkspaceTab, setLiveSellingWorkspaceTab] = useState("DASHBOARD");
   const [miningStatusFilter, setMiningStatusFilter] = useState("ALL");
+  const [sellingPostSearch, setSellingPostSearch] = useState("");
+  const [sellingPostFilter, setSellingPostFilter] = useState("ALL");
+  const [sellingPostSort, setSellingPostSort] = useState("NEWEST");
   const [inventoryTab, setInventoryTab] = useState("DASHBOARD");
   const [salesTab, setSalesTab] = useState("DASHBOARD");
   const [purchasesTab, setPurchasesTab] = useState("DASHBOARD");
@@ -1945,6 +1948,31 @@ export default function PortalPage({ session }) {
     </section>
   );
 
+  const renderSellingPostsToolbar = () => (
+    <section className="toolbar-card" style={{ marginBottom: 16 }}>
+      <input
+        className="search-input"
+        value={sellingPostSearch}
+        onChange={(e) => setSellingPostSearch(e.target.value)}
+        placeholder="Search posts..."
+        aria-label="Search posts"
+      />
+      <select className="filter-select" value={sellingPostFilter} onChange={(e) => setSellingPostFilter(e.target.value)} aria-label="Filter posts">
+        <option value="ALL">Filter: All statuses</option>
+        <option value="ACTIVE">Active</option>
+        <option value="DRAFT">Draft / Scheduled</option>
+        <option value="COMPLETED">Completed / Closed</option>
+        <option value="CANCELLED">Cancelled</option>
+      </select>
+      <select className="filter-select" value={sellingPostSort} onChange={(e) => setSellingPostSort(e.target.value)} aria-label="Sort posts">
+        <option value="NEWEST">Sort: Newest</option>
+        <option value="OLDEST">Sort: Oldest</option>
+        <option value="UPDATED">Recently updated</option>
+        <option value="STATUS">Status</option>
+      </select>
+    </section>
+  );
+
   return (
     <div className="app-shell">
       <style>{`
@@ -2301,7 +2329,7 @@ export default function PortalPage({ session }) {
             () => { setRegularSaleWorkspaceTab("POSTING"); navigateTo("regular-sale"); }
           )}
 
-            {regularSaleWorkspaceTab === "DASHBOARD" || regularSaleWorkspaceTab === "SUMMARY" && (
+            {(regularSaleWorkspaceTab === "DASHBOARD" || regularSaleWorkspaceTab === "SUMMARY") && (
               <>
                 <section className="toolbar-card">
                   <select className="filter-select" defaultValue="ALL">
@@ -2334,6 +2362,8 @@ export default function PortalPage({ session }) {
             )}
 
             {regularSaleWorkspaceTab === "POSTS" && (
+              <>
+                {renderSellingPostsToolbar()}
               <section className="dashboard-panel selling-card">
                 <div className="panel-header">
                   <div><h2>Regular Sale posts</h2><p>Single and Multiple Regular Sale posts by status.</p></div>
@@ -2346,6 +2376,7 @@ export default function PortalPage({ session }) {
                   </table>
                 </div>
               </section>
+              </>
             )}
 
             {regularSaleWorkspaceTab === "POSTING" && (
@@ -2396,6 +2427,7 @@ export default function PortalPage({ session }) {
             setLiveSellingWorkspaceTab,
             () => navigateTo("posts")
           )}
+            {liveSellingWorkspaceTab === "POSTS" && renderSellingPostsToolbar()}
             <section className="dashboard-panel selling-card">
               <div className="panel-header"><div><h2>{liveSellingWorkspaceTab === "POSTS" ? "Live Selling posts" : liveSellingWorkspaceTab === "SUMMARY" ? "Live Selling summary" : "Live Selling dashboard"}</h2><p>Ready for the Live Selling backend connection without exposing placeholder data as real activity.</p></div></div>
               <div className="table-wrapper"><table><thead><tr><th>Session / Post</th><th>Status</th><th>Claims</th><th>Buyers</th><th>Items</th><th>Sales</th></tr></thead><tbody><tr><td colSpan="6">No Live Selling records yet.</td></tr></tbody></table></div>
@@ -3304,7 +3336,7 @@ export default function PortalPage({ session }) {
             () => navigateTo("mining-create")
           )}
 
-            {miningWorkspaceTab === "DASHBOARD" || miningWorkspaceTab === "SUMMARY" && (
+            {(miningWorkspaceTab === "DASHBOARD" || miningWorkspaceTab === "SUMMARY") && (
               <>
                 <section className="toolbar-card">
                   <select className="filter-select" value={miningStatusFilter} onChange={(e) => setMiningStatusFilter(e.target.value)}>
@@ -3342,6 +3374,8 @@ export default function PortalPage({ session }) {
             )}
 
             {miningWorkspaceTab === "POSTS" && (
+              <>
+                {renderSellingPostsToolbar()}
               <section className="dashboard-panel selling-card">
                 <div className="panel-header">
                   <div><h2>Mining posts</h2><p>All regular Post Mining records by status.</p></div>
@@ -3354,6 +3388,7 @@ export default function PortalPage({ session }) {
                   </table>
                 </div>
               </section>
+              </>
             )}
 
             {miningWorkspaceTab === "LIVE MINING" && (
@@ -3550,26 +3585,21 @@ export default function PortalPage({ session }) {
             </header>
 
             <section className="metrics-grid">
-              <MetricCard title="Total auctions" value={auctions.length} subtitle="All auction items" onClick={() => { setAuctionWorkspaceTab("AUCTIONS"); setAuctionStatusFilter("ALL"); }} />
-              <MetricCard title="Active" value={auctions.filter((a) => a.ui_status === "ACTIVE").length} subtitle="Currently open" onClick={() => { setAuctionWorkspaceTab("AUCTIONS"); setAuctionStatusFilter("ACTIVE"); }} />
+              <MetricCard title="Total auctions" value={auctions.length} subtitle="All auction items" onClick={() => { setAuctionWorkspaceTab("POSTS"); setAuctionStatusFilter("ALL"); }} />
+              <MetricCard title="Active" value={auctions.filter((a) => a.ui_status === "ACTIVE").length} subtitle="Currently open" onClick={() => { setAuctionWorkspaceTab("POSTS"); setAuctionStatusFilter("ACTIVE"); }} />
               <MetricCard title="Completed" value={auctions.filter((a) => ["COMPLETED", "COMPLETED_WITH_WINNER", "CLOSED_NO_WINNER"].includes(a.ui_status)).length} subtitle="Closed auctions" />
               <MetricCard title="Cancelled" value={auctions.filter((a) => a.ui_status === "CANCELLED").length} subtitle="Cancelled auctions" />
               <MetricCard title="Total bids" value={auctions.reduce((sum, a) => sum + Number(a.valid_bid_count || a.bid_count || 0), 0)} subtitle="Recorded valid bids" />
               <MetricCard title="Winning value" value={formatCurrency(auctions.reduce((sum, a) => sum + Number(a.highest_bid || 0), 0))} subtitle="Current / final highest bids" />
             </section>
 
-            <section className="dashboard-panel" style={{ marginBottom: 18 }}>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {["SUMMARY", "AUCTIONS", "BIDS", "WINNERS"].map((tab) => (
-                  <button key={tab} type="button" className={auctionWorkspaceTab === tab ? "primary-button" : "secondary-button"} onClick={() => setAuctionWorkspaceTab(tab)}>
-                    {tab.charAt(0) + tab.slice(1).toLowerCase()}
-                  </button>
-                ))}
-                <button type="button" className="secondary-button" onClick={() => navigateTo("facebook-post")}>Create Post</button>
-              </div>
-            </section>
+            {renderSellingTabs(
+              auctionWorkspaceTab,
+              setAuctionWorkspaceTab,
+              () => navigateTo("facebook-post")
+            )}
 
-            {auctionWorkspaceTab === "SUMMARY" && (
+            {(auctionWorkspaceTab === "DASHBOARD" || auctionWorkspaceTab === "SUMMARY") && (
               <>
                 <section className="toolbar-card">
                   <select className="filter-select" value={auctionStatusFilter} onChange={(e) => setAuctionStatusFilter(e.target.value)}>
@@ -3591,7 +3621,7 @@ export default function PortalPage({ session }) {
               </>
             )}
 
-            {auctionWorkspaceTab === "AUCTIONS" && (
+            {auctionWorkspaceTab === "POSTS" && (
               <>
                 <section className="toolbar-card">
                   <input className="search-input" value={auctionSearch} onChange={(e) => setAuctionSearch(e.target.value)} placeholder="Search auctions..." />
