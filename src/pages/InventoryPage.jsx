@@ -190,6 +190,11 @@ export default function InventoryPage({
       null,
     );
 
+  const imageBatchInputRef =
+    useRef(
+      null,
+    );
+
   const importInputRef =
     useRef(
       null,
@@ -347,6 +352,30 @@ export default function InventoryPage({
   ] =
     useState(
       false,
+    );
+
+  const [
+    imageBatchModal,
+    setImageBatchModal,
+  ] =
+    useState(
+      false,
+    );
+
+  const [
+    imageBatch,
+    setImageBatch,
+  ] =
+    useState(
+      null,
+    );
+
+  const [
+    imageAssignments,
+    setImageAssignments,
+  ] =
+    useState(
+      {},
     );
 
   const [
@@ -1192,6 +1221,165 @@ export default function InventoryPage({
       setProcessing(
         false,
       );
+    }
+  }
+
+
+  async function uploadImageBatch(
+    fileList,
+  ) {
+    const files =
+      Array.from(
+        fileList || [],
+      );
+
+    if (!files.length) {
+      return;
+    }
+
+    if (files.length > 100) {
+      setErrorMessage(
+        "Maximum 100 images per batch.",
+      );
+      return;
+    }
+
+    setProcessing(true);
+    setMessage("");
+    setErrorMessage("");
+
+    try {
+      const form = new FormData();
+      form.append("action", "IMAGE_BATCH_UPLOAD");
+      form.append("client_id", client.client_id);
+
+      for (const file of files) {
+        form.append("files", file, file.name);
+      }
+
+      const { data, error } =
+        await supabase.functions.invoke(
+          "eo2mate",
+          {
+            headers: { "x-eo2mate-route": "inventory-admin" },
+            body: form,
+          },
+        );
+
+      if (error) {
+        throw error;
+      }
+
+      if (!data?.success) {
+        throw new Error(
+          data?.message ||
+          "Unable to upload image batch.",
+        );
+      }
+
+      const nextAssignments = {};
+      for (const image of data.batch?.images || []) {
+        nextAssignments[image.inventory_image_upload_item_id] = {
+          inventory_item_id: "",
+          is_primary: false,
+          display_order: 1,
+        };
+      }
+
+      setImageBatch(data.batch);
+      setImageAssignments(nextAssignments);
+      setImageBatchModal(true);
+      setMessage(
+        `${files.length} image(s) uploaded. Assign each image, review, then save.`,
+      );
+    } catch (error) {
+      setErrorMessage(
+        error?.message ||
+        "Unable to upload image batch.",
+      );
+    } finally {
+      if (imageBatchInputRef.current) {
+        imageBatchInputRef.current.value = "";
+      }
+      setProcessing(false);
+    }
+  }
+
+
+  function updateImageAssignment(
+    imageId,
+    changes,
+  ) {
+    setImageAssignments(
+      (current) => ({
+        ...current,
+        [imageId]: {
+          ...(current[imageId] || {}),
+          ...changes,
+        },
+      }),
+    );
+  }
+
+
+  async function saveImageAssignments() {
+    if (!imageBatch?.inventory_image_upload_batch_id) {
+      return;
+    }
+
+    const assignments =
+      (imageBatch.images || [])
+        .map((image) => {
+          const current =
+            imageAssignments[image.inventory_image_upload_item_id] || {};
+
+          return {
+            inventory_image_upload_item_id:
+              image.inventory_image_upload_item_id,
+            inventory_item_id:
+              current.inventory_item_id || "",
+            is_primary:
+              current.is_primary === true,
+            display_order:
+              Math.max(1, Number(current.display_order || 1)),
+          };
+        })
+        .filter((assignment) => assignment.inventory_item_id);
+
+    if (!assignments.length) {
+      setErrorMessage(
+        "Assign at least one image to an inventory product/SKU before saving.",
+      );
+      return;
+    }
+
+    setProcessing(true);
+    setMessage("");
+    setErrorMessage("");
+
+    try {
+      const result = await invoke({
+        action: "SAVE_IMAGE_ASSIGNMENTS",
+        client_id: client.client_id,
+        inventory_image_upload_batch_id:
+          imageBatch.inventory_image_upload_batch_id,
+        assignments,
+      });
+
+      setImageBatchModal(false);
+      setImageBatch(null);
+      setImageAssignments({});
+      await loadItems();
+      setMessage(
+        `Image assignment saved. ${result.saved_images || 0} image(s) assigned.`,
+      );
+    } catch (error) {
+      setErrorMessage(
+        error?.message ||
+        "Unable to save image assignments.",
+      );
+    } finally {
+      setProcessing(false);
     }
   }
 
@@ -2166,6 +2354,29 @@ export default function InventoryPage({
                   Update Existing
                 </option>
               </select>
+
+              <input
+                ref={imageBatchInputRef}
+                type="file"
+                hidden
+                multiple
+                accept="image/jpeg,image/png,image/webp"
+                onChange={(event) =>
+                  uploadImageBatch(event.target.files)
+                }
+              />
+
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() =>
+                  imageBatchInputRef.current?.click()
+                }
+                disabled={processing}
+                title="Upload up to 100 images, then assign them to products/SKUs"
+              >
+                Assign Images
+              </button>
 
               <button
                 type="button"
@@ -3415,6 +3626,144 @@ export default function InventoryPage({
                   }
                 >
                   Save Stock Movement
+                </button>
+              </div>
+            </section>
+          </div>
+        )
+      }
+
+
+      {
+        imageBatchModal &&
+        imageBatch &&
+        (
+          <div className="inventory-modal-backdrop">
+            <section className="inventory-modal" style={{ maxWidth: 1100 }}>
+              <div className="inventory-modal-header">
+                <div>
+                  <h2>Assign Inventory Images</h2>
+                  <p>
+                    Review uploaded images and assign each one to the correct product/SKU.
+                    Unassigned images will remain uncommitted.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  className="icon-button"
+                  onClick={() => setImageBatchModal(false)}
+                  disabled={processing}
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="inventory-image-grid">
+                {(imageBatch.images || []).map((image, index) => {
+                  const assignment =
+                    imageAssignments[image.inventory_image_upload_item_id] || {};
+
+                  return (
+                    <div
+                      key={image.inventory_image_upload_item_id}
+                      className="inventory-image-tile"
+                      style={{ padding: 12 }}
+                    >
+                      {image.signed_url ? (
+                        <img
+                          src={image.signed_url}
+                          alt={image.original_file_name || `Upload ${index + 1}`}
+                        />
+                      ) : (
+                        <div className="inventory-image-placeholder">
+                          Image unavailable
+                        </div>
+                      )}
+
+                      <div className="inventory-image-meta">
+                        {image.original_file_name || `Image ${index + 1}`}
+                      </div>
+
+                      <label>
+                        Product / SKU
+                        <select
+                          value={assignment.inventory_item_id || ""}
+                          onChange={(event) =>
+                            updateImageAssignment(
+                              image.inventory_image_upload_item_id,
+                              { inventory_item_id: event.target.value },
+                            )
+                          }
+                          disabled={processing}
+                        >
+                          <option value="">Unassigned</option>
+                          {items.map((item) => (
+                            <option
+                              key={item.inventory_item_id}
+                              value={item.inventory_item_id}
+                            >
+                              {item.item_code} · {item.item_name}
+                              {item.variant_label ? ` · ${item.variant_label}` : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        <input
+                          type="checkbox"
+                          checked={assignment.is_primary === true}
+                          onChange={(event) =>
+                            updateImageAssignment(
+                              image.inventory_image_upload_item_id,
+                              { is_primary: event.target.checked },
+                            )
+                          }
+                          disabled={processing || !assignment.inventory_item_id}
+                          style={{ width: "auto" }}
+                        />
+                        Primary image
+                      </label>
+
+                      <label>
+                        Display order
+                        <input
+                          type="number"
+                          min="1"
+                          step="1"
+                          value={assignment.display_order || 1}
+                          onChange={(event) =>
+                            updateImageAssignment(
+                              image.inventory_image_upload_item_id,
+                              { display_order: event.target.value },
+                            )
+                          }
+                          disabled={processing || !assignment.inventory_item_id}
+                        />
+                      </label>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="inventory-modal-actions">
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => setImageBatchModal(false)}
+                  disabled={processing}
+                >
+                  Review Later
+                </button>
+
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={saveImageAssignments}
+                  disabled={processing}
+                >
+                  Save Image Assignments
                 </button>
               </div>
             </section>
