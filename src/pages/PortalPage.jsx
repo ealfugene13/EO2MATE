@@ -575,14 +575,14 @@ export default function PortalPage({ session }) {
   const [reportChannelFilter, setReportChannelFilter] = useState("ALL");
 
   // UI-first operational dashboards. Data wiring follows after UI approval.
-  const [auctionWorkspaceTab, setAuctionWorkspaceTab] = useState("SUMMARY");
-  const [miningWorkspaceTab, setMiningWorkspaceTab] = useState("SUMMARY");
-  const [regularSaleWorkspaceTab, setRegularSaleWorkspaceTab] = useState("SUMMARY");
+  const [auctionWorkspaceTab, setAuctionWorkspaceTab] = useState("DASHBOARD");
+  const [miningWorkspaceTab, setMiningWorkspaceTab] = useState("DASHBOARD");
+  const [regularSaleWorkspaceTab, setRegularSaleWorkspaceTab] = useState("DASHBOARD");
   const [liveSellingWorkspaceTab, setLiveSellingWorkspaceTab] = useState("DASHBOARD");
   const [miningStatusFilter, setMiningStatusFilter] = useState("ALL");
-  const [inventoryTab, setInventoryTab] = useState("SUMMARY");
-  const [salesTab, setSalesTab] = useState("SUMMARY");
-  const [purchasesTab, setPurchasesTab] = useState("SUMMARY");
+  const [inventoryTab, setInventoryTab] = useState("DASHBOARD");
+  const [salesTab, setSalesTab] = useState("DASHBOARD");
+  const [purchasesTab, setPurchasesTab] = useState("DASHBOARD");
 
   const filteredChatConversations = useMemo(() => {
     const query = chatSearch.trim().toLowerCase();
@@ -1927,8 +1927,40 @@ export default function PortalPage({ session }) {
     );
   }
 
+  const renderSellingTabs = (activeTab, onTabChange, createAction) => (
+    <section className="selling-tabs">
+      <div>
+        {["DASHBOARD", "SUMMARY", "POSTS"].map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            className={activeTab === tab ? "primary-button" : "secondary-button"}
+            onClick={() => onTabChange(tab)}
+          >
+            {tab === "POSTS" ? "Posts" : tab.charAt(0) + tab.slice(1).toLowerCase()}
+          </button>
+        ))}
+        <button type="button" className="secondary-button" onClick={createAction}>Create Post</button>
+      </div>
+    </section>
+  );
+
   return (
     <div className="app-shell">
+      <style>{`
+        .selling-hero{position:relative;overflow:hidden;background:linear-gradient(135deg,#08233f 0%,#0f3558 62%,#17623a 140%);border-radius:24px;padding:26px 30px;color:#fff;box-shadow:0 18px 45px rgba(8,35,63,.14);margin-bottom:18px}
+        .selling-hero:after{content:"";position:absolute;width:260px;height:260px;right:-80px;top:-125px;border-radius:50%;background:rgba(255,255,255,.07)}
+        .selling-hero .eyebrow{color:rgba(255,255,255,.72)}.selling-hero h1{color:#fff;margin:4px 0 7px;font-size:clamp(28px,3vw,38px);letter-spacing:-.03em}.selling-hero p:not(.eyebrow){color:rgba(255,255,255,.78);margin:0;max-width:780px}
+        .selling-hero .icon-button{background:rgba(255,255,255,.10);border-color:rgba(255,255,255,.20);color:#fff;position:relative;z-index:2}
+        .selling-tabs{padding:8px;border:1px solid #e1e8ef;border-radius:16px;background:rgba(255,255,255,.94);box-shadow:0 8px 24px rgba(8,35,63,.06);margin-bottom:18px}
+        .selling-tabs>div{display:flex;gap:6px;flex-wrap:wrap}.selling-tabs button{min-height:40px;border-radius:11px;padding:0 16px;font-weight:800}
+        .selling-tabs .primary-button{box-shadow:0 7px 18px rgba(43,150,72,.16)}
+        .selling-card{border:1px solid #e2e9f0!important;border-radius:18px!important;box-shadow:0 10px 30px rgba(8,35,63,.055)}
+        .selling-kpi-grid .dashboard-stat{border-radius:18px;box-shadow:0 8px 24px rgba(8,35,63,.055);transition:transform .18s ease,box-shadow .18s ease}
+        .selling-kpi-grid .dashboard-stat:hover{transform:translateY(-2px);box-shadow:0 13px 30px rgba(8,35,63,.09)}
+        .selling-section-title{display:flex;align-items:center;justify-content:space-between;gap:12px}
+        @media(max-width:760px){.selling-hero{border-radius:18px;padding:22px 18px}.selling-tabs{overflow-x:auto}.selling-tabs>div{flex-wrap:nowrap;min-width:max-content}}
+      `}</style>
       <button
         type="button"
         className={`mobile-nav-backdrop ${mobileMenuOpen ? "open" : ""}`}
@@ -2246,7 +2278,7 @@ export default function PortalPage({ session }) {
 
         {metaConnected && page === "regular-sale" && (
           <>
-            <header className="dashboard-header">
+            <header className="dashboard-header selling-hero">
               <div>
                 <p className="eyebrow">FACEBOOK SELLING</p>
                 <h1>Regular Sales</h1>
@@ -2263,22 +2295,13 @@ export default function PortalPage({ session }) {
               <MetricCard title="Sales value" value={formatCurrency(0)} subtitle="Gross Regular Sale value" />
             </section>
 
-            <section className="dashboard-panel" style={{ marginBottom: 18 }}>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {["SUMMARY", "POSTS", "POSTING"].map((tab) => (
-                  <button
-                    key={tab}
-                    type="button"
-                    className={regularSaleWorkspaceTab === tab ? "primary-button" : "secondary-button"}
-                    onClick={() => setRegularSaleWorkspaceTab(tab)}
-                  >
-                    {tab === "POSTING" ? "Create Post" : tab.charAt(0) + tab.slice(1).toLowerCase()}
-                  </button>
-                ))}
-              </div>
-            </section>
+            {renderSellingTabs(
+            regularSaleWorkspaceTab,
+            setRegularSaleWorkspaceTab,
+            () => { setRegularSaleWorkspaceTab("POSTING"); navigateTo("regular-sale"); }
+          )}
 
-            {regularSaleWorkspaceTab === "SUMMARY" && (
+            {regularSaleWorkspaceTab === "DASHBOARD" || regularSaleWorkspaceTab === "SUMMARY" && (
               <>
                 <section className="toolbar-card">
                   <select className="filter-select" defaultValue="ALL">
@@ -2294,7 +2317,7 @@ export default function PortalPage({ session }) {
                     <option value="MONTH">This month</option>
                   </select>
                 </section>
-                <section className="dashboard-panel">
+                <section className="dashboard-panel selling-card">
                   <div className="panel-header">
                     <div><h2>Regular Sale summary</h2><p>Orders, inventory movement, buyers and sales value for fixed-price selling.</p></div>
                   </div>
@@ -2311,7 +2334,7 @@ export default function PortalPage({ session }) {
             )}
 
             {regularSaleWorkspaceTab === "POSTS" && (
-              <section className="dashboard-panel">
+              <section className="dashboard-panel selling-card">
                 <div className="panel-header">
                   <div><h2>Regular Sale posts</h2><p>Single and Multiple Regular Sale posts by status.</p></div>
                   <button className="primary-button" type="button" onClick={() => setRegularSaleWorkspaceTab("POSTING")}>Create Regular Sale Post</button>
@@ -2333,12 +2356,7 @@ export default function PortalPage({ session }) {
 
         {metaConnected && page === "pre-order" && (
           <>
-            <section className="dashboard-panel" style={{ marginBottom: 18 }}>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                <button type="button" className="primary-button">Dashboard / Summary</button>
-                <button type="button" className="secondary-button" onClick={() => navigateTo("pre-order-create")}>Create Post</button>
-              </div>
-            </section>
+            
             <PreorderAdminPage client={client} onCreatePost={() => navigateTo("pre-order-create")} />
           </>
         )}
@@ -2358,7 +2376,7 @@ export default function PortalPage({ session }) {
 
         {metaConnected && page === "live-selling" && (
           <>
-            <header className="dashboard-header">
+            <header className="dashboard-header selling-hero">
               <div>
                 <p className="eyebrow">FACEBOOK SELLING</p>
                 <h1>Live Selling</h1>
@@ -2373,17 +2391,12 @@ export default function PortalPage({ session }) {
               <MetricCard title="Items sold" value="0" subtitle="Allocated quantity" />
               <MetricCard title="Sales value" value={formatCurrency(0)} subtitle="Gross live-selling value" />
             </section>
-            <section className="dashboard-panel" style={{ marginBottom: 18 }}>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {["DASHBOARD", "SUMMARY", "POSTS"].map((tab) => (
-                  <button key={tab} type="button" className={liveSellingWorkspaceTab === tab ? "primary-button" : "secondary-button"} onClick={() => setLiveSellingWorkspaceTab(tab)}>
-                    {tab.charAt(0) + tab.slice(1).toLowerCase()}
-                  </button>
-                ))}
-                <button type="button" className="secondary-button" disabled title="Coming soon">Create Post · Soon</button>
-              </div>
-            </section>
-            <section className="dashboard-panel">
+            {renderSellingTabs(
+            liveSellingWorkspaceTab,
+            setLiveSellingWorkspaceTab,
+            () => navigateTo("posts")
+          )}
+            <section className="dashboard-panel selling-card">
               <div className="panel-header"><div><h2>{liveSellingWorkspaceTab === "POSTS" ? "Live Selling posts" : liveSellingWorkspaceTab === "SUMMARY" ? "Live Selling summary" : "Live Selling dashboard"}</h2><p>Ready for the Live Selling backend connection without exposing placeholder data as real activity.</p></div></div>
               <div className="table-wrapper"><table><thead><tr><th>Session / Post</th><th>Status</th><th>Claims</th><th>Buyers</th><th>Items</th><th>Sales</th></tr></thead><tbody><tr><td colSpan="6">No Live Selling records yet.</td></tr></tbody></table></div>
             </section>
@@ -3266,7 +3279,7 @@ export default function PortalPage({ session }) {
 
         {metaConnected && page === "post-mining" && (
           <>
-            <header className="dashboard-header">
+            <header className="dashboard-header selling-hero">
               <div>
                 <p className="eyebrow">FACEBOOK SELLING</p>
                 <h1>Post Mining</h1>
@@ -3285,23 +3298,13 @@ export default function PortalPage({ session }) {
               <MetricCard title="Claimed value" value={formatCurrency(0)} subtitle="Gross claimed sales" />
             </section>
 
-            <section className="dashboard-panel" style={{ marginBottom: 18 }}>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {["SUMMARY", "POSTS", "LIVE MINING", "CLAIMS", "BUYERS"].map((tab) => (
-                  <button
-                    key={tab}
-                    type="button"
-                    className={miningWorkspaceTab === tab ? "primary-button" : "secondary-button"}
-                    onClick={() => setMiningWorkspaceTab(tab)}
-                  >
-                    {tab === "LIVE MINING" ? "Live Mining" : tab.charAt(0) + tab.slice(1).toLowerCase()}
-                  </button>
-                ))}
-                <button type="button" className="secondary-button" onClick={() => navigateTo("mining-create")}>Create Post</button>
-              </div>
-            </section>
+            {renderSellingTabs(
+            miningWorkspaceTab,
+            setMiningWorkspaceTab,
+            () => navigateTo("mining-create")
+          )}
 
-            {miningWorkspaceTab === "SUMMARY" && (
+            {miningWorkspaceTab === "DASHBOARD" || miningWorkspaceTab === "SUMMARY" && (
               <>
                 <section className="toolbar-card">
                   <select className="filter-select" value={miningStatusFilter} onChange={(e) => setMiningStatusFilter(e.target.value)}>
@@ -3319,7 +3322,7 @@ export default function PortalPage({ session }) {
                   </select>
                 </section>
 
-                <section className="dashboard-panel">
+                <section className="dashboard-panel selling-card">
                   <div className="panel-header">
                     <div>
                       <h2>Mining summary</h2>
@@ -3339,7 +3342,7 @@ export default function PortalPage({ session }) {
             )}
 
             {miningWorkspaceTab === "POSTS" && (
-              <section className="dashboard-panel">
+              <section className="dashboard-panel selling-card">
                 <div className="panel-header">
                   <div><h2>Mining posts</h2><p>All regular Post Mining records by status.</p></div>
                   <button className="primary-button" type="button" onClick={() => navigateTo("mining-create")}>Create Mining Post</button>
@@ -3355,7 +3358,7 @@ export default function PortalPage({ session }) {
 
             {miningWorkspaceTab === "LIVE MINING" && (
               <>
-                <section className="dashboard-panel">
+                <section className="dashboard-panel selling-card">
                   <div className="panel-header">
                     <div>
                       <h2>Live Mining</h2>
@@ -3371,7 +3374,7 @@ export default function PortalPage({ session }) {
                     <MetricCard title="Live sales" value={formatCurrency(0)} subtitle="Claimed value" />
                   </div>
                 </section>
-                <section className="dashboard-panel">
+                <section className="dashboard-panel selling-card">
                   <div className="panel-header"><div><h2>Live sessions</h2><p>Current and previous Live Mining sessions.</p></div></div>
                   <div className="table-wrapper">
                     <table>
@@ -3384,14 +3387,14 @@ export default function PortalPage({ session }) {
             )}
 
             {miningWorkspaceTab === "CLAIMS" && (
-              <section className="dashboard-panel">
+              <section className="dashboard-panel selling-card">
                 <div className="panel-header"><div><h2>Claims</h2><p>Buyer MINE claims from posts and live sessions.</p></div></div>
                 <div className="table-wrapper"><table><thead><tr><th>Buyer</th><th>MINE Code</th><th>Item</th><th>Qty</th><th>Source</th><th>Status</th><th>Amount</th><th>Claimed</th></tr></thead><tbody><tr><td colSpan="8">No claims yet.</td></tr></tbody></table></div>
               </section>
             )}
 
             {miningWorkspaceTab === "BUYERS" && (
-              <section className="dashboard-panel">
+              <section className="dashboard-panel selling-card">
                 <div className="panel-header"><div><h2>Mining buyers</h2><p>Buyer activity across Post Mining and Live Mining.</p></div></div>
                 <div className="table-wrapper"><table><thead><tr><th>Buyer</th><th>Claims</th><th>Items</th><th>Total value</th><th>Paid</th><th>Pending</th><th>Last activity</th></tr></thead><tbody><tr><td colSpan="7">No mining buyers yet.</td></tr></tbody></table></div>
               </section>
