@@ -2411,7 +2411,7 @@ export default function PortalPage({ session }) {
                         <td><button type="button" className="secondary-button" onClick={() => setExpandedSellingPostId(expandedSellingPostId === post.post_id ? null : post.post_id)}>{expandedSellingPostId === post.post_id ? "Hide" : "View"}</button></td>
                       </tr>
                       {expandedSellingPostId === post.post_id && (<tr key={`${post.post_id}-details`}><td colSpan="9"><strong>Items:</strong> {postItems.map((item) => `${item.item_label || item.item_name_snapshot || "Item"} × ${item.quantity_limit || 1}`).join(", ") || "No item rows"} · <strong>Post ID:</strong> {post.post_id}</td></tr>)}
-                      </>);
+                      </Fragment>);
                     }) : <tr><td colSpan="9">No Regular Sale records found in eo2mate_posts.</td></tr>}</tbody>
                   </table>
                 </div>
