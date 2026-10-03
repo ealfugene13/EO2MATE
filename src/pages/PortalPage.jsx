@@ -1,5 +1,5 @@
 import InventoryPage from "./InventoryPage";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { supabase } from "../supabase";
 import SetupPage from "./SetupPage";
 import OnboardingPage from "./OnboardingPage";
@@ -581,6 +581,7 @@ export default function PortalPage({ session }) {
   const [sellingPosts, setSellingPosts] = useState([]);
   const [sellingPostItems, setSellingPostItems] = useState([]);
   const [sellingPostEntries, setSellingPostEntries] = useState([]);
+  const [expandedSellingPostId, setExpandedSellingPostId] = useState(null);
   const [liveSellingWorkspaceTab, setLiveSellingWorkspaceTab] = useState("DASHBOARD");
   const [miningStatusFilter, setMiningStatusFilter] = useState("ALL");
   const [inventoryTab, setInventoryTab] = useState("SUMMARY");
@@ -1690,8 +1691,18 @@ export default function PortalPage({ session }) {
   }), [deliveries]);
 
 
+  const sellingModeOf = (post) => String(
+    post?.mode_code ||
+    post?.post_mode_code ||
+    post?.post_mode ||
+    post?.selling_mode ||
+    post?.mode ||
+    post?.source_mode_code ||
+    ""
+  ).trim().toUpperCase().replace(/[ -]+/g, "_");
+
   const regularSaleData = useMemo(() => {
-    const posts = sellingPosts.filter((p) => String(p.mode_code || p.post_mode || "").toUpperCase() === "REGULAR_SALE");
+    const posts = sellingPosts.filter((p) => sellingModeOf(p) === "REGULAR_SALE");
     const postIds = new Set(posts.map((p) => p.post_id));
     const items = sellingPostItems.filter((i) => postIds.has(i.post_id));
     const itemIds = new Set(items.map((i) => i.post_item_id));
@@ -1704,6 +1715,23 @@ export default function PortalPage({ session }) {
     const active = posts.filter((p) => ["ACTIVE", "OPEN", "PUBLISHED"].includes(String(p.status || "").toUpperCase())).length;
     const soldOut = posts.filter((p) => ["CLOSED", "SOLD_OUT", "FULL"].includes(String(p.status || "").toUpperCase())).length;
     return { posts, items, entries, accepted, itemById, salesValue, itemsSold, buyers: buyers.size, active, soldOut };
+  }, [sellingPosts, sellingPostItems, sellingPostEntries]);
+
+  const miningData = useMemo(() => {
+    const posts = sellingPosts.filter((p) => sellingModeOf(p) === "MINING");
+    const postIds = new Set(posts.map((p) => p.post_id));
+    const items = sellingPostItems.filter((i) => postIds.has(i.post_id));
+    const itemIds = new Set(items.map((i) => i.post_item_id));
+    const entries = sellingPostEntries.filter((e) => postIds.has(e.post_id) || itemIds.has(e.post_item_id));
+    const accepted = entries.filter((e) => ["ACCEPTED", "PARTIAL"].includes(String(e.status || "").toUpperCase()));
+    const itemById = new Map(items.map((i) => [i.post_item_id, i]));
+    const claimedValue = accepted.reduce((sum, e) => sum + Number(e.accepted_quantity || 0) * Number(itemById.get(e.post_item_id)?.unit_price || 0), 0);
+    const itemsClaimed = accepted.reduce((sum, e) => sum + Number(e.accepted_quantity || 0), 0);
+    const buyers = new Set(accepted.map((e) => e.fb_user_id).filter(Boolean));
+    const active = posts.filter((p) => ["ACTIVE", "OPEN", "PUBLISHED"].includes(String(p.status || "").toUpperCase())).length;
+    const completed = posts.filter((p) => ["CLOSED", "COMPLETED", "SOLD_OUT", "FULL"].includes(String(p.status || "").toUpperCase())).length;
+    const cancelled = posts.filter((p) => String(p.status || "").toUpperCase() === "CANCELLED").length;
+    return { posts, items, entries, accepted, itemById, claimedValue, itemsClaimed, buyers: buyers.size, active, completed, cancelled };
   }, [sellingPosts, sellingPostItems, sellingPostEntries]);
 
   const filteredAuctions = useMemo(() => {
@@ -2364,14 +2392,14 @@ export default function PortalPage({ session }) {
                 </div>
                 <div className="table-wrapper">
                   <table>
-                    <thead><tr><th>Post</th><th>Facebook Page</th><th>Status</th><th>Items</th><th>Orders</th><th>Buyers</th><th>Value</th><th>Created</th></tr></thead>
+                    <thead><tr><th>Post</th><th>Facebook Page</th><th>Status</th><th>Items</th><th>Orders</th><th>Buyers</th><th>Value</th><th>Created</th><th>Action</th></tr></thead>
                     <tbody>{regularSaleData.posts.length ? regularSaleData.posts.map((post) => {
                       const postItems = regularSaleData.items.filter((item) => item.post_id === post.post_id);
                       const ids = new Set(postItems.map((item) => item.post_item_id));
                       const accepted = regularSaleData.accepted.filter((entry) => entry.post_id === post.post_id || ids.has(entry.post_item_id));
                       const buyers = new Set(accepted.map((entry) => entry.fb_user_id).filter(Boolean)).size;
                       const value = accepted.reduce((sum, entry) => sum + Number(entry.accepted_quantity || 0) * Number(regularSaleData.itemById.get(entry.post_item_id)?.unit_price || 0), 0);
-                      return (<tr key={post.post_id}>
+                      return (<Fragment key={post.post_id}><tr>
                         <td>{post.fb_post_id || post.facebook_post_id || post.post_id}</td>
                         <td>{post.fb_page_id || post.facebook_page_id || "-"}</td>
                         <td><StatusBadge status={post.status || "-"} /></td>
@@ -2380,8 +2408,11 @@ export default function PortalPage({ session }) {
                         <td>{buyers}</td>
                         <td>{formatCurrency(value)}</td>
                         <td>{formatDateTime(post.created_at)}</td>
-                      </tr>);
-                    }) : <tr><td colSpan="8">No Regular Sale records found in eo2mate_posts.</td></tr>}</tbody>
+                        <td><button type="button" className="secondary-button" onClick={() => setExpandedSellingPostId(expandedSellingPostId === post.post_id ? null : post.post_id)}>{expandedSellingPostId === post.post_id ? "Hide" : "View"}</button></td>
+                      </tr>
+                      {expandedSellingPostId === post.post_id && (<tr key={`${post.post_id}-details`}><td colSpan="9"><strong>Items:</strong> {postItems.map((item) => `${item.item_label || item.item_name_snapshot || "Item"} × ${item.quantity_limit || 1}`).join(", ") || "No item rows"} · <strong>Post ID:</strong> {post.post_id}</td></tr>)}
+                      </>);
+                    }) : <tr><td colSpan="9">No Regular Sale records found in eo2mate_posts.</td></tr>}</tbody>
                   </table>
                 </div>
               </section>
@@ -3337,14 +3368,14 @@ export default function PortalPage({ session }) {
             </header>
 
             <section className="metrics-grid">
-              <MetricCard title="Total posts" value="0" subtitle="All mining posts" />
-              <MetricCard title="Active" value="0" subtitle="Currently accepting MINE" />
+              <MetricCard title="Total posts" value={miningData.posts.length} subtitle="All mining posts" />
+              <MetricCard title="Active" value={miningData.active} subtitle="Currently accepting MINE" />
               <MetricCard title="Live Mining" value="0" subtitle="Active live sessions" />
-              <MetricCard title="Completed" value="0" subtitle="Closed mining posts" />
-              <MetricCard title="Cancelled" value="0" subtitle="Cancelled posts" />
-              <MetricCard title="Total claims" value="0" subtitle="Recorded MINE claims" />
-              <MetricCard title="Unique buyers" value="0" subtitle="Mining customers" />
-              <MetricCard title="Claimed value" value={formatCurrency(0)} subtitle="Gross claimed sales" />
+              <MetricCard title="Completed" value={miningData.completed} subtitle="Closed mining posts" />
+              <MetricCard title="Cancelled" value={miningData.cancelled} subtitle="Cancelled posts" />
+              <MetricCard title="Total claims" value={miningData.accepted.length} subtitle="Recorded MINE claims" />
+              <MetricCard title="Unique buyers" value={miningData.buyers} subtitle="Mining customers" />
+              <MetricCard title="Claimed value" value={formatCurrency(miningData.claimedValue)} subtitle="Gross claimed sales" />
             </section>
 
             <section className="dashboard-panel" style={{ marginBottom: 18 }}>
@@ -3408,8 +3439,21 @@ export default function PortalPage({ session }) {
                 </div>
                 <div className="table-wrapper">
                   <table>
-                    <thead><tr><th>Post</th><th>Facebook Page</th><th>Status</th><th>Items</th><th>Claims</th><th>Buyers</th><th>Value</th><th>Created</th></tr></thead>
-                    <tbody><tr><td colSpan="8">No Post Mining records yet.</td></tr></tbody>
+                    <thead><tr><th>Post</th><th>Facebook Page</th><th>Status</th><th>Items</th><th>Claims</th><th>Buyers</th><th>Value</th><th>Created</th><th>Action</th></tr></thead>
+                    <tbody>{miningData.posts.length ? miningData.posts.map((post) => {
+                      const postItems = miningData.items.filter((item) => item.post_id === post.post_id);
+                      const ids = new Set(postItems.map((item) => item.post_item_id));
+                      const accepted = miningData.accepted.filter((entry) => entry.post_id === post.post_id || ids.has(entry.post_item_id));
+                      const buyers = new Set(accepted.map((entry) => entry.fb_user_id).filter(Boolean)).size;
+                      const value = accepted.reduce((sum, entry) => sum + Number(entry.accepted_quantity || 0) * Number(miningData.itemById.get(entry.post_item_id)?.unit_price || 0), 0);
+                      return (<Fragment key={post.post_id}><tr>
+                        <td>{post.fb_post_id || post.facebook_post_id || post.post_id}</td>
+                        <td>{post.fb_page_id || post.facebook_page_id || "-"}</td>
+                        <td><StatusBadge status={post.status || "-"} /></td>
+                        <td>{postItems.length}</td><td>{accepted.length}</td><td>{buyers}</td><td>{formatCurrency(value)}</td><td>{formatDateTime(post.created_at)}</td>
+                        <td><button type="button" className="secondary-button" onClick={() => setExpandedSellingPostId(expandedSellingPostId === post.post_id ? null : post.post_id)}>{expandedSellingPostId === post.post_id ? "Hide" : "View"}</button></td>
+                      </tr>{expandedSellingPostId === post.post_id && (<tr><td colSpan="9"><strong>Items:</strong> {postItems.map((item) => `${item.item_label || item.item_name_snapshot || "Item"} × ${item.quantity_limit || 1}`).join(", ") || "No item rows"} · <strong>Post ID:</strong> {post.post_id}</td></tr>)}</Fragment>);
+                    }) : <tr><td colSpan="9">No Mining records found in eo2mate_posts.</td></tr>}</tbody>
                   </table>
                 </div>
               </section>
