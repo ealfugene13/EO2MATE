@@ -520,7 +520,6 @@
       <section
         id="shippingFormSection"
         class="card hidden"
-        data-payment-first="true"
       >
 
         <h2 class="card-title">
@@ -794,7 +793,7 @@
           id="paymentWaiting"
           class="notice hidden"
         >
-          Payment is not currently available for this order.
+          Payment is not currently due for this order.
         </div>
 
 
@@ -808,13 +807,23 @@
           </div>
 
           <div id="paymentChoice" class="hidden" style="margin:14px 0;">
-            <div class="muted" style="margin-bottom:8px;">Choose how you want to pay this Pre-Order:</div>
+            <div id="paymentChoiceHelp" class="muted" style="margin-bottom:8px;">
+              Choose how you want to pay.
+            </div>
+
             <label style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;border:1px solid #dfe7ee;border-radius:12px;margin-bottom:8px;cursor:pointer;">
-              <span><input type="radio" name="paymentOption" id="paymentOptionMinimum" value="DP" checked> <span id="paymentOptionMinimumLabel">Pay Down Payment</span></span>
-              <strong id="dpAmount"></strong>
+              <span>
+                <input id="minimumPaymentOption" type="radio" name="paymentOption" value="DP" checked>
+                <span id="minimumChoiceLabel">Pay Down Payment</span>
+              </span>
+              <strong id="minimumAmount"></strong>
             </label>
+
             <label style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;border:1px solid #dfe7ee;border-radius:12px;cursor:pointer;">
-              <span><input type="radio" name="paymentOption" id="paymentOptionFull" value="FULL"> <span id="paymentOptionFullLabel">Pay in Full</span></span>
+              <span>
+                <input id="fullPaymentOption" type="radio" name="paymentOption" value="FULL">
+                <span id="fullChoiceLabel">Pay in Full</span>
+              </span>
               <strong id="fullAmount"></strong>
             </label>
           </div>
@@ -1045,12 +1054,13 @@ const FUNCTION_BASE =
     );
 
   const paymentChoice = document.getElementById("paymentChoice");
-  const dpAmount = document.getElementById("dpAmount");
+  const paymentChoiceHelp = document.getElementById("paymentChoiceHelp");
+  const minimumPaymentOption = document.getElementById("minimumPaymentOption");
+  const fullPaymentOption = document.getElementById("fullPaymentOption");
+  const minimumChoiceLabel = document.getElementById("minimumChoiceLabel");
+  const fullChoiceLabel = document.getElementById("fullChoiceLabel");
+  const minimumAmount = document.getElementById("minimumAmount");
   const fullAmount = document.getElementById("fullAmount");
-  const paymentOptionMinimumLabel = document.getElementById("paymentOptionMinimumLabel");
-  const paymentOptionFullLabel = document.getElementById("paymentOptionFullLabel");
-  const paymentOptionMinimum = document.getElementById("paymentOptionMinimum");
-  const paymentOptionFull = document.getElementById("paymentOptionFull");
 
   const payButton =
     document.getElementById(
@@ -1516,104 +1526,151 @@ const FUNCTION_BASE =
   }
 
 
-  // Payment-first UI guard. Legacy checkout-choice and shipping-first
-  // controls remain in the file for compatibility but are never shown here.
-  checkoutChoiceSection.classList.add("hidden");
-  shippingFormSection.classList.add("hidden");
-
+    // EO2MATE payment-first lifecycle.
+    // The legacy auction "Pay Now / Wait for More Items" and pre-payment
+    // shipping form remain in this baseline for compatibility, but are not
+    // part of the current buyer flow.
+    checkoutChoiceSection.classList.add("hidden");
+    shippingFormSection.classList.add("hidden");
 
   /* =========================================================
      PAYMENT UI
      ========================================================= */
 
-  function renderPayment(
-    data
-  ) {
+  function renderPayment(data) {
 
-    paymentWaiting.classList.add(
-      "hidden"
-    );
+    paymentWaiting.classList.add("hidden");
+    onlinePayment.classList.add("hidden");
+    manualPayment.classList.add("hidden");
+    paymentChoice.classList.add("hidden");
 
-    onlinePayment.classList.add(
-      "hidden"
-    );
-
-    manualPayment.classList.add(
-      "hidden"
-    );
-
-
-    if (
-      data.checkout_type !==
-      "ORDER_GROUP"
-    ) {
+    if (data.checkout_type !== "ORDER_GROUP") {
       return;
     }
 
+    const group = data.order_group || {};
+    const status = String(group.group_status || "").toUpperCase();
+    const options = Array.isArray(group.payment_options)
+      ? group.payment_options
+      : [];
 
-    const status =
-      String(
-        data.order_group.group_status ||
-        ""
-      ).toUpperCase();
+    const paymentDue = Number(
+      group.payment_due ??
+      data.payment?.payment_due ??
+      0
+    );
 
+    const terminalStatuses = new Set([
+      "PAID",
+      "COMPLETED",
+      "CANCELLED",
+      "EXPIRED",
+      "VOID"
+    ]);
 
-    // EO2MATE payment-first lifecycle:
-    // Auction / Mining / Regular Sale and payable Pre-Orders can pay while
-    // the group is OPEN. Shipping details are requested only after verified
-    // full settlement by the backend/Messenger lifecycle.
-    if (!["OPEN", "READY_FOR_PAYMENT"].includes(status)) {
+    // PAYMENT_PENDING / OPEN are intentionally payable.  The previous
+    // checkout incorrectly required READY_FOR_PAYMENT, which belongs to
+    // the older shipping-before-payment lifecycle.
+    const hasOutstandingPayment =
+      paymentDue > 0 ||
+      options.some((option) => Number(option?.amount || 0) > 0);
+
+    if (terminalStatuses.has(status) || !hasOutstandingPayment) {
       paymentWaiting.classList.remove("hidden");
+      paymentWaiting.textContent =
+        terminalStatuses.has(status)
+          ? "There is no outstanding online payment for this order."
+          : "Payment is not currently due for this order.";
       return;
     }
 
+    if (data.payment?.payment_enabled !== true) {
+      manualPayment.classList.remove("hidden");
+      return;
+    }
 
-    const options = data.order_group?.payment_options || [];
-    const canChoose = data.order_group?.can_choose_dp_or_full === true;
-    paymentChoice.classList.toggle("hidden", !canChoose);
+    onlinePayment.classList.remove("hidden");
+
+    const minimum =
+      options.find((option) => ["DP", "MINIMUM"].includes(String(option?.code || "").toUpperCase())) ||
+      null;
+
+    const full =
+      options.find((option) => String(option?.code || "").toUpperCase() === "FULL") ||
+      null;
+
+    const canChoose =
+      group.can_choose_dp_or_full === true &&
+      minimum &&
+      full;
+
     if (canChoose) {
-      const minimum = options.find((x) => ["DP","MINIMUM"].includes(x.code)) || options[0];
-      const full = options.find((x) => x.code === "FULL") || options[1];
-      const isMixed = minimum?.code === "MINIMUM";
-      paymentOptionMinimum.value = minimum?.code || "DP";
-      paymentOptionFull.value = "FULL";
-      paymentOptionMinimumLabel.textContent = minimum?.label || (isMixed ? "Pay Minimum Due Now" : "Pay Down Payment");
-      paymentOptionFullLabel.textContent = full?.label || (isMixed ? "Pay Entire Outstanding Group" : "Pay in Full");
-      dpAmount.textContent = money(minimum?.amount || data.order_group?.payment_due || 0);
-      fullAmount.textContent = money(full?.amount || data.order_group?.payment_due_full || data.order_group?.total_amount || 0);
-      payButton.textContent = `${paymentOptionMinimumLabel.textContent} — ${money(minimum?.amount || data.order_group?.payment_due || 0)}`;
+      const isMixed =
+        group.is_mixed_order_group === true ||
+        String(minimum.code || "").toUpperCase() === "MINIMUM";
+
+      const minimumCode =
+        String(minimum.code || "DP").toUpperCase();
+
+      minimumPaymentOption.value = minimumCode;
+      fullPaymentOption.value = "FULL";
+
+      minimumChoiceLabel.textContent =
+        minimum.label ||
+        (isMixed ? "Pay Minimum Due Now" : "Pay Down Payment");
+
+      fullChoiceLabel.textContent =
+        full.label ||
+        (isMixed ? "Pay Entire Outstanding Group" : "Pay in Full");
+
+      paymentChoiceHelp.textContent =
+        isMixed
+          ? "Choose whether to pay the amount currently required across this order group or settle the entire outstanding balance."
+          : "Choose whether to pay the required Pre-Order down payment or settle the Pre-Order in full.";
+
+      minimumAmount.textContent =
+        money(minimum.amount || paymentDue);
+
+      fullAmount.textContent =
+        money(
+          full.amount ||
+          group.payment_due_full ||
+          group.total_amount ||
+          0
+        );
+
+      paymentChoice.classList.remove("hidden");
+
+      const updatePayButton = () => {
+        const selected =
+          document.querySelector('input[name="paymentOption"]:checked')?.value ||
+          minimumCode;
+
+        const selectedFull = selected === "FULL";
+        const amount = selectedFull
+          ? Number(full.amount || group.payment_due_full || group.total_amount || 0)
+          : Number(minimum.amount || paymentDue);
+
+        const label = selectedFull
+          ? fullChoiceLabel.textContent
+          : minimumChoiceLabel.textContent;
+
+        payButton.textContent =
+          `${label} — ${money(amount)}`;
+      };
+
       document.querySelectorAll('input[name="paymentOption"]').forEach((radio) => {
-        radio.onchange = () => {
-          const selected = document.querySelector('input[name="paymentOption"]:checked')?.value || minimum?.code || "DP";
-          const useFull = selected === "FULL";
-          const selectedAmount = useFull ? (full?.amount || 0) : (minimum?.amount || 0);
-          payButton.textContent = `${useFull ? paymentOptionFullLabel.textContent : paymentOptionMinimumLabel.textContent} — ${money(selectedAmount)}`;
-        };
+        radio.onchange = updatePayButton;
       });
-    } else {
-      payButton.textContent = `Pay ${money(data.order_group?.payment_due || 0)} Online`;
+
+      minimumPaymentOption.checked = true;
+      updatePayButton();
+      return;
     }
 
-    if (
-      data.payment
-        ?.payment_enabled ===
-      true
-    ) {
-
-      onlinePayment.classList.remove(
-        "hidden"
-      );
-
-    } else {
-
-      manualPayment.classList.remove(
-        "hidden"
-      );
-
-    }
-
+    payButton.textContent =
+      `Pay ${money(paymentDue || group.total_amount || 0)} Online`;
   }
-
 
   /* =========================================================
      LOAD
