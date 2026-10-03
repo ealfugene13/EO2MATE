@@ -1027,6 +1027,25 @@ async function getFunctionErrorMessage(error) {
   return message;
 }
 
+const inventoryAvailableQty = (item) => {
+  if (!item) return 0;
+  const candidates = [
+    item.available_quantity,
+    item.available_qty,
+    item.quantity_available,
+    item.available_stock,
+    item.stock_available,
+    item.on_hand_quantity,
+    item.quantity_on_hand,
+    item.current_quantity,
+    item.quantity,
+    item.qty
+  ];
+  const found = candidates.find((value) => value !== null && value !== undefined && value !== "");
+  const number = Number(found);
+  return Number.isFinite(number) ? number : 0;
+};
+
 export default function FacebookPostPage({
   client,
   initialPostMode = "AUCTION",
@@ -1054,6 +1073,7 @@ export default function FacebookPostPage({
   const [singleItemSource, setSingleItemSource] = useState("MANUAL");
   const [singleInventoryItemId, setSingleInventoryItemId] = useState("");
   const [preorderPrice, setPreorderPrice] = useState("");
+  const [preorderPaymentRequirement, setPreorderPaymentRequirement] = useState("DOWN_PAYMENT");
   const [preorderDownPayment, setPreorderDownPayment] = useState("");
   const [preorderDownPaymentType, setPreorderDownPaymentType] = useState("FIXED");
   const [preorderQuantity, setPreorderQuantity] = useState("");
@@ -1398,7 +1418,7 @@ export default function FacebookPostPage({
       const price = normalizeMoney(preorderPrice);
       if (price !== null) lines.push(`Price: ${formatMoneyForCaption(preorderPrice)}`);
       const downPayment = normalizeMoney(preorderDownPayment);
-      if (downPayment !== null) lines.push(preorderDownPaymentType === "PERCENTAGE" ? `Required Down Payment: ${downPayment}%` : `Required Down Payment: ${formatMoneyForCaption(preorderDownPayment)} per item`);
+      if (preorderPaymentRequirement === "DOWN_PAYMENT" && downPayment !== null) lines.push(preorderDownPaymentType === "PERCENTAGE" ? `Required Down Payment: ${downPayment}%` : `Required Down Payment: ${formatMoneyForCaption(preorderDownPayment)} per item`);
       if (preorderQuantity) lines.push(`Available Qty: ${preorderQuantity}`);
       if (preorderMaxPerBuyer) lines.push(`Max Qty / Buyer: ${preorderMaxPerBuyer}`);
       if (preorderDeadline) lines.push(`Pre-Order Until: ${formatFacebookAuctionDate(preorderDeadline)}`);
@@ -1428,6 +1448,7 @@ export default function FacebookPostPage({
     sharedRules,
     singleItem,
     preorderPrice,
+    preorderPaymentRequirement,
     preorderDownPayment,
     preorderDownPaymentType,
     preorderQuantity,
@@ -1482,7 +1503,7 @@ export default function FacebookPostPage({
         const max = item.preorderMaxPerBuyer !== "" ? item.preorderMaxPerBuyer : preorderMaxPerBuyer;
         if (max) lines.push(`Max Qty / Buyer: ${max}`);
         const dp = normalizeMoney(preorderDownPayment);
-        if (dp !== null) lines.push(preorderDownPaymentType === "PERCENTAGE" ? `Required Down Payment: ${dp}%` : `Required Down Payment: ${formatMoneyForCaption(preorderDownPayment)} per item`);
+        if (preorderPaymentRequirement === "DOWN_PAYMENT" && dp !== null) lines.push(preorderDownPaymentType === "PERCENTAGE" ? `Required Down Payment: ${dp}%` : `Required Down Payment: ${formatMoneyForCaption(preorderDownPayment)} per item`);
         if (preorderDeadline) lines.push(`Pre-Order Until: ${formatFacebookAuctionDate(preorderDeadline)}`);
         if (preorderPaymentDeadline) lines.push(`Payment Deadline: ${formatFacebookAuctionDate(preorderPaymentDeadline)}`);
         lines.push(`Comment ${command}<qty> to order, e.g. ${command}1 or ${command} 1.`);
@@ -1783,8 +1804,10 @@ export default function FacebookPostPage({
       return errors;
     } else if (postMode === "PREORDER") {
       const downPayment = normalizeMoney(preorderDownPayment);
-      if (downPayment === null || downPayment <= 0) errors.preorderDownPayment = "Required down payment must be greater than 0.";
-      else if (preorderDownPaymentType === "PERCENTAGE" && downPayment > 100) errors.preorderDownPayment = "Down payment percentage cannot exceed 100%.";
+      if (preorderPaymentRequirement === "DOWN_PAYMENT") {
+        if (downPayment === null || downPayment <= 0) errors.preorderDownPayment = "Required down payment must be greater than 0.";
+        else if (preorderDownPaymentType === "PERCENTAGE" && downPayment > 100) errors.preorderDownPayment = "Down payment percentage cannot exceed 100%.";
+      }
       const deadline = phDateFromLocalInput(preorderDeadline);
       if (!deadline) errors.preorderDeadline = "Pre-Order deadline is required.";
       else if (deadline.getTime() <= Date.now()) errors.preorderDeadline = "Pre-Order deadline must be in the future.";
@@ -1795,7 +1818,7 @@ export default function FacebookPostPage({
         if (!singleItem.trim()) errors.singleItem = "Item name is required.";
         const price = normalizeMoney(preorderPrice);
         if (price === null || price <= 0) errors.preorderPrice = "Price must be greater than 0.";
-        else if (preorderDownPaymentType === "FIXED" && downPayment !== null && downPayment > price) errors.preorderDownPayment = "Required down payment per item cannot exceed the item price.";
+        else if (preorderPaymentRequirement === "DOWN_PAYMENT" && preorderDownPaymentType === "FIXED" && downPayment !== null && downPayment > price) errors.preorderDownPayment = "Required down payment per item cannot exceed the item price.";
         const qty = Number(preorderQuantity);
         if (!Number.isInteger(qty) || qty <= 0) errors.preorderQuantity = "Quantity must be a whole number greater than 0.";
         if (preorderMaxPerBuyer !== "") {
@@ -1808,6 +1831,7 @@ export default function FacebookPostPage({
         if (defaultPrice === null || defaultPrice <= 0) {
           errors.preorderPrice = "Default price must be greater than 0.";
         } else if (
+          preorderPaymentRequirement === "DOWN_PAYMENT" &&
           preorderDownPaymentType === "FIXED" &&
           downPayment !== null &&
           downPayment > defaultPrice
@@ -1838,6 +1862,7 @@ export default function FacebookPostPage({
             errors[`${prefix}.preorderPrice`] =
               `Item ${index + 1}: effective price must be greater than 0.`;
           } else if (
+            preorderPaymentRequirement === "DOWN_PAYMENT" &&
             preorderDownPaymentType === "FIXED" &&
             downPayment !== null &&
             downPayment > effectivePrice
@@ -2315,8 +2340,9 @@ export default function FacebookPostPage({
         main_caption: mainCaption,
         ends_at: phDateFromLocalInput(preorderDeadline)?.toISOString(),
         payment_deadline_at: phDateFromLocalInput(preorderPaymentDeadline)?.toISOString(),
+        payment_requirement: preorderPaymentRequirement === "FULL_PAYMENT" ? "FULL" : (preorderDownPaymentType === "PERCENTAGE" ? "DEPOSIT_PERCENT" : "DEPOSIT_AMOUNT"),
         required_down_payment_type: preorderDownPaymentType,
-        required_down_payment: normalizeMoney(preorderDownPayment),
+        required_down_payment: preorderPaymentRequirement === "DOWN_PAYMENT" ? normalizeMoney(preorderDownPayment) : null,
         max_quantity_per_buyer: preorderMaxPerBuyer === "" ? null : Number(preorderMaxPerBuyer),
         ...(isMultiple ? {
           items: items.map((item) => ({
@@ -2338,7 +2364,7 @@ export default function FacebookPostPage({
             unit_price: normalizeMoney(preorderPrice),
             quantity_limit: Number(preorderQuantity),
             required_down_payment_type: preorderDownPaymentType,
-            required_down_payment: normalizeMoney(preorderDownPayment),
+            required_down_payment: preorderPaymentRequirement === "DOWN_PAYMENT" ? normalizeMoney(preorderDownPayment) : null,
             max_quantity_per_buyer: preorderMaxPerBuyer === "" ? null : Number(preorderMaxPerBuyer),
           },
         }),
@@ -3629,6 +3655,15 @@ export default function FacebookPostPage({
                 {isMultiple && <small>Inherited by an item when its item-specific price is blank.</small>}
               </label>
               <label>
+                Payment Requirement <span className="eo2-required">*</span>
+                <select value={preorderPaymentRequirement} onChange={(e)=>{setPreorderPaymentRequirement(e.target.value); clearFieldError("preorderDownPayment");}} disabled={publishing}>
+                  <option value="FULL_PAYMENT">Full Payment</option>
+                  <option value="DOWN_PAYMENT">Down Payment</option>
+                </select>
+                <small>Full Payment proceeds to shipping after payment. Down Payment waits for item arrival before requesting the outstanding balance.</small>
+              </label>
+              {preorderPaymentRequirement === "DOWN_PAYMENT" && <>
+              <label>
                 Down Payment Type <span className="eo2-required">*</span>
                 <select value={preorderDownPaymentType} onChange={(e)=>{setPreorderDownPaymentType(e.target.value); clearFieldError("preorderDownPayment");}} disabled={publishing}>
                   <option value="FIXED">Exact Amount</option>
@@ -3642,6 +3677,7 @@ export default function FacebookPostPage({
                 <small>{preorderDownPaymentType === "PERCENTAGE" ? "Percentage of the buyer's accepted reservation value (1-100%)." : "Exact down payment amount per accepted item. Must not exceed the item price."}</small>
                 {fieldErrors.preorderDownPayment && <small className="eo2-field-error-text">{fieldErrors.preorderDownPayment}</small>}
               </label>
+              </>}
               <label>
                 {isMultiple ? "Default Available Quantity" : "Available Quantity"} <span className="eo2-required">*</span>
                 <input ref={registerField("preorderQuantity")} type="number" min="1" step="1" value={preorderQuantity} onChange={(e)=>{setPreorderQuantity(e.target.value); clearFieldError("preorderQuantity");}} disabled={publishing} />
