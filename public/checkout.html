@@ -474,7 +474,7 @@
 
       <section
         id="checkoutChoiceSection"
-        class="card"
+        class="card hidden"
       >
 
         <h2 class="card-title">
@@ -520,6 +520,7 @@
       <section
         id="shippingFormSection"
         class="card hidden"
+        data-payment-first="true"
       >
 
         <h2 class="card-title">
@@ -793,7 +794,7 @@
           id="paymentWaiting"
           class="notice hidden"
         >
-          Complete shipping details before payment.
+          Payment is not currently available for this order.
         </div>
 
 
@@ -1515,6 +1516,12 @@ const FUNCTION_BASE =
   }
 
 
+  // Payment-first UI guard. Legacy checkout-choice and shipping-first
+  // controls remain in the file for compatibility but are never shown here.
+  checkoutChoiceSection.classList.add("hidden");
+  shippingFormSection.classList.add("hidden");
+
+
   /* =========================================================
      PAYMENT UI
      ========================================================= */
@@ -1551,17 +1558,13 @@ const FUNCTION_BASE =
       ).toUpperCase();
 
 
-    if (
-      status !==
-      "READY_FOR_PAYMENT"
-    ) {
-
-      paymentWaiting.classList.remove(
-        "hidden"
-      );
-
+    // EO2MATE payment-first lifecycle:
+    // Auction / Mining / Regular Sale and payable Pre-Orders can pay while
+    // the group is OPEN. Shipping details are requested only after verified
+    // full settlement by the backend/Messenger lifecycle.
+    if (!["OPEN", "READY_FOR_PAYMENT"].includes(status)) {
+      paymentWaiting.classList.remove("hidden");
       return;
-
     }
 
 
