@@ -1,0 +1,17 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>EO2MATE Delivery Choice</title><style>
+body{font-family:system-ui,-apple-system,sans-serif;background:#f6f7f9;margin:0;color:#17202a}.wrap{max-width:720px;margin:32px auto;padding:16px}.card{background:#fff;border:1px solid #e4e7eb;border-radius:14px;padding:20px;margin-bottom:14px}.muted{color:#65717e}.item{padding:10px 0;border-bottom:1px solid #eee}.item:last-child{border:0}button{width:100%;padding:14px;margin:7px 0;border:0;border-radius:10px;background:#111827;color:#fff;font-weight:700;font-size:15px;cursor:pointer}button.secondary{background:#fff;color:#111827;border:1px solid #cbd5e1}select{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:9px;margin:8px 0 12px}.ok{background:#ecfdf5;border-color:#a7f3d0}.err{background:#fef2f2;border-color:#fecaca}
+</style></head><body><div class="wrap"><div class="card"><h2>Choose your delivery</h2><p class="muted">Your payment/order records stay unchanged. This choice only controls how your items are physically grouped for delivery.</p></div><div id="app" class="card">Loading…</div></div>
+<script>
+const token=new URLSearchParams(location.search).get("token");const endpoint="https://mimyptmwejkahfiblopu.supabase.co/functions/v1/eo2mate/buyer-fulfillment";const app=document.getElementById("app");
+async function call(action,extra={}){const r=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token,action,...extra})});const j=await r.json();if(!r.ok||!j.success)throw new Error(j.message||j.error||"Request failed");return j}
+const money=n=>"₱"+Number(n||0).toLocaleString("en-PH",{minimumFractionDigits:2,maximumFractionDigits:2});
+function items(xs){return xs.length?xs.map(x=>`<div class="item"><b>${x.item_label||x.order_number||"Item"}</b><br><span class="muted">${x.source_type||""} · Qty ${x.quantity||1} · ${money(x.total_amount)}</span></div>`).join(""):"<p class=muted>None</p>"}
+async function load(){if(!token){app.innerHTML="<b>Invalid fulfillment link.</b>";return}try{const j=await call("LOAD");const h=j.held_delivery_groups||[];app.innerHTML=`<h3>Ready / on-hand</h3>${items(j.summary.ready_items||[])}<h3>Waiting for Pre-Order</h3>${items(j.summary.waiting_preorders||[])}
+<hr><button onclick="choose('WAIT_FOR_ALL')">Wait for Pre-Order — ship together</button><button onclick="choose('SHIP_READY_NOW')">Ship ready items now — PO later</button>
+${h.length?`<hr><label><b>Or combine with an existing held delivery</b></label><select id=held>${h.map(g=>`<option value="${g.delivery_group_id}">${g.delivery_group_number} · ${g.item_count} item(s)</option>`).join("")}</select><button class=secondary onclick="combine()">Add to selected held delivery</button>`:""}`;}catch(e){app.className="card err";app.textContent=e.message}}
+async function choose(a){try{app.innerHTML="Saving your delivery choice…";const j=await call(a);done(j.message)}catch(e){fail(e)}}
+async function combine(){const id=document.getElementById("held").value;try{app.innerHTML="Combining deliveries…";const j=await call("COMBINE_WITH_HELD",{delivery_group_id:id});done(j.message)}catch(e){fail(e)}}
+function done(m){app.className="card ok";app.innerHTML=`<h3>Saved ✓</h3><p>${m}</p><p class=muted>You may close this page and return to Messenger.</p>`}function fail(e){app.className="card err";app.innerHTML=`<h3>Could not save</h3><p>${e.message}</p>`}
+load();
+</script></body></html>
