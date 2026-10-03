@@ -809,11 +809,11 @@
           <div id="paymentChoice" class="hidden" style="margin:14px 0;">
             <div class="muted" style="margin-bottom:8px;">Choose how you want to pay this Pre-Order:</div>
             <label style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;border:1px solid #dfe7ee;border-radius:12px;margin-bottom:8px;cursor:pointer;">
-              <span><input type="radio" name="paymentOption" value="DP" checked> <span id="dpChoiceLabel">Pay Down Payment</span></span>
+              <span><input type="radio" name="paymentOption" id="paymentOptionMinimum" value="DP" checked> <span id="paymentOptionMinimumLabel">Pay Down Payment</span></span>
               <strong id="dpAmount"></strong>
             </label>
             <label style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;border:1px solid #dfe7ee;border-radius:12px;cursor:pointer;">
-              <span><input type="radio" name="paymentOption" value="FULL"> <span id="fullChoiceLabel">Pay in Full</span></span>
+              <span><input type="radio" name="paymentOption" id="paymentOptionFull" value="FULL"> <span id="paymentOptionFullLabel">Pay in Full</span></span>
               <strong id="fullAmount"></strong>
             </label>
           </div>
@@ -1046,8 +1046,10 @@ const FUNCTION_BASE =
   const paymentChoice = document.getElementById("paymentChoice");
   const dpAmount = document.getElementById("dpAmount");
   const fullAmount = document.getElementById("fullAmount");
-  const dpChoiceLabel = document.getElementById("dpChoiceLabel");
-  const fullChoiceLabel = document.getElementById("fullChoiceLabel");
+  const paymentOptionMinimumLabel = document.getElementById("paymentOptionMinimumLabel");
+  const paymentOptionFullLabel = document.getElementById("paymentOptionFullLabel");
+  const paymentOptionMinimum = document.getElementById("paymentOptionMinimum");
+  const paymentOptionFull = document.getElementById("paymentOptionFull");
 
   const payButton =
     document.getElementById(
@@ -1567,23 +1569,22 @@ const FUNCTION_BASE =
     const canChoose = data.order_group?.can_choose_dp_or_full === true;
     paymentChoice.classList.toggle("hidden", !canChoose);
     if (canChoose) {
-      const dp = options.find((x) => x.code === "DP");
-      const full = options.find((x) => x.code === "FULL");
-      const mixed = data.order_group?.is_mixed_order_group === true;
-      dpAmount.textContent = money(dp?.amount || data.order_group?.payment_due || 0);
+      const minimum = options.find((x) => ["DP","MINIMUM"].includes(x.code)) || options[0];
+      const full = options.find((x) => x.code === "FULL") || options[1];
+      const isMixed = minimum?.code === "MINIMUM";
+      paymentOptionMinimum.value = minimum?.code || "DP";
+      paymentOptionFull.value = "FULL";
+      paymentOptionMinimumLabel.textContent = minimum?.label || (isMixed ? "Pay Minimum Due Now" : "Pay Down Payment");
+      paymentOptionFullLabel.textContent = full?.label || (isMixed ? "Pay Entire Outstanding Group" : "Pay in Full");
+      dpAmount.textContent = money(minimum?.amount || data.order_group?.payment_due || 0);
       fullAmount.textContent = money(full?.amount || data.order_group?.payment_due_full || data.order_group?.total_amount || 0);
-      dpChoiceLabel.textContent = mixed ? "Pay Minimum Due Now" : "Pay Down Payment";
-      fullChoiceLabel.textContent = mixed ? "Pay Entire Outstanding Group" : "Pay in Full";
-      payButton.textContent = mixed
-        ? `Pay Minimum Due Now — ${money(dp?.amount || data.order_group?.payment_due || 0)}`
-        : `Pay ${money(dp?.amount || data.order_group?.payment_due || 0)} Down Payment`;
+      payButton.textContent = `${paymentOptionMinimumLabel.textContent} — ${money(minimum?.amount || data.order_group?.payment_due || 0)}`;
       document.querySelectorAll('input[name="paymentOption"]').forEach((radio) => {
         radio.onchange = () => {
-          const selected = document.querySelector('input[name="paymentOption"]:checked')?.value || "DP";
-          const selectedAmount = selected === "FULL" ? (full?.amount || 0) : (dp?.amount || 0);
-          payButton.textContent = selected === "FULL"
-            ? (mixed ? `Pay Entire Outstanding Group — ${money(selectedAmount)}` : `Pay ${money(selectedAmount)} in Full`)
-            : (mixed ? `Pay Minimum Due Now — ${money(selectedAmount)}` : `Pay ${money(selectedAmount)} Down Payment`);
+          const selected = document.querySelector('input[name="paymentOption"]:checked')?.value || minimum?.code || "DP";
+          const useFull = selected === "FULL";
+          const selectedAmount = useFull ? (full?.amount || 0) : (minimum?.amount || 0);
+          payButton.textContent = `${useFull ? paymentOptionFullLabel.textContent : paymentOptionMinimumLabel.textContent} — ${money(selectedAmount)}`;
         };
       });
     } else {
