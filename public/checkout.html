@@ -1252,12 +1252,24 @@ const FUNCTION_BASE =
         "Auction Item";
 
 
+      const meta = [];
+      if (item.order_number) meta.push(`Order ${item.order_number}`);
+      if (item.source_type) meta.push(`Type: ${String(item.source_type).replaceAll("_", " ")}`);
+      meta.push(`Qty: ${Number(item.quantity || 1)}`);
+      if (item.inventory_status) meta.push(`Inventory: ${item.inventory_status}`);
+      if (item.payment_status) meta.push(`Payment: ${String(item.payment_status).replaceAll("_", " ")}`);
+      if (item.item_fulfillment_status) meta.push(`Item status: ${String(item.item_fulfillment_status).replaceAll("_", " ")}`);
+      if (String(item.source_type || "").toUpperCase() === "PREORDER") {
+        meta.push(`PO total: ${money(item.total_amount || item.subtotal || 0)}`);
+        if (Number(item.po_dp_required || 0) > 0) meta.push(`DP required: ${money(item.po_dp_required)}`);
+        if (Number(item.po_dp_paid || 0) > 0) meta.push(`DP paid: ${money(item.po_dp_paid)}`);
+        meta.push(`PO balance: ${money(item.po_balance || 0)}`);
+        meta.push(`Due now: ${money(item.amount_due_now || 0)}`);
+      }
+
       row.querySelector(
         ".item-meta"
-      ).textContent =
-        item.order_number
-          ? `Order ${item.order_number}`
-          : "";
+      ).textContent = meta.join(" • ");
 
 
       row.querySelector(
