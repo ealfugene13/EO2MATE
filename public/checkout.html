@@ -1605,9 +1605,17 @@ const FUNCTION_BASE =
       full;
 
     if (canChoose) {
+      const sourceTypes = new Set(
+        (Array.isArray(data.orders) ? data.orders : [])
+          .map((order) => String(order?.source_type || order?.selling_mode || "").toUpperCase())
+          .filter(Boolean)
+      );
+
+      // "Entire Outstanding Group" is only for a genuinely mixed selling-mode
+      // order group. A PO-only order must say "Pay in Full".
       const isMixed =
-        group.is_mixed_order_group === true ||
-        String(minimum.code || "").toUpperCase() === "MINIMUM";
+        group.is_mixed_order_group === true &&
+        sourceTypes.size > 1;
 
       const minimumCode =
         String(minimum.code || "DP").toUpperCase();
