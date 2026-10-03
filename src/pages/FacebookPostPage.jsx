@@ -1031,6 +1031,7 @@ const inventoryAvailableQty = (item) => {
   if (!item) return 0;
   const candidates = [
     item.available_quantity,
+    item.qty_available,
     item.available_qty,
     item.quantity_available,
     item.available_stock,
@@ -1039,11 +1040,16 @@ const inventoryAvailableQty = (item) => {
     item.quantity_on_hand,
     item.current_quantity,
     item.quantity,
-    item.qty
-  ];
-  const found = candidates.find((value) => value !== null && value !== undefined && value !== "");
-  const number = Number(found);
-  return Number.isFinite(number) ? number : 0;
+    item.qty,
+  ]
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value) && value >= 0);
+
+  // Some inventory payloads currently expose available_quantity=0 while the
+  // authoritative stock quantity is present under another supported field.
+  // Use the greatest reported non-negative availability so eligibility and
+  // the dropdown label cannot disagree.
+  return candidates.length ? Math.max(...candidates) : 0;
 };
 
 export default function FacebookPostPage({
@@ -1368,7 +1374,7 @@ export default function FacebookPostPage({
 
   const pageInventoryItems = useMemo(() =>
     inventoryItems.filter((row) => {
-      const available = Number(row.available_quantity ?? row.qty_available ?? 0);
+      const available = inventoryAvailableQty(row);
       if (!(available > 0)) return false;
       if (String(row.status || "ACTIVE").toUpperCase() !== "ACTIVE") return false;
       const mode = String(row.page_scope_mode || "ALL").toUpperCase();
@@ -1626,7 +1632,7 @@ export default function FacebookPostPage({
     setSingleItem(inventory.item_name || "");
     if (postMode === "REGULAR_SALE") {
       if (inventory.default_selling_price != null) setRegularSalePrice(String(inventory.default_selling_price));
-      if (inventory.available_quantity != null) setRegularSaleQuantity(String(Math.max(1, Number(inventory.available_quantity) || 1)));
+      setRegularSaleQuantity(String(Math.max(1, inventoryAvailableQty(inventory))));
     }
     // Inventory-derived image must always follow the newly selected item.
     // Clear the previous item's image first, including when the new item has no image.
@@ -1654,7 +1660,7 @@ export default function FacebookPostPage({
       inventoryItemId: inventory.inventory_item_id,
       item: inventory.item_name || "",
       regularSalePrice: inventory.default_selling_price != null ? String(inventory.default_selling_price) : "",
-      regularSaleQuantity: inventory.available_quantity != null ? String(Math.max(1, Number(inventory.available_quantity) || 1)) : "",
+      regularSaleQuantity: String(Math.max(1, inventoryAvailableQty(inventory))),
     });
     // MULTIPLE: clear only this item's previous inventory-derived image first.
     // If the newly selected inventory item has no image, its photo stays blank.
@@ -3606,7 +3612,7 @@ export default function FacebookPostPage({
                     <option value="">Select inventory item</option>
                     {pageInventoryItems.map((row) => (
                       <option key={row.inventory_item_id} value={row.inventory_item_id}>
-                        {row.item_code ? `${row.item_code} — ` : ""}{row.item_name} ({Number(row.available_quantity || 0)} available)
+                        {row.item_code ? `${row.item_code} — ` : ""}{row.item_name} ({inventoryAvailableQty(row)} available)
                       </option>
                     ))}
                   </select>
@@ -3811,7 +3817,7 @@ export default function FacebookPostPage({
                           <option value="">Select inventory item</option>
                           {pageInventoryItems.map((row) => (
                             <option key={row.inventory_item_id} value={row.inventory_item_id}>
-                              {row.item_code ? `${row.item_code} — ` : ""}{row.item_name} ({Number(row.available_quantity || 0)} available)
+                              {row.item_code ? `${row.item_code} — ` : ""}{row.item_name} ({inventoryAvailableQty(row)} available)
                             </option>
                           ))}
                         </select>
