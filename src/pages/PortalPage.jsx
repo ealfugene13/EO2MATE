@@ -485,21 +485,7 @@ export default function PortalPage({ session }) {
   const [payments, setPayments] = useState([]);
   const [paymentGroups, setPaymentGroups] = useState([]);
   const [deliveries, setDeliveries] = useState([]);
-  const [sellingPosts, setSellingPosts] = useState([]);
 
-  const postMode = (row) => String(row?.selling_mode ?? row?.post_mode ?? row?.mode ?? row?.post_type ?? row?.type ?? row?.module ?? "").toUpperCase().replace(/[ -]+/g, "_");
-  const regularSalePosts = useMemo(() => sellingPosts.filter((row) => ["REGULAR_SALE", "REGULARSALE", "SALE"].includes(postMode(row))), [sellingPosts]);
-  const miningPosts = useMemo(() => sellingPosts.filter((row) => postMode(row).includes("MINING") || postMode(row) === "MINE"), [sellingPosts]);
-  const orderMode = (row) => String(row?.source_type ?? row?.selling_mode ?? row?.order_type ?? row?.type ?? "").toUpperCase().replace(/[ -]+/g, "_");
-  const regularSaleOrders = useMemo(() => orders.filter((row) => ["REGULAR_SALE", "REGULARSALE", "SALE"].includes(orderMode(row))), [orders]);
-  const miningOrders = useMemo(() => orders.filter((row) => orderMode(row).includes("MINING") || orderMode(row) === "MINE"), [orders]);
-  const rowQty = (row) => Number(row?.quantity ?? row?.qty ?? row?.allocated_quantity ?? 1) || 0;
-  const rowValue = (row) => Number(row?.total_amount ?? row?.amount ?? row?.order_total ?? row?.line_total ?? ((Number(row?.unit_price ?? row?.price ?? 0) || 0) * rowQty(row))) || 0;
-  const rowStatus = (row) => String(row?.status ?? row?.post_status ?? row?.order_status ?? "UNKNOWN").toUpperCase();
-  const rowBuyer = (row) => row?.buyer_fb_user_id ?? row?.buyer_id ?? row?.facebook_user_id ?? row?.customer_id ?? row?.buyer_name ?? null;
-  const postLabel = (row) => row?.title ?? row?.post_title ?? row?.item_name ?? row?.name ?? row?.facebook_post_id ?? row?.post_id ?? "Post";
-  const postPage = (row) => row?.facebook_page_name ?? row?.page_name ?? row?.fb_page_name ?? row?.page_id ?? "—";
-  const postCreated = (row) => row?.created_at ?? row?.post_created_at ?? row?.published_at ?? null;
   const [page, setPage] = useState("dashboard");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [postsExpanded, setPostsExpanded] = useState(true);
@@ -589,17 +575,17 @@ export default function PortalPage({ session }) {
   const [reportChannelFilter, setReportChannelFilter] = useState("ALL");
 
   // UI-first operational dashboards. Data wiring follows after UI approval.
-  const [auctionWorkspaceTab, setAuctionWorkspaceTab] = useState("DASHBOARD");
-  const [miningWorkspaceTab, setMiningWorkspaceTab] = useState("DASHBOARD");
-  const [regularSaleWorkspaceTab, setRegularSaleWorkspaceTab] = useState("DASHBOARD");
+  const [auctionWorkspaceTab, setAuctionWorkspaceTab] = useState("SUMMARY");
+  const [miningWorkspaceTab, setMiningWorkspaceTab] = useState("SUMMARY");
+  const [regularSaleWorkspaceTab, setRegularSaleWorkspaceTab] = useState("SUMMARY");
+  const [sellingPosts, setSellingPosts] = useState([]);
+  const [sellingPostItems, setSellingPostItems] = useState([]);
+  const [sellingPostEntries, setSellingPostEntries] = useState([]);
   const [liveSellingWorkspaceTab, setLiveSellingWorkspaceTab] = useState("DASHBOARD");
   const [miningStatusFilter, setMiningStatusFilter] = useState("ALL");
-  const [sellingPostSearch, setSellingPostSearch] = useState("");
-  const [sellingPostFilter, setSellingPostFilter] = useState("ALL");
-  const [sellingPostSort, setSellingPostSort] = useState("NEWEST");
-  const [inventoryTab, setInventoryTab] = useState("DASHBOARD");
-  const [salesTab, setSalesTab] = useState("DASHBOARD");
-  const [purchasesTab, setPurchasesTab] = useState("DASHBOARD");
+  const [inventoryTab, setInventoryTab] = useState("SUMMARY");
+  const [salesTab, setSalesTab] = useState("SUMMARY");
+  const [purchasesTab, setPurchasesTab] = useState("SUMMARY");
 
   const filteredChatConversations = useMemo(() => {
     const query = chatSearch.trim().toLowerCase();
@@ -1251,7 +1237,9 @@ export default function PortalPage({ session }) {
         paymentResult,
         paymentGroupResult,
         deliveryResult,
-        sellingPostResult,
+        sellingPostsResult,
+        sellingPostItemsResult,
+        sellingPostEntriesResult,
       ] = await Promise.all([
         supabase
           .from("client_auction_list")
@@ -1284,6 +1272,18 @@ export default function PortalPage({ session }) {
           .select("*")
           .eq("client_id", clientUser.client_id)
           .order("created_at", { ascending: false }),
+
+        supabase
+          .from("eo2mate_post_items")
+          .select("*")
+          .eq("client_id", clientUser.client_id)
+          .order("created_at", { ascending: false }),
+
+        supabase
+          .from("eo2mate_post_entries")
+          .select("*")
+          .eq("client_id", clientUser.client_id)
+          .order("created_at", { ascending: false }),
       ]);
 
       if (auctionResult.error) throw auctionResult.error;
@@ -1291,14 +1291,18 @@ export default function PortalPage({ session }) {
       if (paymentResult.error) throw paymentResult.error;
       if (paymentGroupResult.error) throw paymentGroupResult.error;
       if (deliveryResult.error) throw deliveryResult.error;
-      if (sellingPostResult.error) console.warn("Unable to load eo2mate_posts", sellingPostResult.error);
+      if (sellingPostsResult.error) throw sellingPostsResult.error;
+      if (sellingPostItemsResult.error) throw sellingPostItemsResult.error;
+      if (sellingPostEntriesResult.error) throw sellingPostEntriesResult.error;
 
       setAuctions(auctionResult.data || []);
       setOrders(orderResult.data || []);
       setPayments(paymentResult.data || []);
       setPaymentGroups(paymentGroupResult.data || []);
       setDeliveries(deliveryResult.data || []);
-      setSellingPosts(sellingPostResult.data || []);
+      setSellingPosts(sellingPostsResult.data || []);
+      setSellingPostItems(sellingPostItemsResult.data || []);
+      setSellingPostEntries(sellingPostEntriesResult.data || []);
 
       /*
        * Facebook is optional for workspace access.
@@ -1685,6 +1689,23 @@ export default function PortalPage({ session }) {
     delivered: deliveries.filter((d) => d.delivery_status === "DELIVERED").length,
   }), [deliveries]);
 
+
+  const regularSaleData = useMemo(() => {
+    const posts = sellingPosts.filter((p) => String(p.mode_code || p.post_mode || "").toUpperCase() === "REGULAR_SALE");
+    const postIds = new Set(posts.map((p) => p.post_id));
+    const items = sellingPostItems.filter((i) => postIds.has(i.post_id));
+    const itemIds = new Set(items.map((i) => i.post_item_id));
+    const entries = sellingPostEntries.filter((e) => postIds.has(e.post_id) || itemIds.has(e.post_item_id));
+    const accepted = entries.filter((e) => ["ACCEPTED", "PARTIAL"].includes(String(e.status || "").toUpperCase()));
+    const itemById = new Map(items.map((i) => [i.post_item_id, i]));
+    const salesValue = accepted.reduce((sum, e) => sum + Number(e.accepted_quantity || 0) * Number(itemById.get(e.post_item_id)?.unit_price || 0), 0);
+    const itemsSold = accepted.reduce((sum, e) => sum + Number(e.accepted_quantity || 0), 0);
+    const buyers = new Set(accepted.map((e) => e.fb_user_id).filter(Boolean));
+    const active = posts.filter((p) => ["ACTIVE", "OPEN", "PUBLISHED"].includes(String(p.status || "").toUpperCase())).length;
+    const soldOut = posts.filter((p) => ["CLOSED", "SOLD_OUT", "FULL"].includes(String(p.status || "").toUpperCase())).length;
+    return { posts, items, entries, accepted, itemById, salesValue, itemsSold, buyers: buyers.size, active, soldOut };
+  }, [sellingPosts, sellingPostItems, sellingPostEntries]);
+
   const filteredAuctions = useMemo(() => {
     return auctions.filter((auction) => {
       const matchesStatus =
@@ -1953,65 +1974,8 @@ export default function PortalPage({ session }) {
     );
   }
 
-  const renderSellingTabs = (activeTab, onTabChange, createAction) => (
-    <section className="selling-tabs">
-      <div>
-        {["DASHBOARD", "SUMMARY", "POSTS"].map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            className={activeTab === tab ? "primary-button" : "secondary-button"}
-            onClick={() => onTabChange(tab)}
-          >
-            {tab === "POSTS" ? "Posts" : tab.charAt(0) + tab.slice(1).toLowerCase()}
-          </button>
-        ))}
-        <button type="button" className="secondary-button" onClick={createAction}>Create Post</button>
-      </div>
-    </section>
-  );
-
-  const renderSellingPostsToolbar = () => (
-    <section className="toolbar-card" style={{ marginBottom: 16 }}>
-      <input
-        className="search-input"
-        value={sellingPostSearch}
-        onChange={(e) => setSellingPostSearch(e.target.value)}
-        placeholder="Search posts..."
-        aria-label="Search posts"
-      />
-      <select className="filter-select" value={sellingPostFilter} onChange={(e) => setSellingPostFilter(e.target.value)} aria-label="Filter posts">
-        <option value="ALL">Filter: All statuses</option>
-        <option value="ACTIVE">Active</option>
-        <option value="DRAFT">Draft / Scheduled</option>
-        <option value="COMPLETED">Completed / Closed</option>
-        <option value="CANCELLED">Cancelled</option>
-      </select>
-      <select className="filter-select" value={sellingPostSort} onChange={(e) => setSellingPostSort(e.target.value)} aria-label="Sort posts">
-        <option value="NEWEST">Sort: Newest</option>
-        <option value="OLDEST">Sort: Oldest</option>
-        <option value="UPDATED">Recently updated</option>
-        <option value="STATUS">Status</option>
-      </select>
-    </section>
-  );
-
   return (
     <div className="app-shell">
-      <style>{`
-        .selling-hero{position:relative;overflow:hidden;background:linear-gradient(135deg,#08233f 0%,#0f3558 62%,#17623a 140%);border-radius:24px;padding:26px 30px;color:#fff;box-shadow:0 18px 45px rgba(8,35,63,.14);margin-bottom:18px}
-        .selling-hero:after{content:"";position:absolute;width:260px;height:260px;right:-80px;top:-125px;border-radius:50%;background:rgba(255,255,255,.07)}
-        .selling-hero .eyebrow{color:rgba(255,255,255,.72)}.selling-hero h1{color:#fff;margin:4px 0 7px;font-size:clamp(28px,3vw,38px);letter-spacing:-.03em}.selling-hero p:not(.eyebrow){color:rgba(255,255,255,.78);margin:0;max-width:780px}
-        .selling-hero .icon-button{background:rgba(255,255,255,.10);border-color:rgba(255,255,255,.20);color:#fff;position:relative;z-index:2}
-        .selling-tabs{padding:8px;border:1px solid #e1e8ef;border-radius:16px;background:rgba(255,255,255,.94);box-shadow:0 8px 24px rgba(8,35,63,.06);margin-bottom:18px}
-        .selling-tabs>div{display:flex;gap:6px;flex-wrap:wrap}.selling-tabs button{min-height:40px;border-radius:11px;padding:0 16px;font-weight:800}
-        .selling-tabs .primary-button{box-shadow:0 7px 18px rgba(43,150,72,.16)}
-        .selling-card{border:1px solid #e2e9f0!important;border-radius:18px!important;box-shadow:0 10px 30px rgba(8,35,63,.055)}
-        .selling-kpi-grid .dashboard-stat{border-radius:18px;box-shadow:0 8px 24px rgba(8,35,63,.055);transition:transform .18s ease,box-shadow .18s ease}
-        .selling-kpi-grid .dashboard-stat:hover{transform:translateY(-2px);box-shadow:0 13px 30px rgba(8,35,63,.09)}
-        .selling-section-title{display:flex;align-items:center;justify-content:space-between;gap:12px}
-        @media(max-width:760px){.selling-hero{border-radius:18px;padding:22px 18px}.selling-tabs{overflow-x:auto}.selling-tabs>div{flex-wrap:nowrap;min-width:max-content}}
-      `}</style>
       <button
         type="button"
         className={`mobile-nav-backdrop ${mobileMenuOpen ? "open" : ""}`}
@@ -2049,51 +2013,38 @@ export default function PortalPage({ session }) {
 
               <SidebarNavButton
                 icon="create"
-                className={`nav-item ${page === "posts" ? "active" : ""}`}
-                onClick={() => navigateTo("posts")}
+                className={`nav-item ${page === "posts" || page === "facebook-post" || page === "post-mining" || page === "pre-order" || page === "regular-sale" || page.includes("auction") ? "active" : ""}`}
+                onClick={() => setPostsExpanded((value) => !value)}
+                aria-expanded={postsExpanded}
               >
-                Create Post
+                <span className="nav-parent-label">Posts <span className="nav-chevron">{postsExpanded ? "▾" : "›"}</span></span>
               </SidebarNavButton>
 
-              <SidebarNavButton
-                icon="auction"
-                className={`nav-item ${page === "auctions" ? "active" : ""}`}
-                onClick={() => { setAuctionWorkspaceTab("SUMMARY"); goToAuctions("ALL"); setMobileMenuOpen(false); }}
-              >
-                Auctions
-              </SidebarNavButton>
+              {postsExpanded && (
+                <div className="nav-submenu">
+                  <button type="button" className={`nav-subitem ${page === "posts" ? "active" : ""}`} onClick={() => navigateTo("posts")}>Create Post</button>
 
-              <SidebarNavButton
-                icon="mining"
-                className={`nav-item ${page === "post-mining" ? "active" : ""}`}
-                onClick={() => { setMiningWorkspaceTab("SUMMARY"); navigateTo("post-mining"); }}
-              >
-                Mining
-              </SidebarNavButton>
+                  <div className="nav-subgroup-label" style={{ margin: "10px 12px 4px", fontSize: 10, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", opacity: .65 }}>Auctions</div>
+                  <button type="button" className={`nav-subitem ${page === "auctions" ? "active" : ""}`} onClick={() => { setAuctionWorkspaceTab("SUMMARY"); goToAuctions("ALL"); setMobileMenuOpen(false); }}>Dashboard / Summary</button>
+                  <button type="button" className={`nav-subitem ${page === "facebook-post" ? "active" : ""}`} onClick={() => navigateTo("facebook-post")}>Create Post</button>
 
-              <SidebarNavButton
-                icon="preorder"
-                className={`nav-item ${page === "pre-order" ? "active" : ""}`}
-                onClick={() => navigateTo("pre-order")}
-              >
-                Pre-Orders
-              </SidebarNavButton>
+                  <div className="nav-subgroup-label" style={{ margin: "10px 12px 4px", fontSize: 10, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", opacity: .65 }}>Mining</div>
+                  <button type="button" className={`nav-subitem ${page === "post-mining" ? "active" : ""}`} onClick={() => { setMiningWorkspaceTab("SUMMARY"); navigateTo("post-mining"); }}>Dashboard / Summary</button>
+                  <button type="button" className={`nav-subitem ${page === "mining-create" ? "active" : ""}`} onClick={() => navigateTo("mining-create")}>Create Post</button>
 
-              <SidebarNavButton
-                icon="sales"
-                className={`nav-item ${page === "regular-sale" ? "active" : ""}`}
-                onClick={() => { setRegularSaleWorkspaceTab("SUMMARY"); navigateTo("regular-sale"); }}
-              >
-                Regular Sales
-              </SidebarNavButton>
+                  <div className="nav-subgroup-label" style={{ margin: "10px 12px 4px", fontSize: 10, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", opacity: .65 }}>Pre-Orders</div>
+                  <button type="button" className={`nav-subitem ${page === "pre-order" ? "active" : ""}`} onClick={() => navigateTo("pre-order")}>Dashboard / Summary</button>
+                  <button type="button" className={`nav-subitem ${page === "pre-order-create" ? "active" : ""}`} onClick={() => navigateTo("pre-order-create")}>Create Post</button>
 
-              <SidebarNavButton
-                icon="live"
-                className={`nav-item ${page === "live-selling" ? "active" : ""}`}
-                onClick={() => { setLiveSellingWorkspaceTab("DASHBOARD"); navigateTo("live-selling"); }}
-              >
-                Live Selling
-              </SidebarNavButton>
+                  <div className="nav-subgroup-label" style={{ margin: "10px 12px 4px", fontSize: 10, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", opacity: .65 }}>Regular Sales</div>
+                  <button type="button" className={`nav-subitem ${page === "regular-sale" ? "active" : ""}`} onClick={() => { setRegularSaleWorkspaceTab("SUMMARY"); navigateTo("regular-sale"); }}>Dashboard / Summary</button>
+                  <button type="button" className={`nav-subitem ${page === "regular-sale" && regularSaleWorkspaceTab === "POSTING" ? "active" : ""}`} onClick={() => { setRegularSaleWorkspaceTab("POSTING"); navigateTo("regular-sale"); }}>Create Post</button>
+
+                  <div className="nav-subgroup-label" style={{ margin: "10px 12px 4px", fontSize: 10, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", opacity: .65 }}>Live Selling</div>
+                  <button type="button" className={`nav-subitem ${page === "live-selling" ? "active" : ""}`} onClick={() => { setLiveSellingWorkspaceTab("DASHBOARD"); navigateTo("live-selling"); }}>Dashboard / Summary</button>
+                  <button type="button" className="nav-subitem" disabled title="Live Selling post creation is coming soon">Create Post <span className="coming-soon-pill">Soon</span></button>
+                </div>
+              )}
 
             </>
           )}
@@ -2272,7 +2223,7 @@ export default function PortalPage({ session }) {
               aria-label="Back to main dashboard"
               title="Back to main dashboard"
             >
-              <span aria-hidden="true" style={{ fontSize: 18, lineHeight: 1 }}>⌂</span>
+              ← Main Dashboard
             </button>
           </div>
         )}
@@ -2329,7 +2280,7 @@ export default function PortalPage({ session }) {
 
         {metaConnected && page === "regular-sale" && (
           <>
-            <header className="dashboard-header selling-hero">
+            <header className="dashboard-header">
               <div>
                 <p className="eyebrow">FACEBOOK SELLING</p>
                 <h1>Regular Sales</h1>
@@ -2338,21 +2289,30 @@ export default function PortalPage({ session }) {
             </header>
 
             <section className="metrics-grid">
-              <MetricCard title="Total posts" value={regularSalePosts.length} subtitle="All Regular Sale posts" />
-              <MetricCard title="Active" value={regularSalePosts.filter((r) => ["ACTIVE", "OPEN", "PUBLISHED"].includes(rowStatus(r))).length} subtitle="Currently accepting orders" />
-              <MetricCard title="Sold out" value={regularSalePosts.filter((r) => rowStatus(r) === "SOLD_OUT").length} subtitle="Closed after stock sold out" />
-              <MetricCard title="Orders" value={regularSaleOrders.length} subtitle="Accepted customer orders" />
-              <MetricCard title="Items sold" value={regularSaleOrders.reduce((n, r) => n + rowQty(r), 0)} subtitle="Total allocated quantity" />
-              <MetricCard title="Sales value" value={formatCurrency(regularSaleOrders.reduce((n, r) => n + rowValue(r), 0))} subtitle="Gross Regular Sale value" />
+              <MetricCard title="Total posts" value={regularSaleData.posts.length} subtitle="All Regular Sale posts" />
+              <MetricCard title="Active" value={regularSaleData.active} subtitle="Currently accepting orders" />
+              <MetricCard title="Sold out" value={regularSaleData.soldOut} subtitle="Closed / sold out" />
+              <MetricCard title="Orders" value={regularSaleData.accepted.length} subtitle="Accepted customer claims" />
+              <MetricCard title="Items sold" value={regularSaleData.itemsSold} subtitle="Total allocated quantity" />
+              <MetricCard title="Sales value" value={formatCurrency(regularSaleData.salesValue)} subtitle="Gross accepted value" />
             </section>
 
-            {renderSellingTabs(
-            regularSaleWorkspaceTab,
-            setRegularSaleWorkspaceTab,
-            () => { setRegularSaleWorkspaceTab("POSTING"); navigateTo("regular-sale"); }
-          )}
+            <section className="dashboard-panel" style={{ marginBottom: 18 }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {["SUMMARY", "POSTS", "POSTING"].map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    className={regularSaleWorkspaceTab === tab ? "primary-button" : "secondary-button"}
+                    onClick={() => setRegularSaleWorkspaceTab(tab)}
+                  >
+                    {tab === "POSTING" ? "Create Post" : tab.charAt(0) + tab.slice(1).toLowerCase()}
+                  </button>
+                ))}
+              </div>
+            </section>
 
-            {(regularSaleWorkspaceTab === "DASHBOARD" || regularSaleWorkspaceTab === "SUMMARY") && (
+            {regularSaleWorkspaceTab === "SUMMARY" && (
               <>
                 <section className="toolbar-card">
                   <select className="filter-select" defaultValue="ALL">
@@ -2368,26 +2328,24 @@ export default function PortalPage({ session }) {
                     <option value="MONTH">This month</option>
                   </select>
                 </section>
-                <section className="dashboard-panel selling-card">
+                <section className="dashboard-panel">
                   <div className="panel-header">
                     <div><h2>Regular Sale summary</h2><p>Orders, inventory movement, buyers and sales value for fixed-price selling.</p></div>
                   </div>
                   <div className="metrics-grid">
                     <MetricCard title="Sell-through rate" value="—" subtitle="Sold quantity versus offered stock" />
-                    <MetricCard title="Unique buyers" value="0" subtitle="Regular Sale customers" />
-                    <MetricCard title="Remaining items" value="0" subtitle="Available quantity" />
-                    <MetricCard title="Paid value" value={formatCurrency(0)} subtitle="Collected Regular Sale sales" />
-                    <MetricCard title="Pending value" value={formatCurrency(0)} subtitle="Awaiting payment" />
-                    <MetricCard title="Average order" value={formatCurrency(0)} subtitle="Average accepted order value" />
+                    <MetricCard title="Unique buyers" value={regularSaleData.buyers} subtitle="Regular Sale customers" />
+                    <MetricCard title="Accepted claims" value={regularSaleData.accepted.length} subtitle="Accepted / partial entries" />
+                    <MetricCard title="Allocated value" value={formatCurrency(regularSaleData.salesValue)} subtitle="Accepted Regular Sale value" />
+                    <MetricCard title="Items allocated" value={regularSaleData.itemsSold} subtitle="Reserved from selling posts" />
+                    <MetricCard title="Average claim" value={formatCurrency(regularSaleData.accepted.length ? regularSaleData.salesValue / regularSaleData.accepted.length : 0)} subtitle="Average accepted claim value" />
                   </div>
                 </section>
               </>
             )}
 
             {regularSaleWorkspaceTab === "POSTS" && (
-              <>
-                {renderSellingPostsToolbar()}
-              <section className="dashboard-panel selling-card">
+              <section className="dashboard-panel">
                 <div className="panel-header">
                   <div><h2>Regular Sale posts</h2><p>Single and Multiple Regular Sale posts by status.</p></div>
                   <button className="primary-button" type="button" onClick={() => setRegularSaleWorkspaceTab("POSTING")}>Create Regular Sale Post</button>
@@ -2395,11 +2353,26 @@ export default function PortalPage({ session }) {
                 <div className="table-wrapper">
                   <table>
                     <thead><tr><th>Post</th><th>Facebook Page</th><th>Status</th><th>Items</th><th>Orders</th><th>Buyers</th><th>Value</th><th>Created</th></tr></thead>
-                    <tbody>{regularSalePosts.length === 0 ? <tr><td colSpan="8">No Regular Sale records found in eo2mate_posts.</td></tr> : regularSalePosts.map((post, index) => { const pid = post.post_id ?? post.id ?? post.facebook_post_id ?? index; const linked = regularSaleOrders.filter((o) => String(o.post_id ?? o.eo2mate_post_id ?? o.facebook_post_id ?? "") === String(post.post_id ?? post.id ?? post.facebook_post_id ?? "")); const buyers = new Set(linked.map(rowBuyer).filter(Boolean)).size; return <tr key={pid}><td>{postLabel(post)}</td><td>{postPage(post)}</td><td>{rowStatus(post)}</td><td>{post.item_count ?? post.items_count ?? "—"}</td><td>{linked.length}</td><td>{buyers}</td><td>{formatCurrency(linked.reduce((n,r)=>n+rowValue(r),0))}</td><td>{postCreated(post) ? new Date(postCreated(post)).toLocaleString() : "—"}</td></tr>; })}</tbody>
+                    <tbody>{regularSaleData.posts.length ? regularSaleData.posts.map((post) => {
+                      const postItems = regularSaleData.items.filter((item) => item.post_id === post.post_id);
+                      const ids = new Set(postItems.map((item) => item.post_item_id));
+                      const accepted = regularSaleData.accepted.filter((entry) => entry.post_id === post.post_id || ids.has(entry.post_item_id));
+                      const buyers = new Set(accepted.map((entry) => entry.fb_user_id).filter(Boolean)).size;
+                      const value = accepted.reduce((sum, entry) => sum + Number(entry.accepted_quantity || 0) * Number(regularSaleData.itemById.get(entry.post_item_id)?.unit_price || 0), 0);
+                      return (<tr key={post.post_id}>
+                        <td>{post.fb_post_id || post.facebook_post_id || post.post_id}</td>
+                        <td>{post.fb_page_id || post.facebook_page_id || "-"}</td>
+                        <td><StatusBadge status={post.status || "-"} /></td>
+                        <td>{postItems.length}</td>
+                        <td>{accepted.length}</td>
+                        <td>{buyers}</td>
+                        <td>{formatCurrency(value)}</td>
+                        <td>{formatDateTime(post.created_at)}</td>
+                      </tr>);
+                    }) : <tr><td colSpan="8">No Regular Sale records found in eo2mate_posts.</td></tr>}</tbody>
                   </table>
                 </div>
               </section>
-              </>
             )}
 
             {regularSaleWorkspaceTab === "POSTING" && (
@@ -2410,7 +2383,12 @@ export default function PortalPage({ session }) {
 
         {metaConnected && page === "pre-order" && (
           <>
-            
+            <section className="dashboard-panel" style={{ marginBottom: 18 }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                <button type="button" className="primary-button">Dashboard / Summary</button>
+                <button type="button" className="secondary-button" onClick={() => navigateTo("pre-order-create")}>Create Post</button>
+              </div>
+            </section>
             <PreorderAdminPage client={client} onCreatePost={() => navigateTo("pre-order-create")} />
           </>
         )}
@@ -2430,7 +2408,7 @@ export default function PortalPage({ session }) {
 
         {metaConnected && page === "live-selling" && (
           <>
-            <header className="dashboard-header selling-hero">
+            <header className="dashboard-header">
               <div>
                 <p className="eyebrow">FACEBOOK SELLING</p>
                 <h1>Live Selling</h1>
@@ -2445,13 +2423,17 @@ export default function PortalPage({ session }) {
               <MetricCard title="Items sold" value="0" subtitle="Allocated quantity" />
               <MetricCard title="Sales value" value={formatCurrency(0)} subtitle="Gross live-selling value" />
             </section>
-            {renderSellingTabs(
-            liveSellingWorkspaceTab,
-            setLiveSellingWorkspaceTab,
-            () => navigateTo("posts")
-          )}
-            {liveSellingWorkspaceTab === "POSTS" && renderSellingPostsToolbar()}
-            <section className="dashboard-panel selling-card">
+            <section className="dashboard-panel" style={{ marginBottom: 18 }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {["DASHBOARD", "SUMMARY", "POSTS"].map((tab) => (
+                  <button key={tab} type="button" className={liveSellingWorkspaceTab === tab ? "primary-button" : "secondary-button"} onClick={() => setLiveSellingWorkspaceTab(tab)}>
+                    {tab.charAt(0) + tab.slice(1).toLowerCase()}
+                  </button>
+                ))}
+                <button type="button" className="secondary-button" disabled title="Coming soon">Create Post · Soon</button>
+              </div>
+            </section>
+            <section className="dashboard-panel">
               <div className="panel-header"><div><h2>{liveSellingWorkspaceTab === "POSTS" ? "Live Selling posts" : liveSellingWorkspaceTab === "SUMMARY" ? "Live Selling summary" : "Live Selling dashboard"}</h2><p>Ready for the Live Selling backend connection without exposing placeholder data as real activity.</p></div></div>
               <div className="table-wrapper"><table><thead><tr><th>Session / Post</th><th>Status</th><th>Claims</th><th>Buyers</th><th>Items</th><th>Sales</th></tr></thead><tbody><tr><td colSpan="6">No Live Selling records yet.</td></tr></tbody></table></div>
             </section>
@@ -3334,7 +3316,7 @@ export default function PortalPage({ session }) {
 
         {metaConnected && page === "post-mining" && (
           <>
-            <header className="dashboard-header selling-hero">
+            <header className="dashboard-header">
               <div>
                 <p className="eyebrow">FACEBOOK SELLING</p>
                 <h1>Post Mining</h1>
@@ -3343,23 +3325,33 @@ export default function PortalPage({ session }) {
             </header>
 
             <section className="metrics-grid">
-              <MetricCard title="Total posts" value={miningPosts.length} subtitle="All mining posts" />
-              <MetricCard title="Active" value={miningPosts.filter((r) => ["ACTIVE", "OPEN", "PUBLISHED"].includes(rowStatus(r))).length} subtitle="Currently accepting MINE" />
+              <MetricCard title="Total posts" value="0" subtitle="All mining posts" />
+              <MetricCard title="Active" value="0" subtitle="Currently accepting MINE" />
               <MetricCard title="Live Mining" value="0" subtitle="Active live sessions" />
               <MetricCard title="Completed" value="0" subtitle="Closed mining posts" />
               <MetricCard title="Cancelled" value="0" subtitle="Cancelled posts" />
-              <MetricCard title="Total claims" value={miningOrders.length} subtitle="Recorded MINE claims / orders" />
-              <MetricCard title="Unique buyers" value={new Set(miningOrders.map(rowBuyer).filter(Boolean)).size} subtitle="Mining customers" />
-              <MetricCard title="Claimed value" value={formatCurrency(miningOrders.reduce((n,r)=>n+rowValue(r),0))} subtitle="Gross claimed sales" />
+              <MetricCard title="Total claims" value="0" subtitle="Recorded MINE claims" />
+              <MetricCard title="Unique buyers" value="0" subtitle="Mining customers" />
+              <MetricCard title="Claimed value" value={formatCurrency(0)} subtitle="Gross claimed sales" />
             </section>
 
-            {renderSellingTabs(
-            miningWorkspaceTab,
-            setMiningWorkspaceTab,
-            () => navigateTo("mining-create")
-          )}
+            <section className="dashboard-panel" style={{ marginBottom: 18 }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {["SUMMARY", "POSTS", "LIVE MINING", "CLAIMS", "BUYERS"].map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    className={miningWorkspaceTab === tab ? "primary-button" : "secondary-button"}
+                    onClick={() => setMiningWorkspaceTab(tab)}
+                  >
+                    {tab === "LIVE MINING" ? "Live Mining" : tab.charAt(0) + tab.slice(1).toLowerCase()}
+                  </button>
+                ))}
+                <button type="button" className="secondary-button" onClick={() => navigateTo("mining-create")}>Create Post</button>
+              </div>
+            </section>
 
-            {(miningWorkspaceTab === "DASHBOARD" || miningWorkspaceTab === "SUMMARY") && (
+            {miningWorkspaceTab === "SUMMARY" && (
               <>
                 <section className="toolbar-card">
                   <select className="filter-select" value={miningStatusFilter} onChange={(e) => setMiningStatusFilter(e.target.value)}>
@@ -3377,7 +3369,7 @@ export default function PortalPage({ session }) {
                   </select>
                 </section>
 
-                <section className="dashboard-panel selling-card">
+                <section className="dashboard-panel">
                   <div className="panel-header">
                     <div>
                       <h2>Mining summary</h2>
@@ -3397,9 +3389,7 @@ export default function PortalPage({ session }) {
             )}
 
             {miningWorkspaceTab === "POSTS" && (
-              <>
-                {renderSellingPostsToolbar()}
-              <section className="dashboard-panel selling-card">
+              <section className="dashboard-panel">
                 <div className="panel-header">
                   <div><h2>Mining posts</h2><p>All regular Post Mining records by status.</p></div>
                   <button className="primary-button" type="button" onClick={() => navigateTo("mining-create")}>Create Mining Post</button>
@@ -3407,16 +3397,15 @@ export default function PortalPage({ session }) {
                 <div className="table-wrapper">
                   <table>
                     <thead><tr><th>Post</th><th>Facebook Page</th><th>Status</th><th>Items</th><th>Claims</th><th>Buyers</th><th>Value</th><th>Created</th></tr></thead>
-                    <tbody>{miningPosts.length === 0 ? <tr><td colSpan="8">No Mining records found in eo2mate_posts.</td></tr> : miningPosts.map((post, index) => { const pid = post.post_id ?? post.id ?? post.facebook_post_id ?? index; const linked = miningOrders.filter((o) => String(o.post_id ?? o.eo2mate_post_id ?? o.facebook_post_id ?? "") === String(post.post_id ?? post.id ?? post.facebook_post_id ?? "")); const buyers = new Set(linked.map(rowBuyer).filter(Boolean)).size; return <tr key={pid}><td>{postLabel(post)}</td><td>{postPage(post)}</td><td>{rowStatus(post)}</td><td>{post.item_count ?? post.items_count ?? "—"}</td><td>{linked.length}</td><td>{buyers}</td><td>{formatCurrency(linked.reduce((n,r)=>n+rowValue(r),0))}</td><td>{postCreated(post) ? new Date(postCreated(post)).toLocaleString() : "—"}</td></tr>; })}</tbody>
+                    <tbody><tr><td colSpan="8">No Post Mining records yet.</td></tr></tbody>
                   </table>
                 </div>
               </section>
-              </>
             )}
 
             {miningWorkspaceTab === "LIVE MINING" && (
               <>
-                <section className="dashboard-panel selling-card">
+                <section className="dashboard-panel">
                   <div className="panel-header">
                     <div>
                       <h2>Live Mining</h2>
@@ -3432,7 +3421,7 @@ export default function PortalPage({ session }) {
                     <MetricCard title="Live sales" value={formatCurrency(0)} subtitle="Claimed value" />
                   </div>
                 </section>
-                <section className="dashboard-panel selling-card">
+                <section className="dashboard-panel">
                   <div className="panel-header"><div><h2>Live sessions</h2><p>Current and previous Live Mining sessions.</p></div></div>
                   <div className="table-wrapper">
                     <table>
@@ -3445,14 +3434,14 @@ export default function PortalPage({ session }) {
             )}
 
             {miningWorkspaceTab === "CLAIMS" && (
-              <section className="dashboard-panel selling-card">
+              <section className="dashboard-panel">
                 <div className="panel-header"><div><h2>Claims</h2><p>Buyer MINE claims from posts and live sessions.</p></div></div>
                 <div className="table-wrapper"><table><thead><tr><th>Buyer</th><th>MINE Code</th><th>Item</th><th>Qty</th><th>Source</th><th>Status</th><th>Amount</th><th>Claimed</th></tr></thead><tbody><tr><td colSpan="8">No claims yet.</td></tr></tbody></table></div>
               </section>
             )}
 
             {miningWorkspaceTab === "BUYERS" && (
-              <section className="dashboard-panel selling-card">
+              <section className="dashboard-panel">
                 <div className="panel-header"><div><h2>Mining buyers</h2><p>Buyer activity across Post Mining and Live Mining.</p></div></div>
                 <div className="table-wrapper"><table><thead><tr><th>Buyer</th><th>Claims</th><th>Items</th><th>Total value</th><th>Paid</th><th>Pending</th><th>Last activity</th></tr></thead><tbody><tr><td colSpan="7">No mining buyers yet.</td></tr></tbody></table></div>
               </section>
@@ -3608,21 +3597,26 @@ export default function PortalPage({ session }) {
             </header>
 
             <section className="metrics-grid">
-              <MetricCard title="Total auctions" value={auctions.length} subtitle="All auction items" onClick={() => { setAuctionWorkspaceTab("POSTS"); setAuctionStatusFilter("ALL"); }} />
-              <MetricCard title="Active" value={auctions.filter((a) => a.ui_status === "ACTIVE").length} subtitle="Currently open" onClick={() => { setAuctionWorkspaceTab("POSTS"); setAuctionStatusFilter("ACTIVE"); }} />
+              <MetricCard title="Total auctions" value={auctions.length} subtitle="All auction items" onClick={() => { setAuctionWorkspaceTab("AUCTIONS"); setAuctionStatusFilter("ALL"); }} />
+              <MetricCard title="Active" value={auctions.filter((a) => a.ui_status === "ACTIVE").length} subtitle="Currently open" onClick={() => { setAuctionWorkspaceTab("AUCTIONS"); setAuctionStatusFilter("ACTIVE"); }} />
               <MetricCard title="Completed" value={auctions.filter((a) => ["COMPLETED", "COMPLETED_WITH_WINNER", "CLOSED_NO_WINNER"].includes(a.ui_status)).length} subtitle="Closed auctions" />
               <MetricCard title="Cancelled" value={auctions.filter((a) => a.ui_status === "CANCELLED").length} subtitle="Cancelled auctions" />
               <MetricCard title="Total bids" value={auctions.reduce((sum, a) => sum + Number(a.valid_bid_count || a.bid_count || 0), 0)} subtitle="Recorded valid bids" />
               <MetricCard title="Winning value" value={formatCurrency(auctions.reduce((sum, a) => sum + Number(a.highest_bid || 0), 0))} subtitle="Current / final highest bids" />
             </section>
 
-            {renderSellingTabs(
-              auctionWorkspaceTab,
-              setAuctionWorkspaceTab,
-              () => navigateTo("facebook-post")
-            )}
+            <section className="dashboard-panel" style={{ marginBottom: 18 }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {["SUMMARY", "AUCTIONS", "BIDS", "WINNERS"].map((tab) => (
+                  <button key={tab} type="button" className={auctionWorkspaceTab === tab ? "primary-button" : "secondary-button"} onClick={() => setAuctionWorkspaceTab(tab)}>
+                    {tab.charAt(0) + tab.slice(1).toLowerCase()}
+                  </button>
+                ))}
+                <button type="button" className="secondary-button" onClick={() => navigateTo("facebook-post")}>Create Post</button>
+              </div>
+            </section>
 
-            {(auctionWorkspaceTab === "DASHBOARD" || auctionWorkspaceTab === "SUMMARY") && (
+            {auctionWorkspaceTab === "SUMMARY" && (
               <>
                 <section className="toolbar-card">
                   <select className="filter-select" value={auctionStatusFilter} onChange={(e) => setAuctionStatusFilter(e.target.value)}>
@@ -3644,7 +3638,7 @@ export default function PortalPage({ session }) {
               </>
             )}
 
-            {auctionWorkspaceTab === "POSTS" && (
+            {auctionWorkspaceTab === "AUCTIONS" && (
               <>
                 <section className="toolbar-card">
                   <input className="search-input" value={auctionSearch} onChange={(e) => setAuctionSearch(e.target.value)} placeholder="Search auctions..." />
@@ -3676,9 +3670,9 @@ export default function PortalPage({ session }) {
         {page === "sales" && (
           <>
             <header className="dashboard-header"><div><p className="eyebrow">SALES</p><h1>Sales</h1><p>Consolidated sales from Auctions, Post Mining, Live Mining and manual transactions.</p></div></header>
-            <section className="metrics-grid"><MetricCard title="Gross sales" value={formatCurrency(orders.reduce((n,r)=>n+rowValue(r),0))} subtitle="Before deductions" /><MetricCard title="Net sales" value={formatCurrency(orders.reduce((n,r)=>n+rowValue(r),0))} subtitle="Current recorded order value" /><MetricCard title="Paid" value={formatCurrency(payments.filter((p)=>String(p.status||p.payment_status||"").toLowerCase()==="paid").reduce((n,p)=>n+Number(p.amount||0),0))} subtitle="Collected sales" /><MetricCard title="Pending" value={formatCurrency(payments.filter((p)=>String(p.status||p.payment_status||"").toLowerCase()==="pending").reduce((n,p)=>n+Number(p.amount||0),0))} subtitle="Awaiting payment" /><MetricCard title="Transactions" value={orders.length} subtitle="Sales records" /><MetricCard title="Average sale" value={formatCurrency(orders.length ? orders.reduce((n,r)=>n+rowValue(r),0)/orders.length : 0)} subtitle="Per transaction" /></section>
+            <section className="metrics-grid"><MetricCard title="Gross sales" value={formatCurrency(0)} subtitle="Before deductions" /><MetricCard title="Net sales" value={formatCurrency(0)} subtitle="After discounts / adjustments" /><MetricCard title="Paid" value={formatCurrency(0)} subtitle="Collected sales" /><MetricCard title="Pending" value={formatCurrency(0)} subtitle="Awaiting payment" /><MetricCard title="Transactions" value="0" subtitle="Sales records" /><MetricCard title="Average sale" value={formatCurrency(0)} subtitle="Per transaction" /></section>
             <section className="dashboard-panel" style={{ marginBottom: 18 }}><div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>{["SUMMARY", "TRANSACTIONS", "RETURNS"].map((tab) => <button key={tab} type="button" className={salesTab === tab ? "primary-button" : "secondary-button"} onClick={() => setSalesTab(tab)}>{tab.charAt(0)+tab.slice(1).toLowerCase()}</button>)}</div></section>
-            <section className="dashboard-panel"><div className="panel-header"><div><h2>{salesTab === "SUMMARY" ? "Sales summary" : salesTab.charAt(0)+salesTab.slice(1).toLowerCase()}</h2><p>Sales data will consolidate all enabled EO2MATE selling channels.</p></div></div><div className="table-wrapper"><table><thead><tr><th>Date</th><th>Reference</th><th>Channel</th><th>Buyer</th><th>Items</th><th>Gross</th><th>Paid</th><th>Status</th></tr></thead><tbody>{orders.length === 0 ? <tr><td colSpan="8">No consolidated sales records yet.</td></tr> : orders.map((o,index)=><tr key={o.order_id ?? o.id ?? index}><td>{formatDateTime(o.created_at)}</td><td>{o.order_number ?? o.order_id ?? o.id ?? "—"}</td><td>{orderMode(o) || "—"}</td><td>{o.buyer_name ?? o.customer_name ?? o.buyer_fb_user_id ?? "—"}</td><td>{rowQty(o)}</td><td>{formatCurrency(rowValue(o))}</td><td>{String(o.payment_status ?? "").toUpperCase()==="PAID" ? formatCurrency(rowValue(o)) : formatCurrency(0)}</td><td>{o.payment_status ?? o.order_status ?? o.status ?? "—"}</td></tr>)}</tbody></table></div></section>
+            <section className="dashboard-panel"><div className="panel-header"><div><h2>{salesTab === "SUMMARY" ? "Sales summary" : salesTab.charAt(0)+salesTab.slice(1).toLowerCase()}</h2><p>Sales data will consolidate all enabled EO2MATE selling channels.</p></div></div><div className="table-wrapper"><table><thead><tr><th>Date</th><th>Reference</th><th>Channel</th><th>Buyer</th><th>Items</th><th>Gross</th><th>Paid</th><th>Status</th></tr></thead><tbody><tr><td colSpan="8">No consolidated sales records yet.</td></tr></tbody></table></div></section>
           </>
         )}
 
