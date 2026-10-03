@@ -1275,8 +1275,8 @@ export default function PortalPage({ session }) {
 
         supabase
           .from("eo2mate_post_items")
-          .select("*")
-          .eq("client_id", clientUser.client_id)
+          .select("*, eo2mate_posts!inner(client_id)")
+          .eq("eo2mate_posts.client_id", clientUser.client_id)
           .order("created_at", { ascending: false }),
 
         supabase
