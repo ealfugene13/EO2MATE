@@ -806,6 +806,18 @@
             Online payment is available.
           </div>
 
+          <div id="paymentChoice" class="hidden" style="margin:14px 0;">
+            <div class="muted" style="margin-bottom:8px;">Choose how you want to pay this Pre-Order:</div>
+            <label style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;border:1px solid #dfe7ee;border-radius:12px;margin-bottom:8px;cursor:pointer;">
+              <span><input type="radio" name="paymentOption" value="DP" checked> Pay Down Payment</span>
+              <strong id="dpAmount"></strong>
+            </label>
+            <label style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;border:1px solid #dfe7ee;border-radius:12px;cursor:pointer;">
+              <span><input type="radio" name="paymentOption" value="FULL"> Pay in Full</span>
+              <strong id="fullAmount"></strong>
+            </label>
+          </div>
+
           <button
             id="payButton"
             class="button button-primary"
@@ -1030,6 +1042,10 @@ const FUNCTION_BASE =
     document.getElementById(
       "manualPayment"
     );
+
+  const paymentChoice = document.getElementById("paymentChoice");
+  const dpAmount = document.getElementById("dpAmount");
+  const fullAmount = document.getElementById("fullAmount");
 
   const payButton =
     document.getElementById(
@@ -1545,6 +1561,26 @@ const FUNCTION_BASE =
     }
 
 
+    const options = data.order_group?.payment_options || [];
+    const canChoose = data.order_group?.can_choose_dp_or_full === true;
+    paymentChoice.classList.toggle("hidden", !canChoose);
+    if (canChoose) {
+      const dp = options.find((x) => x.code === "DP");
+      const full = options.find((x) => x.code === "FULL");
+      dpAmount.textContent = money(dp?.amount || data.order_group?.payment_due || 0);
+      fullAmount.textContent = money(full?.amount || data.order_group?.payment_due_full || data.order_group?.total_amount || 0);
+      payButton.textContent = `Pay ${money(dp?.amount || data.order_group?.payment_due || 0)} Down Payment`;
+      document.querySelectorAll('input[name="paymentOption"]').forEach((radio) => {
+        radio.onchange = () => {
+          const selected = document.querySelector('input[name="paymentOption"]:checked')?.value || "DP";
+          const selectedAmount = selected === "FULL" ? (full?.amount || 0) : (dp?.amount || 0);
+          payButton.textContent = selected === "FULL" ? `Pay ${money(selectedAmount)} in Full` : `Pay ${money(selectedAmount)} Down Payment`;
+        };
+      });
+    } else {
+      payButton.textContent = `Pay ${money(data.order_group?.payment_due || 0)} Online`;
+    }
+
     if (
       data.payment
         ?.payment_enabled ===
@@ -2023,7 +2059,9 @@ payButton.addEventListener(
                   checkout_token:
                     token,
                   provider:
-                    "MAYA"
+                    "MAYA",
+                  payment_option:
+                    (document.querySelector('input[name="paymentOption"]:checked')?.value || null)
                 }
               )
           }
