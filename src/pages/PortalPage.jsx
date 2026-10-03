@@ -1,5 +1,5 @@
 import InventoryPage from "./InventoryPage";
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../supabase";
 import SetupPage from "./SetupPage";
 import OnboardingPage from "./OnboardingPage";
@@ -485,6 +485,10 @@ export default function PortalPage({ session }) {
   const [payments, setPayments] = useState([]);
   const [paymentGroups, setPaymentGroups] = useState([]);
   const [deliveries, setDeliveries] = useState([]);
+  const [regularSalePosts, setRegularSalePosts] = useState([]);
+  const [miningPosts, setMiningPosts] = useState([]);
+  const [sellingPostItems, setSellingPostItems] = useState([]);
+  const [sellingPostEntries, setSellingPostEntries] = useState([]);
 
   const [page, setPage] = useState("dashboard");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -578,10 +582,6 @@ export default function PortalPage({ session }) {
   const [auctionWorkspaceTab, setAuctionWorkspaceTab] = useState("SUMMARY");
   const [miningWorkspaceTab, setMiningWorkspaceTab] = useState("SUMMARY");
   const [regularSaleWorkspaceTab, setRegularSaleWorkspaceTab] = useState("SUMMARY");
-  const [sellingPosts, setSellingPosts] = useState([]);
-  const [sellingPostItems, setSellingPostItems] = useState([]);
-  const [sellingPostEntries, setSellingPostEntries] = useState([]);
-  const [expandedSellingPostId, setExpandedSellingPostId] = useState(null);
   const [liveSellingWorkspaceTab, setLiveSellingWorkspaceTab] = useState("DASHBOARD");
   const [miningStatusFilter, setMiningStatusFilter] = useState("ALL");
   const [inventoryTab, setInventoryTab] = useState("SUMMARY");
@@ -1238,9 +1238,8 @@ export default function PortalPage({ session }) {
         paymentResult,
         paymentGroupResult,
         deliveryResult,
-        sellingPostsResult,
-        sellingPostItemsResult,
-        sellingPostEntriesResult,
+        regularSaleResult,
+        miningResult,
       ] = await Promise.all([
         supabase
           .from("client_auction_list")
@@ -1272,18 +1271,14 @@ export default function PortalPage({ session }) {
           .from("eo2mate_posts")
           .select("*")
           .eq("client_id", clientUser.client_id)
+          .eq("mode_code", "REGULAR_SALE")
           .order("created_at", { ascending: false }),
 
         supabase
-          .from("eo2mate_post_items")
-          .select("*, eo2mate_posts!inner(client_id)")
-          .eq("eo2mate_posts.client_id", clientUser.client_id)
-          .order("created_at", { ascending: false }),
-
-        supabase
-          .from("eo2mate_post_entries")
+          .from("eo2mate_posts")
           .select("*")
           .eq("client_id", clientUser.client_id)
+          .eq("mode_code", "MINING")
           .order("created_at", { ascending: false }),
       ]);
 
@@ -1292,18 +1287,43 @@ export default function PortalPage({ session }) {
       if (paymentResult.error) throw paymentResult.error;
       if (paymentGroupResult.error) throw paymentGroupResult.error;
       if (deliveryResult.error) throw deliveryResult.error;
-      if (sellingPostsResult.error) throw sellingPostsResult.error;
-      if (sellingPostItemsResult.error) throw sellingPostItemsResult.error;
-      if (sellingPostEntriesResult.error) throw sellingPostEntriesResult.error;
+      if (regularSaleResult.error) throw regularSaleResult.error;
+      if (miningResult.error) throw miningResult.error;
 
       setAuctions(auctionResult.data || []);
       setOrders(orderResult.data || []);
       setPayments(paymentResult.data || []);
       setPaymentGroups(paymentGroupResult.data || []);
       setDeliveries(deliveryResult.data || []);
-      setSellingPosts(sellingPostsResult.data || []);
-      setSellingPostItems(sellingPostItemsResult.data || []);
-      setSellingPostEntries(sellingPostEntriesResult.data || []);
+      const regularRows = regularSaleResult.data || [];
+      const miningRows = miningResult.data || [];
+      setRegularSalePosts(regularRows);
+      setMiningPosts(miningRows);
+
+      const sellingPostIds = [...regularRows, ...miningRows]
+        .map((row) => row.post_id)
+        .filter(Boolean);
+
+      if (sellingPostIds.length) {
+        const [itemsResult, entriesResult] = await Promise.all([
+          supabase
+            .from("eo2mate_post_items")
+            .select("*")
+            .in("post_id", sellingPostIds),
+          supabase
+            .from("eo2mate_post_entries")
+            .select("*")
+            .in("post_id", sellingPostIds)
+            .order("created_at", { ascending: false }),
+        ]);
+        if (itemsResult.error) throw itemsResult.error;
+        if (entriesResult.error) throw entriesResult.error;
+        setSellingPostItems(itemsResult.data || []);
+        setSellingPostEntries(entriesResult.data || []);
+      } else {
+        setSellingPostItems([]);
+        setSellingPostEntries([]);
+      }
 
       /*
        * Facebook is optional for workspace access.
@@ -1690,50 +1710,6 @@ export default function PortalPage({ session }) {
     delivered: deliveries.filter((d) => d.delivery_status === "DELIVERED").length,
   }), [deliveries]);
 
-
-  const sellingModeOf = (post) => String(
-    post?.mode_code ||
-    post?.post_mode_code ||
-    post?.post_mode ||
-    post?.selling_mode ||
-    post?.mode ||
-    post?.source_mode_code ||
-    ""
-  ).trim().toUpperCase().replace(/[ -]+/g, "_");
-
-  const regularSaleData = useMemo(() => {
-    const posts = sellingPosts.filter((p) => sellingModeOf(p) === "REGULAR_SALE");
-    const postIds = new Set(posts.map((p) => p.post_id));
-    const items = sellingPostItems.filter((i) => postIds.has(i.post_id));
-    const itemIds = new Set(items.map((i) => i.post_item_id));
-    const entries = sellingPostEntries.filter((e) => postIds.has(e.post_id) || itemIds.has(e.post_item_id));
-    const accepted = entries.filter((e) => ["ACCEPTED", "PARTIAL"].includes(String(e.status || "").toUpperCase()));
-    const itemById = new Map(items.map((i) => [i.post_item_id, i]));
-    const salesValue = accepted.reduce((sum, e) => sum + Number(e.accepted_quantity || 0) * Number(itemById.get(e.post_item_id)?.unit_price || 0), 0);
-    const itemsSold = accepted.reduce((sum, e) => sum + Number(e.accepted_quantity || 0), 0);
-    const buyers = new Set(accepted.map((e) => e.fb_user_id).filter(Boolean));
-    const active = posts.filter((p) => ["ACTIVE", "OPEN", "PUBLISHED"].includes(String(p.status || "").toUpperCase())).length;
-    const soldOut = posts.filter((p) => ["CLOSED", "SOLD_OUT", "FULL"].includes(String(p.status || "").toUpperCase())).length;
-    return { posts, items, entries, accepted, itemById, salesValue, itemsSold, buyers: buyers.size, active, soldOut };
-  }, [sellingPosts, sellingPostItems, sellingPostEntries]);
-
-  const miningData = useMemo(() => {
-    const posts = sellingPosts.filter((p) => sellingModeOf(p) === "MINING");
-    const postIds = new Set(posts.map((p) => p.post_id));
-    const items = sellingPostItems.filter((i) => postIds.has(i.post_id));
-    const itemIds = new Set(items.map((i) => i.post_item_id));
-    const entries = sellingPostEntries.filter((e) => postIds.has(e.post_id) || itemIds.has(e.post_item_id));
-    const accepted = entries.filter((e) => ["ACCEPTED", "PARTIAL"].includes(String(e.status || "").toUpperCase()));
-    const itemById = new Map(items.map((i) => [i.post_item_id, i]));
-    const claimedValue = accepted.reduce((sum, e) => sum + Number(e.accepted_quantity || 0) * Number(itemById.get(e.post_item_id)?.unit_price || 0), 0);
-    const itemsClaimed = accepted.reduce((sum, e) => sum + Number(e.accepted_quantity || 0), 0);
-    const buyers = new Set(accepted.map((e) => e.fb_user_id).filter(Boolean));
-    const active = posts.filter((p) => ["ACTIVE", "OPEN", "PUBLISHED"].includes(String(p.status || "").toUpperCase())).length;
-    const completed = posts.filter((p) => ["CLOSED", "COMPLETED", "SOLD_OUT", "FULL"].includes(String(p.status || "").toUpperCase())).length;
-    const cancelled = posts.filter((p) => String(p.status || "").toUpperCase() === "CANCELLED").length;
-    return { posts, items, entries, accepted, itemById, claimedValue, itemsClaimed, buyers: buyers.size, active, completed, cancelled };
-  }, [sellingPosts, sellingPostItems, sellingPostEntries]);
-
   const filteredAuctions = useMemo(() => {
     return auctions.filter((auction) => {
       const matchesStatus =
@@ -2041,51 +2017,39 @@ export default function PortalPage({ session }) {
 
               <SidebarNavButton
                 icon="create"
-                className={`nav-item ${page === "posts" ? "active" : ""}`}
-                onClick={() => navigateTo("posts")}
+                className={`nav-item ${page === "posts" || page === "facebook-post" || page === "post-mining" || page === "pre-order" || page === "regular-sale" || page.includes("auction") ? "active" : ""}`}
+                onClick={() => setPostsExpanded((value) => !value)}
+                aria-expanded={postsExpanded}
               >
-                Create Post
+                <span className="nav-parent-label">Posts <span className="nav-chevron">{postsExpanded ? "▾" : "›"}</span></span>
               </SidebarNavButton>
 
-              <SidebarNavButton
-                icon="auction"
-                className={`nav-item ${page.includes("auction") || page === "facebook-post" ? "active" : ""}`}
-                onClick={() => { setAuctionWorkspaceTab("SUMMARY"); goToAuctions("ALL"); setMobileMenuOpen(false); }}
-              >
-                Auctions
-              </SidebarNavButton>
+              {postsExpanded && (
+                <div className="nav-submenu">
+                  <button type="button" className={`nav-subitem ${page === "posts" ? "active" : ""}`} onClick={() => navigateTo("posts")}>Create Post</button>
 
-              <SidebarNavButton
-                icon="mining"
-                className={`nav-item ${page === "post-mining" || page === "mining-create" ? "active" : ""}`}
-                onClick={() => { setMiningWorkspaceTab("SUMMARY"); navigateTo("post-mining"); }}
-              >
-                Mining
-              </SidebarNavButton>
+                  <div className="nav-subgroup-label" style={{ margin: "10px 12px 4px", fontSize: 10, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", opacity: .65 }}>Auctions</div>
+                  <button type="button" className={`nav-subitem ${page === "auctions" ? "active" : ""}`} onClick={() => { setAuctionWorkspaceTab("SUMMARY"); goToAuctions("ALL"); setMobileMenuOpen(false); }}>Dashboard / Summary</button>
+                  <button type="button" className={`nav-subitem ${page === "facebook-post" ? "active" : ""}`} onClick={() => navigateTo("facebook-post")}>Create Post</button>
 
-              <SidebarNavButton
-                icon="orders"
-                className={`nav-item ${page === "pre-order" || page === "pre-order-create" ? "active" : ""}`}
-                onClick={() => navigateTo("pre-order")}
-              >
-                Pre-Orders
-              </SidebarNavButton>
+                  <div className="nav-subgroup-label" style={{ margin: "10px 12px 4px", fontSize: 10, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", opacity: .65 }}>Mining</div>
+                  <button type="button" className={`nav-subitem ${page === "post-mining" ? "active" : ""}`} onClick={() => { setMiningWorkspaceTab("SUMMARY"); navigateTo("post-mining"); }}>Dashboard / Summary</button>
+                  <button type="button" className={`nav-subitem ${page === "mining-create" ? "active" : ""}`} onClick={() => navigateTo("mining-create")}>Create Post</button>
 
-              <SidebarNavButton
-                icon="sales"
-                className={`nav-item ${page === "regular-sale" ? "active" : ""}`}
-                onClick={() => { setRegularSaleWorkspaceTab("SUMMARY"); navigateTo("regular-sale"); }}
-              >
-                Regular Sales
-              </SidebarNavButton>
+                  <div className="nav-subgroup-label" style={{ margin: "10px 12px 4px", fontSize: 10, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", opacity: .65 }}>Pre-Orders</div>
+                  <button type="button" className={`nav-subitem ${page === "pre-order" ? "active" : ""}`} onClick={() => navigateTo("pre-order")}>Dashboard / Summary</button>
+                  <button type="button" className={`nav-subitem ${page === "pre-order-create" ? "active" : ""}`} onClick={() => navigateTo("pre-order-create")}>Create Post</button>
 
-              <SidebarNavButton
-                icon="facebook"
-                className={`nav-item ${page === "live-selling" ? "active" : ""}`}
-                onClick={() => { setLiveSellingWorkspaceTab("DASHBOARD"); navigateTo("live-selling"); }}
-              >
-                Live Selling
-              </SidebarNavButton>
+                  <div className="nav-subgroup-label" style={{ margin: "10px 12px 4px", fontSize: 10, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", opacity: .65 }}>Regular Sales</div>
+                  <button type="button" className={`nav-subitem ${page === "regular-sale" ? "active" : ""}`} onClick={() => { setRegularSaleWorkspaceTab("SUMMARY"); navigateTo("regular-sale"); }}>Dashboard / Summary</button>
+                  <button type="button" className={`nav-subitem ${page === "regular-sale" && regularSaleWorkspaceTab === "POSTING" ? "active" : ""}`} onClick={() => { setRegularSaleWorkspaceTab("POSTING"); navigateTo("regular-sale"); }}>Create Post</button>
+
+                  <div className="nav-subgroup-label" style={{ margin: "10px 12px 4px", fontSize: 10, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", opacity: .65 }}>Live Selling</div>
+                  <button type="button" className={`nav-subitem ${page === "live-selling" ? "active" : ""}`} onClick={() => { setLiveSellingWorkspaceTab("DASHBOARD"); navigateTo("live-selling"); }}>Dashboard / Summary</button>
+                  <button type="button" className="nav-subitem" disabled title="Live Selling post creation is coming soon">Create Post <span className="coming-soon-pill">Soon</span></button>
+                </div>
+              )}
+
             </>
           )}
 
@@ -2329,12 +2293,12 @@ export default function PortalPage({ session }) {
             </header>
 
             <section className="metrics-grid">
-              <MetricCard title="Total posts" value={regularSaleData.posts.length} subtitle="All Regular Sale posts" />
-              <MetricCard title="Active" value={regularSaleData.active} subtitle="Currently accepting orders" />
-              <MetricCard title="Sold out" value={regularSaleData.soldOut} subtitle="Closed / sold out" />
-              <MetricCard title="Orders" value={regularSaleData.accepted.length} subtitle="Accepted customer claims" />
-              <MetricCard title="Items sold" value={regularSaleData.itemsSold} subtitle="Total allocated quantity" />
-              <MetricCard title="Sales value" value={formatCurrency(regularSaleData.salesValue)} subtitle="Gross accepted value" />
+              <MetricCard title="Total posts" value={regularSalePosts.length} subtitle="All Regular Sale posts" />
+              <MetricCard title="Active" value={regularSalePosts.filter((p) => String(p.status || "").toUpperCase() === "ACTIVE").length} subtitle="Currently accepting orders" />
+              <MetricCard title="Sold out" value={regularSalePosts.filter((p) => ["CLOSED", "SOLD_OUT", "FULL"].includes(String(p.status || "").toUpperCase())).length} subtitle="Closed after stock sold out" />
+              <MetricCard title="Orders" value={sellingPostEntries.filter((e) => regularSalePosts.some((p) => p.post_id === e.post_id)).length} subtitle="Accepted customer orders" />
+              <MetricCard title="Items sold" value={sellingPostEntries.filter((e) => regularSalePosts.some((p) => p.post_id === e.post_id)).reduce((sum, e) => sum + Number(e.quantity || e.qty || 1), 0)} subtitle="Total allocated quantity" />
+              <MetricCard title="Sales value" value={formatCurrency(0)} subtitle="Gross Regular Sale value" />
             </section>
 
             <section className="dashboard-panel" style={{ marginBottom: 18 }}>
@@ -2374,11 +2338,11 @@ export default function PortalPage({ session }) {
                   </div>
                   <div className="metrics-grid">
                     <MetricCard title="Sell-through rate" value="—" subtitle="Sold quantity versus offered stock" />
-                    <MetricCard title="Unique buyers" value={regularSaleData.buyers} subtitle="Regular Sale customers" />
-                    <MetricCard title="Accepted claims" value={regularSaleData.accepted.length} subtitle="Accepted / partial entries" />
-                    <MetricCard title="Allocated value" value={formatCurrency(regularSaleData.salesValue)} subtitle="Accepted Regular Sale value" />
-                    <MetricCard title="Items allocated" value={regularSaleData.itemsSold} subtitle="Reserved from selling posts" />
-                    <MetricCard title="Average claim" value={formatCurrency(regularSaleData.accepted.length ? regularSaleData.salesValue / regularSaleData.accepted.length : 0)} subtitle="Average accepted claim value" />
+                    <MetricCard title="Unique buyers" value="0" subtitle="Regular Sale customers" />
+                    <MetricCard title="Remaining items" value="0" subtitle="Available quantity" />
+                    <MetricCard title="Paid value" value={formatCurrency(0)} subtitle="Collected Regular Sale sales" />
+                    <MetricCard title="Pending value" value={formatCurrency(0)} subtitle="Awaiting payment" />
+                    <MetricCard title="Average order" value={formatCurrency(0)} subtitle="Average accepted order value" />
                   </div>
                 </section>
               </>
@@ -2392,27 +2356,24 @@ export default function PortalPage({ session }) {
                 </div>
                 <div className="table-wrapper">
                   <table>
-                    <thead><tr><th>Post</th><th>Facebook Page</th><th>Status</th><th>Items</th><th>Orders</th><th>Buyers</th><th>Value</th><th>Created</th><th>Action</th></tr></thead>
-                    <tbody>{regularSaleData.posts.length ? regularSaleData.posts.map((post) => {
-                      const postItems = regularSaleData.items.filter((item) => item.post_id === post.post_id);
-                      const ids = new Set(postItems.map((item) => item.post_item_id));
-                      const accepted = regularSaleData.accepted.filter((entry) => entry.post_id === post.post_id || ids.has(entry.post_item_id));
-                      const buyers = new Set(accepted.map((entry) => entry.fb_user_id).filter(Boolean)).size;
-                      const value = accepted.reduce((sum, entry) => sum + Number(entry.accepted_quantity || 0) * Number(regularSaleData.itemById.get(entry.post_item_id)?.unit_price || 0), 0);
-                      return (<Fragment key={post.post_id}><tr>
-                        <td>{post.fb_post_id || post.facebook_post_id || post.post_id}</td>
-                        <td>{post.fb_page_id || post.facebook_page_id || "-"}</td>
-                        <td><StatusBadge status={post.status || "-"} /></td>
-                        <td>{postItems.length}</td>
-                        <td>{accepted.length}</td>
-                        <td>{buyers}</td>
-                        <td>{formatCurrency(value)}</td>
-                        <td>{formatDateTime(post.created_at)}</td>
-                        <td><button type="button" className="secondary-button" onClick={() => setExpandedSellingPostId(expandedSellingPostId === post.post_id ? null : post.post_id)}>{expandedSellingPostId === post.post_id ? "Hide" : "View"}</button></td>
-                      </tr>
-                      {expandedSellingPostId === post.post_id && (<tr key={`${post.post_id}-details`}><td colSpan="9"><strong>Items:</strong> {postItems.map((item) => `${item.item_label || item.item_name_snapshot || "Item"} × ${item.quantity_limit || 1}`).join(", ") || "No item rows"} · <strong>Post ID:</strong> {post.post_id}</td></tr>)}
-                      </Fragment>);
-                    }) : <tr><td colSpan="9">No Regular Sale records found in eo2mate_posts.</td></tr>}</tbody>
+                    <thead><tr><th>Post</th><th>Facebook Page</th><th>Status</th><th>Items</th><th>Orders</th><th>Buyers</th><th>Value</th><th>Created</th></tr></thead>
+                    <tbody>
+                      {regularSalePosts.length ? regularSalePosts.map((post) => {
+                        const items = sellingPostItems.filter((item) => item.post_id === post.post_id);
+                        const entries = sellingPostEntries.filter((entry) => entry.post_id === post.post_id);
+                        const buyers = new Set(entries.map((entry) => entry.buyer_psid || entry.buyer_id || entry.facebook_user_id).filter(Boolean));
+                        const value = entries.reduce((sum, entry) => sum + Number(entry.total_amount || entry.amount || entry.unit_price || 0) * Number(entry.quantity || entry.qty || 1), 0);
+                        return (
+                          <tr key={post.post_id}>
+                            <td>{post.title || post.item_label || post.post_name || post.facebook_post_id || post.post_id}</td>
+                            <td>{post.fb_page_id || post.facebook_page_id || "-"}</td>
+                            <td><StatusBadge status={post.status || "-"} /></td>
+                            <td>{items.length}</td><td>{entries.length}</td><td>{buyers.size}</td>
+                            <td>{formatCurrency(value)}</td><td>{formatDateTime(post.created_at)}</td>
+                          </tr>
+                        );
+                      }) : <tr><td colSpan="8">No Regular Sale records found.</td></tr>}
+                    </tbody>
                   </table>
                 </div>
               </section>
@@ -3368,14 +3329,14 @@ export default function PortalPage({ session }) {
             </header>
 
             <section className="metrics-grid">
-              <MetricCard title="Total posts" value={miningData.posts.length} subtitle="All mining posts" />
-              <MetricCard title="Active" value={miningData.active} subtitle="Currently accepting MINE" />
+              <MetricCard title="Total posts" value={miningPosts.length} subtitle="All mining posts" />
+              <MetricCard title="Active" value={miningPosts.filter((p) => String(p.status || "").toUpperCase() === "ACTIVE").length} subtitle="Currently accepting MINE" />
               <MetricCard title="Live Mining" value="0" subtitle="Active live sessions" />
-              <MetricCard title="Completed" value={miningData.completed} subtitle="Closed mining posts" />
-              <MetricCard title="Cancelled" value={miningData.cancelled} subtitle="Cancelled posts" />
-              <MetricCard title="Total claims" value={miningData.accepted.length} subtitle="Recorded MINE claims" />
-              <MetricCard title="Unique buyers" value={miningData.buyers} subtitle="Mining customers" />
-              <MetricCard title="Claimed value" value={formatCurrency(miningData.claimedValue)} subtitle="Gross claimed sales" />
+              <MetricCard title="Completed" value={miningPosts.filter((p) => ["COMPLETED", "CLOSED", "FULL"].includes(String(p.status || "").toUpperCase())).length} subtitle="Closed mining posts" />
+              <MetricCard title="Cancelled" value={miningPosts.filter((p) => String(p.status || "").toUpperCase() === "CANCELLED").length} subtitle="Cancelled posts" />
+              <MetricCard title="Total claims" value={sellingPostEntries.filter((e) => miningPosts.some((p) => p.post_id === e.post_id)).length} subtitle="Recorded MINE claims" />
+              <MetricCard title="Unique buyers" value="0" subtitle="Mining customers" />
+              <MetricCard title="Claimed value" value={formatCurrency(0)} subtitle="Gross claimed sales" />
             </section>
 
             <section className="dashboard-panel" style={{ marginBottom: 18 }}>
@@ -3439,21 +3400,24 @@ export default function PortalPage({ session }) {
                 </div>
                 <div className="table-wrapper">
                   <table>
-                    <thead><tr><th>Post</th><th>Facebook Page</th><th>Status</th><th>Items</th><th>Claims</th><th>Buyers</th><th>Value</th><th>Created</th><th>Action</th></tr></thead>
-                    <tbody>{miningData.posts.length ? miningData.posts.map((post) => {
-                      const postItems = miningData.items.filter((item) => item.post_id === post.post_id);
-                      const ids = new Set(postItems.map((item) => item.post_item_id));
-                      const accepted = miningData.accepted.filter((entry) => entry.post_id === post.post_id || ids.has(entry.post_item_id));
-                      const buyers = new Set(accepted.map((entry) => entry.fb_user_id).filter(Boolean)).size;
-                      const value = accepted.reduce((sum, entry) => sum + Number(entry.accepted_quantity || 0) * Number(miningData.itemById.get(entry.post_item_id)?.unit_price || 0), 0);
-                      return (<Fragment key={post.post_id}><tr>
-                        <td>{post.fb_post_id || post.facebook_post_id || post.post_id}</td>
-                        <td>{post.fb_page_id || post.facebook_page_id || "-"}</td>
-                        <td><StatusBadge status={post.status || "-"} /></td>
-                        <td>{postItems.length}</td><td>{accepted.length}</td><td>{buyers}</td><td>{formatCurrency(value)}</td><td>{formatDateTime(post.created_at)}</td>
-                        <td><button type="button" className="secondary-button" onClick={() => setExpandedSellingPostId(expandedSellingPostId === post.post_id ? null : post.post_id)}>{expandedSellingPostId === post.post_id ? "Hide" : "View"}</button></td>
-                      </tr>{expandedSellingPostId === post.post_id && (<tr><td colSpan="9"><strong>Items:</strong> {postItems.map((item) => `${item.item_label || item.item_name_snapshot || "Item"} × ${item.quantity_limit || 1}`).join(", ") || "No item rows"} · <strong>Post ID:</strong> {post.post_id}</td></tr>)}</Fragment>);
-                    }) : <tr><td colSpan="9">No Mining records found in eo2mate_posts.</td></tr>}</tbody>
+                    <thead><tr><th>Post</th><th>Facebook Page</th><th>Status</th><th>Items</th><th>Claims</th><th>Buyers</th><th>Value</th><th>Created</th></tr></thead>
+                    <tbody>
+                      {miningPosts.length ? miningPosts.map((post) => {
+                        const items = sellingPostItems.filter((item) => item.post_id === post.post_id);
+                        const entries = sellingPostEntries.filter((entry) => entry.post_id === post.post_id);
+                        const buyers = new Set(entries.map((entry) => entry.buyer_psid || entry.buyer_id || entry.facebook_user_id).filter(Boolean));
+                        const value = entries.reduce((sum, entry) => sum + Number(entry.total_amount || entry.amount || entry.unit_price || 0) * Number(entry.quantity || entry.qty || 1), 0);
+                        return (
+                          <tr key={post.post_id}>
+                            <td>{post.title || post.item_label || post.post_name || post.facebook_post_id || post.post_id}</td>
+                            <td>{post.fb_page_id || post.facebook_page_id || "-"}</td>
+                            <td><StatusBadge status={post.status || "-"} /></td>
+                            <td>{items.length}</td><td>{entries.length}</td><td>{buyers.size}</td>
+                            <td>{formatCurrency(value)}</td><td>{formatDateTime(post.created_at)}</td>
+                          </tr>
+                        );
+                      }) : <tr><td colSpan="8">No Post Mining records found.</td></tr>}
+                    </tbody>
                   </table>
                 </div>
               </section>
