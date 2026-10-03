@@ -485,7 +485,21 @@ export default function PortalPage({ session }) {
   const [payments, setPayments] = useState([]);
   const [paymentGroups, setPaymentGroups] = useState([]);
   const [deliveries, setDeliveries] = useState([]);
+  const [sellingPosts, setSellingPosts] = useState([]);
 
+  const postMode = (row) => String(row?.selling_mode ?? row?.post_mode ?? row?.mode ?? row?.post_type ?? row?.type ?? row?.module ?? "").toUpperCase().replace(/[ -]+/g, "_");
+  const regularSalePosts = useMemo(() => sellingPosts.filter((row) => ["REGULAR_SALE", "REGULARSALE", "SALE"].includes(postMode(row))), [sellingPosts]);
+  const miningPosts = useMemo(() => sellingPosts.filter((row) => postMode(row).includes("MINING") || postMode(row) === "MINE"), [sellingPosts]);
+  const orderMode = (row) => String(row?.source_type ?? row?.selling_mode ?? row?.order_type ?? row?.type ?? "").toUpperCase().replace(/[ -]+/g, "_");
+  const regularSaleOrders = useMemo(() => orders.filter((row) => ["REGULAR_SALE", "REGULARSALE", "SALE"].includes(orderMode(row))), [orders]);
+  const miningOrders = useMemo(() => orders.filter((row) => orderMode(row).includes("MINING") || orderMode(row) === "MINE"), [orders]);
+  const rowQty = (row) => Number(row?.quantity ?? row?.qty ?? row?.allocated_quantity ?? 1) || 0;
+  const rowValue = (row) => Number(row?.total_amount ?? row?.amount ?? row?.order_total ?? row?.line_total ?? ((Number(row?.unit_price ?? row?.price ?? 0) || 0) * rowQty(row))) || 0;
+  const rowStatus = (row) => String(row?.status ?? row?.post_status ?? row?.order_status ?? "UNKNOWN").toUpperCase();
+  const rowBuyer = (row) => row?.buyer_fb_user_id ?? row?.buyer_id ?? row?.facebook_user_id ?? row?.customer_id ?? row?.buyer_name ?? null;
+  const postLabel = (row) => row?.title ?? row?.post_title ?? row?.item_name ?? row?.name ?? row?.facebook_post_id ?? row?.post_id ?? "Post";
+  const postPage = (row) => row?.facebook_page_name ?? row?.page_name ?? row?.fb_page_name ?? row?.page_id ?? "—";
+  const postCreated = (row) => row?.created_at ?? row?.post_created_at ?? row?.published_at ?? null;
   const [page, setPage] = useState("dashboard");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [postsExpanded, setPostsExpanded] = useState(true);
@@ -1237,6 +1251,7 @@ export default function PortalPage({ session }) {
         paymentResult,
         paymentGroupResult,
         deliveryResult,
+        sellingPostResult,
       ] = await Promise.all([
         supabase
           .from("client_auction_list")
@@ -1263,6 +1278,12 @@ export default function PortalPage({ session }) {
           .from("client_delivery_list")
           .select("*")
           .order("created_at", { ascending: false }),
+
+        supabase
+          .from("eo2mate_posts")
+          .select("*")
+          .eq("client_id", clientUser.client_id)
+          .order("created_at", { ascending: false }),
       ]);
 
       if (auctionResult.error) throw auctionResult.error;
@@ -1270,12 +1291,14 @@ export default function PortalPage({ session }) {
       if (paymentResult.error) throw paymentResult.error;
       if (paymentGroupResult.error) throw paymentGroupResult.error;
       if (deliveryResult.error) throw deliveryResult.error;
+      if (sellingPostResult.error) console.warn("Unable to load eo2mate_posts", sellingPostResult.error);
 
       setAuctions(auctionResult.data || []);
       setOrders(orderResult.data || []);
       setPayments(paymentResult.data || []);
       setPaymentGroups(paymentGroupResult.data || []);
       setDeliveries(deliveryResult.data || []);
+      setSellingPosts(sellingPostResult.data || []);
 
       /*
        * Facebook is optional for workspace access.
@@ -2315,12 +2338,12 @@ export default function PortalPage({ session }) {
             </header>
 
             <section className="metrics-grid">
-              <MetricCard title="Total posts" value="0" subtitle="All Regular Sale posts" />
-              <MetricCard title="Active" value="0" subtitle="Currently accepting orders" />
-              <MetricCard title="Sold out" value="0" subtitle="Closed after stock sold out" />
-              <MetricCard title="Orders" value="0" subtitle="Accepted customer orders" />
-              <MetricCard title="Items sold" value="0" subtitle="Total allocated quantity" />
-              <MetricCard title="Sales value" value={formatCurrency(0)} subtitle="Gross Regular Sale value" />
+              <MetricCard title="Total posts" value={regularSalePosts.length} subtitle="All Regular Sale posts" />
+              <MetricCard title="Active" value={regularSalePosts.filter((r) => ["ACTIVE", "OPEN", "PUBLISHED"].includes(rowStatus(r))).length} subtitle="Currently accepting orders" />
+              <MetricCard title="Sold out" value={regularSalePosts.filter((r) => rowStatus(r) === "SOLD_OUT").length} subtitle="Closed after stock sold out" />
+              <MetricCard title="Orders" value={regularSaleOrders.length} subtitle="Accepted customer orders" />
+              <MetricCard title="Items sold" value={regularSaleOrders.reduce((n, r) => n + rowQty(r), 0)} subtitle="Total allocated quantity" />
+              <MetricCard title="Sales value" value={formatCurrency(regularSaleOrders.reduce((n, r) => n + rowValue(r), 0))} subtitle="Gross Regular Sale value" />
             </section>
 
             {renderSellingTabs(
@@ -2372,7 +2395,7 @@ export default function PortalPage({ session }) {
                 <div className="table-wrapper">
                   <table>
                     <thead><tr><th>Post</th><th>Facebook Page</th><th>Status</th><th>Items</th><th>Orders</th><th>Buyers</th><th>Value</th><th>Created</th></tr></thead>
-                    <tbody><tr><td colSpan="8">No Regular Sale records yet.</td></tr></tbody>
+                    <tbody>{regularSalePosts.length === 0 ? <tr><td colSpan="8">No Regular Sale records found in eo2mate_posts.</td></tr> : regularSalePosts.map((post, index) => { const pid = post.post_id ?? post.id ?? post.facebook_post_id ?? index; const linked = regularSaleOrders.filter((o) => String(o.post_id ?? o.eo2mate_post_id ?? o.facebook_post_id ?? "") === String(post.post_id ?? post.id ?? post.facebook_post_id ?? "")); const buyers = new Set(linked.map(rowBuyer).filter(Boolean)).size; return <tr key={pid}><td>{postLabel(post)}</td><td>{postPage(post)}</td><td>{rowStatus(post)}</td><td>{post.item_count ?? post.items_count ?? "—"}</td><td>{linked.length}</td><td>{buyers}</td><td>{formatCurrency(linked.reduce((n,r)=>n+rowValue(r),0))}</td><td>{postCreated(post) ? new Date(postCreated(post)).toLocaleString() : "—"}</td></tr>; })}</tbody>
                   </table>
                 </div>
               </section>
@@ -3320,14 +3343,14 @@ export default function PortalPage({ session }) {
             </header>
 
             <section className="metrics-grid">
-              <MetricCard title="Total posts" value="0" subtitle="All mining posts" />
-              <MetricCard title="Active" value="0" subtitle="Currently accepting MINE" />
+              <MetricCard title="Total posts" value={miningPosts.length} subtitle="All mining posts" />
+              <MetricCard title="Active" value={miningPosts.filter((r) => ["ACTIVE", "OPEN", "PUBLISHED"].includes(rowStatus(r))).length} subtitle="Currently accepting MINE" />
               <MetricCard title="Live Mining" value="0" subtitle="Active live sessions" />
               <MetricCard title="Completed" value="0" subtitle="Closed mining posts" />
               <MetricCard title="Cancelled" value="0" subtitle="Cancelled posts" />
-              <MetricCard title="Total claims" value="0" subtitle="Recorded MINE claims" />
-              <MetricCard title="Unique buyers" value="0" subtitle="Mining customers" />
-              <MetricCard title="Claimed value" value={formatCurrency(0)} subtitle="Gross claimed sales" />
+              <MetricCard title="Total claims" value={miningOrders.length} subtitle="Recorded MINE claims / orders" />
+              <MetricCard title="Unique buyers" value={new Set(miningOrders.map(rowBuyer).filter(Boolean)).size} subtitle="Mining customers" />
+              <MetricCard title="Claimed value" value={formatCurrency(miningOrders.reduce((n,r)=>n+rowValue(r),0))} subtitle="Gross claimed sales" />
             </section>
 
             {renderSellingTabs(
@@ -3384,7 +3407,7 @@ export default function PortalPage({ session }) {
                 <div className="table-wrapper">
                   <table>
                     <thead><tr><th>Post</th><th>Facebook Page</th><th>Status</th><th>Items</th><th>Claims</th><th>Buyers</th><th>Value</th><th>Created</th></tr></thead>
-                    <tbody><tr><td colSpan="8">No Post Mining records yet.</td></tr></tbody>
+                    <tbody>{miningPosts.length === 0 ? <tr><td colSpan="8">No Mining records found in eo2mate_posts.</td></tr> : miningPosts.map((post, index) => { const pid = post.post_id ?? post.id ?? post.facebook_post_id ?? index; const linked = miningOrders.filter((o) => String(o.post_id ?? o.eo2mate_post_id ?? o.facebook_post_id ?? "") === String(post.post_id ?? post.id ?? post.facebook_post_id ?? "")); const buyers = new Set(linked.map(rowBuyer).filter(Boolean)).size; return <tr key={pid}><td>{postLabel(post)}</td><td>{postPage(post)}</td><td>{rowStatus(post)}</td><td>{post.item_count ?? post.items_count ?? "—"}</td><td>{linked.length}</td><td>{buyers}</td><td>{formatCurrency(linked.reduce((n,r)=>n+rowValue(r),0))}</td><td>{postCreated(post) ? new Date(postCreated(post)).toLocaleString() : "—"}</td></tr>; })}</tbody>
                   </table>
                 </div>
               </section>
@@ -3653,9 +3676,9 @@ export default function PortalPage({ session }) {
         {page === "sales" && (
           <>
             <header className="dashboard-header"><div><p className="eyebrow">SALES</p><h1>Sales</h1><p>Consolidated sales from Auctions, Post Mining, Live Mining and manual transactions.</p></div></header>
-            <section className="metrics-grid"><MetricCard title="Gross sales" value={formatCurrency(0)} subtitle="Before deductions" /><MetricCard title="Net sales" value={formatCurrency(0)} subtitle="After discounts / adjustments" /><MetricCard title="Paid" value={formatCurrency(0)} subtitle="Collected sales" /><MetricCard title="Pending" value={formatCurrency(0)} subtitle="Awaiting payment" /><MetricCard title="Transactions" value="0" subtitle="Sales records" /><MetricCard title="Average sale" value={formatCurrency(0)} subtitle="Per transaction" /></section>
+            <section className="metrics-grid"><MetricCard title="Gross sales" value={formatCurrency(orders.reduce((n,r)=>n+rowValue(r),0))} subtitle="Before deductions" /><MetricCard title="Net sales" value={formatCurrency(orders.reduce((n,r)=>n+rowValue(r),0))} subtitle="Current recorded order value" /><MetricCard title="Paid" value={formatCurrency(payments.filter((p)=>String(p.status||p.payment_status||"").toLowerCase()==="paid").reduce((n,p)=>n+Number(p.amount||0),0))} subtitle="Collected sales" /><MetricCard title="Pending" value={formatCurrency(payments.filter((p)=>String(p.status||p.payment_status||"").toLowerCase()==="pending").reduce((n,p)=>n+Number(p.amount||0),0))} subtitle="Awaiting payment" /><MetricCard title="Transactions" value={orders.length} subtitle="Sales records" /><MetricCard title="Average sale" value={formatCurrency(orders.length ? orders.reduce((n,r)=>n+rowValue(r),0)/orders.length : 0)} subtitle="Per transaction" /></section>
             <section className="dashboard-panel" style={{ marginBottom: 18 }}><div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>{["SUMMARY", "TRANSACTIONS", "RETURNS"].map((tab) => <button key={tab} type="button" className={salesTab === tab ? "primary-button" : "secondary-button"} onClick={() => setSalesTab(tab)}>{tab.charAt(0)+tab.slice(1).toLowerCase()}</button>)}</div></section>
-            <section className="dashboard-panel"><div className="panel-header"><div><h2>{salesTab === "SUMMARY" ? "Sales summary" : salesTab.charAt(0)+salesTab.slice(1).toLowerCase()}</h2><p>Sales data will consolidate all enabled EO2MATE selling channels.</p></div></div><div className="table-wrapper"><table><thead><tr><th>Date</th><th>Reference</th><th>Channel</th><th>Buyer</th><th>Items</th><th>Gross</th><th>Paid</th><th>Status</th></tr></thead><tbody><tr><td colSpan="8">No consolidated sales records yet.</td></tr></tbody></table></div></section>
+            <section className="dashboard-panel"><div className="panel-header"><div><h2>{salesTab === "SUMMARY" ? "Sales summary" : salesTab.charAt(0)+salesTab.slice(1).toLowerCase()}</h2><p>Sales data will consolidate all enabled EO2MATE selling channels.</p></div></div><div className="table-wrapper"><table><thead><tr><th>Date</th><th>Reference</th><th>Channel</th><th>Buyer</th><th>Items</th><th>Gross</th><th>Paid</th><th>Status</th></tr></thead><tbody>{orders.length === 0 ? <tr><td colSpan="8">No consolidated sales records yet.</td></tr> : orders.map((o,index)=><tr key={o.order_id ?? o.id ?? index}><td>{formatDateTime(o.created_at)}</td><td>{o.order_number ?? o.order_id ?? o.id ?? "—"}</td><td>{orderMode(o) || "—"}</td><td>{o.buyer_name ?? o.customer_name ?? o.buyer_fb_user_id ?? "—"}</td><td>{rowQty(o)}</td><td>{formatCurrency(rowValue(o))}</td><td>{String(o.payment_status ?? "").toUpperCase()==="PAID" ? formatCurrency(rowValue(o)) : formatCurrency(0)}</td><td>{o.payment_status ?? o.order_status ?? o.status ?? "—"}</td></tr>)}</tbody></table></div></section>
           </>
         )}
 
