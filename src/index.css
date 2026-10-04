@@ -2701,3 +2701,29 @@ button.post-type-card:hover { transform: translateY(-2px); border-color: #bcdcc3
 @media (max-width: 560px) {
   .selling-detail-workspace .metrics-grid { grid-template-columns: 1fr; }
 }
+
+/* Selling detail navigation + linked winner enhancements */
+.button-icon,
+.inline-button-svg {
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  flex: 0 0 16px;
+  vertical-align: middle;
+}
+.button-icon svg { width: 16px; height: 16px; display: block; }
+.secondary-button .button-icon,
+.back-button .button-icon { margin-right: 6px; }
+.inline-button-svg { margin-right: 6px; }
+.table-link-button {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
