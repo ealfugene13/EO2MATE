@@ -485,7 +485,7 @@ function SellingPostDetailPanel({ detail, loading, error, onClose }) {
     <section id="selling-post-detail" className="dashboard-panel selling-card">
       <div className="panel-header">
         <div><p className="eyebrow">{String(detail.mode_code || "POST").replaceAll("_", " ")}</p><h2>Post details</h2><p>{post.caption || "No post caption"}</p></div>
-        <button className="secondary-button" type="button" onClick={onClose}>Close details</button>
+        <button className="secondary-button" type="button" onClick={onClose}>Back to Posts</button>
       </div>
       <div className="preorder-summary-grid">
         <div><span>Facebook Page</span><strong>{detail.facebook_page || "—"}</strong></div>
@@ -749,7 +749,6 @@ export default function PortalPage({ session }) {
       const firstError = postResult.error || itemsResult.error || activityResult.error;
       if (firstError) throw firstError;
       setSellingPostDetail({ ...row, post: postResult.data, items: itemsResult.data || [], activity: activityResult.data || [] });
-      window.setTimeout(() => document.getElementById("selling-post-detail")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
     } catch (error) {
       console.error("Failed to load selling post detail", error);
       setSellingPostDetailError(error?.message || "Unable to load post details.");
@@ -2445,6 +2444,9 @@ export default function PortalPage({ session }) {
         )}
 
         {metaConnected && page === "regular-sale" && (
+          (sellingPostDetailLoading || sellingPostDetailError || sellingPostDetail?.mode_code === "REGULAR_SALE") ? (
+            <SellingPostDetailPanel detail={sellingPostDetail} loading={sellingPostDetailLoading} error={sellingPostDetailError} onClose={() => { setSellingPostDetail(null); setSellingPostDetailError(""); }} />
+          ) : (
           <>
             <header className="dashboard-header">
               <div>
@@ -2542,14 +2544,11 @@ export default function PortalPage({ session }) {
               </section>
             )}
 
-            {regularSaleWorkspaceTab === "POSTS" && (sellingPostDetailLoading || sellingPostDetailError || sellingPostDetail?.mode_code === "REGULAR_SALE") && (
-              <SellingPostDetailPanel detail={sellingPostDetail} loading={sellingPostDetailLoading} error={sellingPostDetailError} onClose={() => setSellingPostDetail(null)} />
-            )}
-
             {regularSaleWorkspaceTab === "POSTING" && (
               <FacebookPostPage client={client} initialPostMode="REGULAR_SALE" />
             )}
           </>
+          )
         )}
 
         {metaConnected && page === "pre-order" && (
@@ -3486,6 +3485,9 @@ export default function PortalPage({ session }) {
         )}
 
         {metaConnected && page === "post-mining" && (
+          (sellingPostDetailLoading || sellingPostDetailError || sellingPostDetail?.mode_code === "MINING") ? (
+            <SellingPostDetailPanel detail={sellingPostDetail} loading={sellingPostDetailLoading} error={sellingPostDetailError} onClose={() => { setSellingPostDetail(null); setSellingPostDetailError(""); }} />
+          ) : (
           <>
             <header className="dashboard-header">
               <div>
@@ -3591,10 +3593,6 @@ export default function PortalPage({ session }) {
               </section>
             )}
 
-            {miningWorkspaceTab === "POSTS" && (sellingPostDetailLoading || sellingPostDetailError || sellingPostDetail?.mode_code === "MINING") && (
-              <SellingPostDetailPanel detail={sellingPostDetail} loading={sellingPostDetailLoading} error={sellingPostDetailError} onClose={() => setSellingPostDetail(null)} />
-            )}
-
             {miningWorkspaceTab === "LIVE MINING" && (
               <>
                 <section className="dashboard-panel">
@@ -3639,6 +3637,7 @@ export default function PortalPage({ session }) {
               </section>
             )}
           </>
+          )
         )}
 
         {page === "dashboard" && (

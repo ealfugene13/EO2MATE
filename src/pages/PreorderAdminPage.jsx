@@ -15,7 +15,7 @@ export default function PreorderAdminPage({ client, onCreatePost }) {
   async function call(action,extra={}) { const {data,error}=await supabase.functions.invoke("eo2mate",{headers:{"x-eo2mate-route":"preorder-admin"},body:{action,client_id:client.client_id,...extra}}); if(error)throw error; if(!data?.success)throw new Error(data?.error||"Request failed"); return data; }
   async function load(){ setLoading(true); setError(""); try { const p=await call("LIST"); setPosts(p.posts||[]); } catch(e){setError(e.message)} finally{setLoading(false)} }
   useEffect(()=>{if(client?.client_id)load()},[client?.client_id]);
-  async function open(post){ setSelected(post); setError(""); try{const d=await call("ENTRIES",{post_id:post.post_id});setEntries(d.entries||[]);window.setTimeout(()=>document.getElementById("preorder-post-detail")?.scrollIntoView({behavior:"smooth",block:"start"}),0)}catch(e){setError(e.message)} }
+  async function open(post){ setSelected(post); setError(""); try{const d=await call("ENTRIES",{post_id:post.post_id});setEntries(d.entries||[])}catch(e){setError(e.message)} }
   async function cancel(entry){const reason=window.prompt("Cancellation reason code (BUYER_REQUESTED, NO_PAYMENT, DUMMY_FAKE_SUSPECTED, NUISANCE_FAKE_ACTIVITY, OTHER):","BUYER_REQUESTED");if(!reason)return;try{await call("CANCEL_ENTRY",{post_entry_id:entry.post_entry_id,reason_code:reason});await open(selected);setNotice("Reservation cancelled and quantity released.")}catch(e){setError(e.message)}}
 
   const summary=useMemo(()=>{
@@ -51,6 +51,7 @@ export default function PreorderAdminPage({ client, onCreatePost }) {
   const tabs=["DASHBOARD","SUMMARY","POSTS"];
 
   return <>
+    {!selected && <>
     <header className="dashboard-header preorder-admin-header selling-hero"><div><p className="eyebrow">SELLING · PRE-ORDER</p><h1>Pre-Order</h1><p>Summary, Pre-Order posts and buyer reservations in one workspace.</p></div><button className="icon-button refresh-icon-button" type="button" onClick={load} disabled={loading} title="Refresh" aria-label="Refresh"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v5h-5"/><path d="M4 18v-5h5"/><path d="M6.1 9a7 7 0 0 1 11.3-2.1L20 9"/><path d="M4 15l2.6 2.1A7 7 0 0 0 17.9 15"/></svg></button></header>
     {notice&&<div className="success-message global-error">{notice}</div>}{error&&<div className="dashboard-error global-error">{error}</div>}
 
@@ -60,8 +61,9 @@ export default function PreorderAdminPage({ client, onCreatePost }) {
         <button type="button" className="secondary-button" onClick={()=>onCreatePost?.()}>Create Post</button>
       </div>
     </section>
+    </>}
 
-    {workspaceTab==="DASHBOARD"&&<>
+    {workspaceTab==="DASHBOARD"&&!selected&&<>
       <section className="metrics-grid" style={{ marginBottom:18 }}>
         <div className="metric-card"><span>Total Pre-Orders</span><strong>{summary.total}</strong><small>All Pre-Order posts</small></div>
         <div className="metric-card"><span>Active</span><strong>{summary.active}</strong><small>Currently accepting orders</small></div>
@@ -72,9 +74,9 @@ export default function PreorderAdminPage({ client, onCreatePost }) {
       <section className="dashboard-panel preorder-panel"><div className="panel-header"><div><h2>Pre-Order summary</h2><p>Quick operational view of your current Pre-Order activity.</p></div></div><div className="table-wrapper"><table><thead><tr><th>Type</th><th>Status</th><th>Deadline</th><th>Closure</th><th>Items</th><th></th></tr></thead><tbody>{posts.slice(0,8).map(p=><tr key={p.post_id}><td><strong>{pretty(p.post_type_code)}</strong></td><td><Badge value={p.status}/></td><td>{fmtDate(p.ends_at)}</td><td>{p.eo2mate_preorder_settings?.ordering_close_reason?<Badge value={p.eo2mate_preorder_settings.ordering_close_reason}/>:<span className="table-muted">—</span>}</td><td>{p.eo2mate_post_items?.length||0}</td><td><button className="table-action-button" type="button" onClick={()=>open(p)}>Reservations</button></td></tr>)}{!loading&&posts.length===0&&<tr><td colSpan="6" className="empty-table-cell">No Pre-Orders yet.</td></tr>}</tbody></table></div></section>
     </>}
 
-    {workspaceTab==="SUMMARY"&&<section className="dashboard-panel preorder-panel selling-card"><div className="panel-header"><div><h2>Pre-Order summary</h2><p>Operational summary across current Pre-Order activity.</p></div></div><div className="preorder-summary-grid"><div><span>Total posts</span><strong>{summary.total}</strong></div><div><span>Active</span><strong>{summary.active}</strong></div><div><span>Closed</span><strong>{summary.closed}</strong></div><div><span>Items</span><strong>{summary.items}</strong></div></div></section>}
+    {workspaceTab==="SUMMARY"&&!selected&&<section className="dashboard-panel preorder-panel selling-card"><div className="panel-header"><div><h2>Pre-Order summary</h2><p>Operational summary across current Pre-Order activity.</p></div></div><div className="preorder-summary-grid"><div><span>Total posts</span><strong>{summary.total}</strong></div><div><span>Active</span><strong>{summary.active}</strong></div><div><span>Closed</span><strong>{summary.closed}</strong></div><div><span>Items</span><strong>{summary.items}</strong></div></div></section>}
 
-    {workspaceTab==="POSTS"&&<>
+    {workspaceTab==="POSTS"&&!selected&&<>
       <section className="toolbar-card" style={{marginBottom:16}}>
         <input className="search-input" value={postSearch} onChange={e=>setPostSearch(e.target.value)} placeholder="Search posts..." />
         <select className="filter-select" value={postFilter} onChange={e=>setPostFilter(e.target.value)}><option value="ALL">Filter: All statuses</option><option value="ACTIVE">Active</option><option value="DRAFT">Draft / Scheduled</option><option value="COMPLETED">Completed / Closed</option><option value="CANCELLED">Cancelled</option></select>
