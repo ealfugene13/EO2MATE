@@ -2727,3 +2727,23 @@ button.post-type-card:hover { transform: translateY(-2px); border-color: #bcdcc3
   text-underline-offset: 3px;
   cursor: pointer;
 }
+
+
+/* Compact icon-only navigation controls */
+.icon-only-nav {
+  width: 42px;
+  min-width: 42px;
+  height: 40px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.icon-only-nav .button-icon,
+.icon-only-nav .inline-button-svg {
+  width: 19px;
+  height: 19px;
+  margin-right: 0;
+  flex-basis: 19px;
+}
+.icon-only-nav .button-icon svg { width: 19px; height: 19px; }
