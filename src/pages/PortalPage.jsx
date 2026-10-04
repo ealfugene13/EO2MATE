@@ -488,7 +488,6 @@ export default function PortalPage({ session }) {
 
   const [page, setPage] = useState("dashboard");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [postsExpanded, setPostsExpanded] = useState(true);
 
   useEffect(() => {
     setMobileMenuOpen(false);
@@ -588,7 +587,7 @@ export default function PortalPage({ session }) {
   const [purchasesTab, setPurchasesTab] = useState("SUMMARY");
 
   useEffect(() => {
-    if (!client?.client_id || !metaConnected) return;
+    if (!client?.client_id) return;
 
     let cancelled = false;
 
@@ -694,7 +693,7 @@ export default function PortalPage({ session }) {
 
     loadSellingPostRows();
     return () => { cancelled = true; };
-  }, [client?.client_id, metaConnected]);
+  }, [client?.client_id]);
 
   const regularSaleStats = useMemo(() => {
     const rows = sellingPostRows.REGULAR_SALE || [];
@@ -2104,38 +2103,11 @@ export default function PortalPage({ session }) {
 
               <SidebarNavButton
                 icon="create"
-                className={`nav-item ${page === "posts" || page === "facebook-post" || page === "post-mining" || page === "pre-order" || page === "regular-sale" || page.includes("auction") ? "active" : ""}`}
-                onClick={() => setPostsExpanded((value) => !value)}
-                aria-expanded={postsExpanded}
+                className={`nav-item ${page === "posts" ? "active" : ""}`}
+                onClick={() => navigateTo("posts")}
               >
-                <span className="nav-parent-label">Posts <span className="nav-chevron">{postsExpanded ? "▾" : "›"}</span></span>
+                Posts
               </SidebarNavButton>
-
-              {postsExpanded && (
-                <div className="nav-submenu">
-                  <button type="button" className={`nav-subitem ${page === "posts" ? "active" : ""}`} onClick={() => navigateTo("posts")}>Create Post</button>
-
-                  <div className="nav-subgroup-label" style={{ margin: "10px 12px 4px", fontSize: 10, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", opacity: .65 }}>Auctions</div>
-                  <button type="button" className={`nav-subitem ${page === "auctions" ? "active" : ""}`} onClick={() => { setAuctionWorkspaceTab("SUMMARY"); goToAuctions("ALL"); setMobileMenuOpen(false); }}>Dashboard / Summary</button>
-                  <button type="button" className={`nav-subitem ${page === "facebook-post" ? "active" : ""}`} onClick={() => navigateTo("facebook-post")}>Create Post</button>
-
-                  <div className="nav-subgroup-label" style={{ margin: "10px 12px 4px", fontSize: 10, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", opacity: .65 }}>Mining</div>
-                  <button type="button" className={`nav-subitem ${page === "post-mining" ? "active" : ""}`} onClick={() => { setMiningWorkspaceTab("SUMMARY"); navigateTo("post-mining"); }}>Dashboard / Summary</button>
-                  <button type="button" className={`nav-subitem ${page === "mining-create" ? "active" : ""}`} onClick={() => navigateTo("mining-create")}>Create Post</button>
-
-                  <div className="nav-subgroup-label" style={{ margin: "10px 12px 4px", fontSize: 10, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", opacity: .65 }}>Pre-Orders</div>
-                  <button type="button" className={`nav-subitem ${page === "pre-order" ? "active" : ""}`} onClick={() => navigateTo("pre-order")}>Dashboard / Summary</button>
-                  <button type="button" className={`nav-subitem ${page === "pre-order-create" ? "active" : ""}`} onClick={() => navigateTo("pre-order-create")}>Create Post</button>
-
-                  <div className="nav-subgroup-label" style={{ margin: "10px 12px 4px", fontSize: 10, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", opacity: .65 }}>Regular Sales</div>
-                  <button type="button" className={`nav-subitem ${page === "regular-sale" ? "active" : ""}`} onClick={() => { setRegularSaleWorkspaceTab("SUMMARY"); navigateTo("regular-sale"); }}>Dashboard / Summary</button>
-                  <button type="button" className={`nav-subitem ${page === "regular-sale" && regularSaleWorkspaceTab === "POSTING" ? "active" : ""}`} onClick={() => { setRegularSaleWorkspaceTab("POSTING"); navigateTo("regular-sale"); }}>Create Post</button>
-
-                  <div className="nav-subgroup-label" style={{ margin: "10px 12px 4px", fontSize: 10, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", opacity: .65 }}>Live Selling</div>
-                  <button type="button" className={`nav-subitem ${page === "live-selling" ? "active" : ""}`} onClick={() => { setLiveSellingWorkspaceTab("DASHBOARD"); navigateTo("live-selling"); }}>Dashboard / Summary</button>
-                  <button type="button" className="nav-subitem" disabled title="Live Selling post creation is coming soon">Create Post <span className="coming-soon-pill">Soon</span></button>
-                </div>
-              )}
 
             </>
           )}
