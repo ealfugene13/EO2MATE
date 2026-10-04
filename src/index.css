@@ -2635,3 +2635,69 @@ button.post-type-card:hover { transform: translateY(-2px); border-color: #bcdcc3
 .payment-provider-actions label { display:flex; gap:7px; align-items:center; font-size:12px; font-weight:700; }
 .payment-provider-warning { color:#9a6b18 !important; }
 .payment-instructions-input { width:100%; box-sizing:border-box; border:1px solid #dfe6ee; border-radius:12px; padding:12px; resize:vertical; font:inherit; }
+
+/* Selling detail page presentation */
+.selling-detail-workspace .metrics-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.selling-detail-workspace .metric-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-height: 112px;
+}
+.selling-detail-workspace .metric-card > span {
+  display: block;
+  color: #6f7f96;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.selling-detail-workspace .metric-card > strong {
+  display: block;
+  margin: 8px 0 5px;
+  color: #14243b;
+  font-size: 28px;
+  font-weight: 750;
+  line-height: 1;
+}
+.selling-detail-workspace .metric-card > small {
+  display: block;
+  color: #8190a5;
+  font-size: 12px;
+  line-height: 1.35;
+}
+.selling-detail-workspace .selling-hero h1 {
+  max-width: 760px;
+  margin-bottom: 6px;
+}
+.preorder-caption-card {
+  margin: 20px 22px;
+  padding: 16px 18px;
+  border: 1px solid #e5eaf1;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+.preorder-caption-card > span {
+  display: block;
+  margin-bottom: 7px;
+  color: #718198;
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.preorder-caption-card > p {
+  margin: 0;
+  color: #263a55;
+  font-size: 14px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 900px) {
+  .selling-detail-workspace .metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  .selling-detail-workspace .metrics-grid { grid-template-columns: 1fr; }
+}
