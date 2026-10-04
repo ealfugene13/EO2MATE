@@ -490,7 +490,7 @@ function SellingPostDetailPanel({ detail, loading, error, onClose }) {
     try { await navigator.clipboard.writeText(String(value)); setCopied(label); window.setTimeout(() => setCopied(""), 1400); } catch (_) {}
   };
   if (loading) return <section className="dashboard-panel selling-card"><div className="panel-header"><div><p className="eyebrow">POST DETAILS</p><h2>Loading post…</h2><p>Retrieving items and transaction activity.</p></div></div></section>;
-  if (error) return <section className="dashboard-panel selling-card"><div className="panel-header"><div><h2>Post details unavailable</h2><p className="dashboard-error global-error">{error}</p></div><button className="secondary-button" type="button" onClick={onClose}>Back to Posts</button></div></section>;
+  if (error) return <section className="dashboard-panel selling-card"><div className="panel-header"><div><h2>Post details unavailable</h2><p className="dashboard-error global-error">{error}</p></div><button className="secondary-button icon-only-nav" type="button" onClick={onClose} aria-label="Back to posts" title="Back to posts"><span className="button-icon"><NavIcon type="back" /></span></button></div></section>;
   if (!detail) return null;
   const post = detail.post || detail;
   const mining = detail.mode_code === "MINING";
@@ -510,7 +510,7 @@ function SellingPostDetailPanel({ detail, loading, error, onClose }) {
     <div className="selling-detail-workspace">
       <header className="dashboard-header selling-hero" style={{marginBottom:16}}>
         <div>
-          <button className="secondary-button" type="button" onClick={onClose} style={{marginBottom:14}}><span className="button-icon"><NavIcon type="back" /></span> Back to Posts</button>
+          <button className="secondary-button icon-only-nav" type="button" onClick={onClose} style={{marginBottom:14}} aria-label="Back to posts" title="Back to posts"><span className="button-icon"><NavIcon type="back" /></span></button>
           <p className="eyebrow">FACEBOOK SELLING · {String(detail.mode_code || "POST").replaceAll("_", " ")}</p>
           <h1>{mining ? "Mining Post Details" : "Regular Sale Post Details"}</h1>
           <p>{post.post_type_code || "—"} · {detail.facebook_page || "Facebook Page"} · Created {formatDateTime(post.created_at)}</p>
@@ -2451,12 +2451,12 @@ export default function PortalPage({ session }) {
           <div style={{ display: "flex", justifyContent: "flex-start", marginBottom: 14 }}>
             <button
               type="button"
-              className="secondary-button"
-              onClick={() => navigateTo("dashboard")}
+              className="secondary-button icon-only-nav"
+              onClick={() => navigateTo("dashboard")
               aria-label="Back to main dashboard"
               title="Back to main dashboard"
             >
-              <span className="button-icon"><NavIcon type="dashboard" /></span> Main Dashboard
+              <span className="button-icon"><NavIcon type="dashboard" /></span>
             </button>
           </div>
         )}
@@ -4275,7 +4275,7 @@ export default function PortalPage({ session }) {
 
         {page === "auction-detail" && (
           <>
-            <button className="back-button" onClick={() => setPage("auctions")}><span className="button-icon"><NavIcon type="back" /></span> Back to auctions</button>
+            <button className="back-button icon-only-nav" onClick={() => setPage("auctions")} aria-label="Back to auctions" title="Back to auctions"><span className="button-icon"><NavIcon type="back" /></span></button>
 
             {detailLoading ? (
               <div className="loading-card detail-loading"><h2>Loading auction</h2></div>

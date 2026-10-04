@@ -95,7 +95,7 @@ export default function PreorderAdminPage({ client, onCreatePost }) {
       const copy=async(label,value)=>{if(!value)return;try{await navigator.clipboard.writeText(String(value));setCopied(label);window.setTimeout(()=>setCopied(""),1400)}catch(_){}};
       return <div className="selling-detail-workspace">
         <header className="dashboard-header selling-hero" style={{marginBottom:16}}><div>
-          <button className="secondary-button" type="button" onClick={()=>{setSelected(null);setEntries([])}} style={{marginBottom:14}}><BackIcon/> Back to Posts</button>
+          <button className="secondary-button icon-only-nav" type="button" onClick={()=>{setSelected(null);setEntries([])}} style={{marginBottom:14}} aria-label="Back to posts" title="Back to posts"><BackIcon/></button>
           <p className="eyebrow">FACEBOOK SELLING · PRE-ORDER</p><h1>Pre-Order Post Details</h1><p>{pretty(selected.post_type_code)} · Created {fmtDate(selected.created_at)}</p>
         </div><Badge value={selected.status}/></header>
         <section className="metrics-grid" style={{marginBottom:16}}>
