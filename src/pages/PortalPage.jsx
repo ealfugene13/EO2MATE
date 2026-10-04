@@ -31,6 +31,12 @@ function NavIcon({ type }) {
         <path d="M19 6v4" />
       </svg>
     ),
+    back: (
+      <svg {...common}>
+        <path d="M19 12H5" />
+        <path d="m12 19-7-7 7-7" />
+      </svg>
+    ),
     dashboard: (
       <svg {...common}>
         <rect x="3" y="3" width="7" height="7" rx="1" />
@@ -492,12 +498,19 @@ function SellingPostDetailPanel({ detail, loading, error, onClose }) {
   const activity = detail.activity || [];
   const buyers = new Set(activity.map(a => a.fb_user_id).filter(Boolean)).size;
   const value = mining ? activity.reduce((n,a)=>n + Number(a.claim_price||0),0) : items.reduce((n,i)=>n + Number(i.unit_price||0) * Number(i.quantity_limit||0),0);
+  const itemWinners = items.map((item) => {
+    const candidates = activity.filter((a) => a.post_item_id === item.post_item_id);
+    const eligible = mining
+      ? candidates.filter((a) => !a.superseded_at && !["REJECTED","CANCELLED","INVALID","SUPERSEDED"].includes(String(a.status || "").toUpperCase()))
+      : candidates.filter((a) => Number(a.accepted_quantity || 0) > 0 && !["REJECTED","CANCELLED","INVALID"].includes(String(a.status || "").toUpperCase()));
+    return { item, winners: eligible };
+  });
   const tabs = ["OVERVIEW","ITEMS", mining ? "CLAIMS" : "ORDERS"];
   return (
     <div className="selling-detail-workspace">
       <header className="dashboard-header selling-hero" style={{marginBottom:16}}>
         <div>
-          <button className="secondary-button" type="button" onClick={onClose} style={{marginBottom:14}}>← Back to Posts</button>
+          <button className="secondary-button" type="button" onClick={onClose} style={{marginBottom:14}}><span className="button-icon"><NavIcon type="back" /></span> Back to Posts</button>
           <p className="eyebrow">FACEBOOK SELLING · {String(detail.mode_code || "POST").replaceAll("_", " ")}</p>
           <h1>{mining ? "Mining Post Details" : "Regular Sale Post Details"}</h1>
           <p>{post.post_type_code || "—"} · {detail.facebook_page || "Facebook Page"} · Created {formatDateTime(post.created_at)}</p>
@@ -525,6 +538,10 @@ function SellingPostDetailPanel({ detail, loading, error, onClose }) {
           <div><span>Starts</span><strong>{formatDateTime(post.starts_at)}</strong></div>
           <div><span>Ends</span><strong>{formatDateTime(post.ends_at)}</strong></div>
         </div>
+        <div className="panel-header"><div><h3>Winner / buyer per item</h3><p>{mining ? "Accepted mining claimant(s) for each item." : "Accepted buyer(s) allocated to each item."}</p></div></div>
+        <div className="table-wrapper"><table><thead><tr><th>Item</th><th>Winner / Buyer</th><th>{mining ? "Claim" : "Accepted Qty"}</th><th>Status</th></tr></thead><tbody>
+          {itemWinners.map(({item,winners}) => winners.length ? winners.map((winner,index)=><tr key={`${item.post_item_id}-${winner.mining_claim_id || winner.post_entry_id}`}><td>{index===0?<strong>{item.item_label || item.item_name_snapshot || `Item ${item.item_no || ""}`}</strong>:""}</td><td>{winner.fb_user_name || winner.fb_user_id || "—"}</td><td>{mining ? `${winner.action_code || "CLAIM"} · ${formatCurrency(winner.claim_price)}` : (winner.accepted_quantity ?? "—")}</td><td><StatusBadge status={winner.status}/></td></tr>) : <tr key={item.post_item_id}><td><strong>{item.item_label || item.item_name_snapshot || `Item ${item.item_no || ""}`}</strong></td><td>—</td><td>—</td><td>—</td></tr>)}
+        </tbody></table></div>
         <div className="panel-header"><div><h3>References</h3><p>Use these IDs when tracing a post in Meta or EO2MATE logs.</p></div></div>
         <div className="preorder-summary-grid">
           <div><span>EO2MATE Post ID</span><strong title={post.post_id}>{post.post_id || "—"}</strong>{post.post_id&&<button className="table-action-button" type="button" onClick={()=>copyValue("post",post.post_id)}>{copied==="post"?"Copied":"Copy"}</button>}</div>
@@ -534,9 +551,9 @@ function SellingPostDetailPanel({ detail, loading, error, onClose }) {
 
       {detailTab === "ITEMS" && <section className="dashboard-panel selling-card">
         <div className="panel-header"><div><h2>Items</h2><p>Products and inventory references attached to this post.</p></div></div>
-        <div className="table-wrapper"><table><thead><tr><th>#</th><th>Item</th><th>Source</th><th>SKU / Inventory</th><th>Price</th><th>Qty</th><th>Status</th><th>Fulfillment</th></tr></thead><tbody>
-          {items.map(item => <tr key={item.post_item_id}><td>{item.item_no ?? "—"}</td><td><strong>{item.item_label || item.item_name_snapshot || "—"}</strong></td><td>{item.item_source || "—"}</td><td title={item.inventory_item_id}>{item.item_code_snapshot || item.inventory_item_id || "—"}</td><td>{formatCurrency(item.unit_price)}</td><td>{item.quantity_limit ?? "—"}</td><td><StatusBadge status={item.status}/></td><td>{statusLabel(item.fulfillment_status) || "—"}</td></tr>)}
-          {!items.length && <tr><td colSpan="8" className="empty-table-cell">No item records found.</td></tr>}
+        <div className="table-wrapper"><table><thead><tr><th>#</th><th>Item</th><th>Source</th><th>SKU / Inventory</th><th>Price</th><th>Qty</th><th>Winner / Buyer</th><th>Status</th><th>Fulfillment</th></tr></thead><tbody>
+          {items.map(item => { const winners=itemWinners.find(x=>x.item.post_item_id===item.post_item_id)?.winners||[]; return <tr key={item.post_item_id}><td>{item.item_no ?? "—"}</td><td><strong>{item.item_label || item.item_name_snapshot || "—"}</strong></td><td>{item.item_source || "—"}</td><td title={item.inventory_item_id}>{item.item_code_snapshot || item.inventory_item_id || "—"}</td><td>{formatCurrency(item.unit_price)}</td><td>{item.quantity_limit ?? "—"}</td><td>{winners.length ? winners.map(w=>w.fb_user_name || w.fb_user_id || "—").join(", ") : "—"}</td><td><StatusBadge status={item.status}/></td><td>{statusLabel(item.fulfillment_status) || "—"}</td></tr>})}
+          {!items.length && <tr><td colSpan="9" className="empty-table-cell">No item records found.</td></tr>}
         </tbody></table></div>
       </section>}
 
@@ -558,6 +575,7 @@ export default function PortalPage({ session }) {
   const [onboardingStatus, setOnboardingStatus] = useState(null);
 
   const [auctions, setAuctions] = useState([]);
+  const [auctionBids, setAuctionBids] = useState([]);
   const [orders, setOrders] = useState([]);
   const [payments, setPayments] = useState([]);
   const [paymentGroups, setPaymentGroups] = useState([]);
@@ -1471,6 +1489,7 @@ export default function PortalPage({ session }) {
 
       const [
         auctionResult,
+        auctionBidResult,
         orderResult,
         paymentResult,
         paymentGroupResult,
@@ -1480,6 +1499,11 @@ export default function PortalPage({ session }) {
           .from("client_auction_list")
           .select("*")
           .order("post_created_at", { ascending: false }),
+
+        supabase
+          .from("client_auction_bid_history")
+          .select("*")
+          .order("commented_at", { ascending: false }),
 
         supabase
           .from("client_order_list")
@@ -1504,12 +1528,14 @@ export default function PortalPage({ session }) {
       ]);
 
       if (auctionResult.error) throw auctionResult.error;
+      if (auctionBidResult.error) console.warn("Unable to load consolidated auction bids", auctionBidResult.error);
       if (orderResult.error) throw orderResult.error;
       if (paymentResult.error) throw paymentResult.error;
       if (paymentGroupResult.error) throw paymentGroupResult.error;
       if (deliveryResult.error) throw deliveryResult.error;
 
       setAuctions(auctionResult.data || []);
+      setAuctionBids(auctionBidResult.data || []);
       setOrders(orderResult.data || []);
       setPayments(paymentResult.data || []);
       setPaymentGroups(paymentGroupResult.data || []);
@@ -2430,7 +2456,7 @@ export default function PortalPage({ session }) {
               aria-label="Back to main dashboard"
               title="Back to main dashboard"
             >
-              ← Main Dashboard
+              <span className="button-icon"><NavIcon type="dashboard" /></span> Main Dashboard
             </button>
           </div>
         )}
@@ -3887,11 +3913,11 @@ export default function PortalPage({ session }) {
             )}
 
             {auctionWorkspaceTab === "BIDS" && (
-              <section className="dashboard-panel"><div className="panel-header"><div><h2>Bid activity</h2><p>Consolidated bid monitoring will be wired to the validated bid-history source.</p></div></div><div className="table-wrapper"><table><thead><tr><th>Auction</th><th>Bidder</th><th>Bid</th><th>Validity</th><th>Facebook Comment</th><th>Time</th></tr></thead><tbody><tr><td colSpan="6">Select an auction for its current bid history. Consolidated view will be connected after UI approval.</td></tr></tbody></table></div></section>
+              <section className="dashboard-panel"><div className="panel-header"><div><h2>Bid activity</h2><p>Validated bid history across your auction items.</p></div></div><div className="table-wrapper"><table><thead><tr><th>Auction</th><th>Bidder</th><th>Bid</th><th>Validity</th><th>Facebook Comment</th><th>Time</th></tr></thead><tbody>{auctionBids.map((bid) => { const auction=auctions.find(a=>a.auction_item_id===bid.auction_item_id); return <tr key={bid.bid_id || `${bid.auction_item_id}-${bid.fb_comment_id || bid.commented_at}`} className="clickable-row" onClick={()=>openAuction(bid.auction_item_id)}><td><strong>{auction?.item_label || bid.item_label || "Auction"}</strong></td><td>{bid.fb_user_name || bid.fb_user_id || "—"}</td><td>{formatCurrency(bid.bid_amt)}</td><td><StatusBadge status={bid.is_valid ? "VALID" : "INVALID"}/></td><td>{bid.fb_comment_id || bid.comment_text || "—"}</td><td>{formatDateTime(bid.commented_at)}</td></tr>})}{!auctionBids.length&&<tr><td colSpan="6" className="empty-table-cell">No bid records found.</td></tr>}</tbody></table></div></section>
             )}
 
             {auctionWorkspaceTab === "WINNERS" && (
-              <section className="dashboard-panel"><div className="panel-header"><div><h2>Auction winners</h2><p>Winner, winning amount and downstream payment/order status.</p></div></div><div className="table-wrapper"><table><thead><tr><th>Auction</th><th>Winner</th><th>Winning amount</th><th>Order</th><th>Payment</th><th>Completed</th></tr></thead><tbody>{auctions.filter((a) => a.highest_bidder_name && ["COMPLETED_WITH_WINNER", "COMPLETED", "CLOSED"].includes(String(a.ui_status || "").toUpperCase())).map((a) => (<tr key={a.auction_item_id} className="clickable-row" onClick={() => openAuction(a.auction_item_id)}><td>{a.item_label}</td><td>{a.highest_bidder_name}</td><td>{formatCurrency(a.highest_bid)}</td><td>{a.order_status || "-"}</td><td>{a.payment_status || "-"}</td><td>{formatDateTime(a.auction_end_dt)}</td></tr>))}</tbody></table></div></section>
+              <section className="dashboard-panel"><div className="panel-header"><div><h2>Auction winners</h2><p>Winner, winning amount and downstream payment/order status.</p></div></div><div className="table-wrapper"><table><thead><tr><th>Auction</th><th>Winner</th><th>Winning amount</th><th>Order</th><th>Payment</th><th>Completed</th></tr></thead><tbody>{auctions.filter((a) => a.highest_bidder_name && ["COMPLETED_WITH_WINNER", "COMPLETED", "CLOSED"].includes(String(a.ui_status || "").toUpperCase())).map((a) => (<tr key={a.auction_item_id} className="clickable-row" onClick={() => openAuction(a.auction_item_id)}><td>{a.item_label}</td><td><button className="table-link-button" type="button" onClick={(event)=>{event.stopPropagation();openAuction(a.auction_item_id)}}>{a.highest_bidder_name}</button></td><td>{formatCurrency(a.highest_bid)}</td><td>{a.order_status || "-"}</td><td>{a.payment_status || "-"}</td><td>{formatDateTime(a.auction_end_dt)}</td></tr>))}</tbody></table></div></section>
             )}
           </>
         )}
@@ -4249,7 +4275,7 @@ export default function PortalPage({ session }) {
 
         {page === "auction-detail" && (
           <>
-            <button className="back-button" onClick={() => setPage("auctions")}>← Back to auctions</button>
+            <button className="back-button" onClick={() => setPage("auctions")}><span className="button-icon"><NavIcon type="back" /></span> Back to auctions</button>
 
             {detailLoading ? (
               <div className="loading-card detail-loading"><h2>Loading auction</h2></div>
