@@ -642,7 +642,6 @@ export default function PortalPage({ session }) {
 
   const [automationControls, setAutomationControls] = useState([]);
   const [automationPages, setAutomationPages] = useState([]);
-  const clientReportPages = useMemo(() => (automationPages || []).filter((p) => !p.client_id || String(p.client_id) === String(client?.client_id || "")), [automationPages, client?.client_id]);
   const [automationControlLoading, setAutomationControlLoading] = useState(false);
   const [automationControlMessage, setAutomationControlMessage] = useState("");
   const [automationModal, setAutomationModal] = useState(null);
@@ -1248,12 +1247,6 @@ export default function PortalPage({ session }) {
       setAutomationControlLoading(false);
     }
   }
-
-  useEffect(() => {
-    if (page === "reports" && client?.client_id) {
-      loadAutomationControls();
-    }
-  }, [page, client?.client_id]);
 
   async function openAutomationControl() {
     setPage("automation-control");
@@ -2686,6 +2679,632 @@ export default function PortalPage({ session }) {
               <MetricCard title="Sales value" value={formatCurrency(regularSaleStats.value)} subtitle="Gross Regular Sale value" />
             </section>
 
+            <section className="dashboard-panel" style={{ marginBottom: 18 }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {["SUMMARY", "POSTS", "POSTING"].map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    className={regularSaleWorkspaceTab === tab ? "primary-button" : "secondary-button"}
+                    onClick={() => setRegularSaleWorkspaceTab(tab)}
+                  >
+                    {tab === "POSTING" ? "Create Post" : tab.charAt(0) + tab.slice(1).toLowerCase()}
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            {regularSaleWorkspaceTab === "SUMMARY" && (
+              <>
+                <section className="toolbar-card">
+                  <select className="filter-select" defaultValue="ALL">
+                    <option value="ALL">All statuses</option>
+                    <option value="ACTIVE">Active</option>
+                    <option value="SOLD_OUT">Sold out</option>
+                    <option value="CANCELLED">Cancelled</option>
+                  </select>
+                  <select className="filter-select" defaultValue="30D">
+                    <option value="TODAY">Today</option>
+                    <option value="7D">Last 7 days</option>
+                    <option value="30D">Last 30 days</option>
+                    <option value="MONTH">This month</option>
+                  </select>
+                </section>
+                <section className="dashboard-panel">
+                  <div className="panel-header">
+                    <div><h2>Regular Sale summary</h2><p>Orders, inventory movement, buyers and sales value for fixed-price selling.</p></div>
+                  </div>
+                  <div className="metrics-grid">
+                    <MetricCard title="Sell-through rate" value="—" subtitle="Sold quantity versus offered stock" />
+                    <MetricCard title="Unique buyers" value={regularSaleStats.buyers} subtitle="Regular Sale customers" />
+                    <MetricCard title="Remaining items" value="0" subtitle="Available quantity" />
+                    <MetricCard title="Paid value" value={formatCurrency(0)} subtitle="Collected Regular Sale sales" />
+                    <MetricCard title="Pending value" value={formatCurrency(0)} subtitle="Awaiting payment" />
+                    <MetricCard title="Average order" value={formatCurrency(0)} subtitle="Average accepted order value" />
+                  </div>
+                </section>
+              </>
+            )}
+
+            {regularSaleWorkspaceTab === "POSTS" && (
+              <section className="dashboard-panel">
+                <div className="panel-header">
+                  <div><h2>Regular Sale posts</h2><p>Single and Multiple Regular Sale posts by status.</p></div>
+                  <button className="primary-button" type="button" onClick={() => setRegularSaleWorkspaceTab("POSTING")}>Create Regular Sale Post</button>
+                </div>
+                <div className="table-wrapper">
+                  <table>
+                    <thead><tr><th>Post</th><th>Facebook Page</th><th>Status</th><th>Items</th><th>Orders</th><th>Buyers</th><th>Value</th><th>Created</th><th>Action</th></tr></thead>
+                    <tbody>
+                      {sellingPostLoading && <tr><td colSpan="9">Loading Regular Sale records...</td></tr>}
+                      {!sellingPostLoading && sellingPostError && <tr><td colSpan="9">{sellingPostError}</td></tr>}
+                      {!sellingPostLoading && !sellingPostError && !(sellingPostRows.REGULAR_SALE || []).length && <tr><td colSpan="9">No Regular Sale records yet.</td></tr>}
+                      {!sellingPostLoading && !sellingPostError && (sellingPostRows.REGULAR_SALE || []).map((row) => (
+                        <tr key={row.post_id}>
+                          <td>{row.post_type_code || "—"}</td>
+                          <td>{row.facebook_page}</td>
+                          <td>{row.status || "—"}</td>
+                          <td>{row.items}</td>
+                          <td>{row.transactions}</td>
+                          <td>{row.buyers}</td>
+                          <td>{formatCurrency(row.value)}</td>
+                          <td>{formatDateTime(row.created_at)}</td>
+                          <td><button className="table-action-button" type="button" onClick={() => openSellingPostDetail(row)}>Details</button></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            )}
+
+            {regularSaleWorkspaceTab === "POSTING" && (
+              <FacebookPostPage client={client} initialPostMode="REGULAR_SALE" />
+            )}
+          </>
+          )
+        )}
+
+        {metaConnected && page === "pre-order" && (
+          <>
+            <section className="dashboard-panel" style={{ marginBottom: 18 }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                <button type="button" className="primary-button">Dashboard / Summary</button>
+                <button type="button" className="secondary-button" onClick={() => navigateTo("pre-order-create")}>Create Post</button>
+              </div>
+            </section>
+            <PreorderAdminPage client={client} onCreatePost={() => navigateTo("pre-order-create")} />
+          </>
+        )}
+
+        {metaConnected && page === "facebook-post" && (
+          <FacebookPostPage client={client} initialPostMode="AUCTION" />
+        )}
+
+        {page === "pre-order-create" && (
+          <FacebookPostPage client={client} initialPostMode="PREORDER" />
+        )}
+
+        {page === "mining-create" && (
+          <FacebookPostPage client={client} initialPostMode="MINING" />
+        )}
+
+
+        {metaConnected && page === "live-selling" && (
+          <>
+            <header className="dashboard-header">
+              <div>
+                <p className="eyebrow">FACEBOOK SELLING</p>
+                <h1>Live Selling</h1>
+                <p>Live-selling dashboard for sessions, claims, buyers and sales performance. Transaction processing will activate when the Live Selling module is enabled.</p>
+              </div>
+            </header>
+            <section className="metrics-grid">
+              <MetricCard title="Live sessions" value="0" subtitle="Sessions in selected period" />
+              <MetricCard title="Active session" value="0" subtitle="Currently live" />
+              <MetricCard title="Claims" value="0" subtitle="Live comment claims" />
+              <MetricCard title="Unique buyers" value="0" subtitle="Live customers" />
+              <MetricCard title="Items sold" value="0" subtitle="Allocated quantity" />
+              <MetricCard title="Sales value" value={formatCurrency(0)} subtitle="Gross live-selling value" />
+            </section>
+            <section className="dashboard-panel" style={{ marginBottom: 18 }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {["DASHBOARD", "SUMMARY", "POSTS"].map((tab) => (
+                  <button key={tab} type="button" className={liveSellingWorkspaceTab === tab ? "primary-button" : "secondary-button"} onClick={() => setLiveSellingWorkspaceTab(tab)}>
+                    {tab.charAt(0) + tab.slice(1).toLowerCase()}
+                  </button>
+                ))}
+                <button type="button" className="secondary-button" disabled title="Coming soon">Create Post · Soon</button>
+              </div>
+            </section>
+            <section className="dashboard-panel">
+              <div className="panel-header"><div><h2>{liveSellingWorkspaceTab === "POSTS" ? "Live Selling posts" : liveSellingWorkspaceTab === "SUMMARY" ? "Live Selling summary" : "Live Selling dashboard"}</h2><p>Ready for the Live Selling backend connection without exposing placeholder data as real activity.</p></div></div>
+              <div className="table-wrapper"><table><thead><tr><th>Session / Post</th><th>Status</th><th>Claims</th><th>Buyers</th><th>Items</th><th>Sales</th></tr></thead><tbody><tr><td colSpan="6">No Live Selling records yet.</td></tr></tbody></table></div>
+            </section>
+          </>
+        )}
+
+        {page === "facebook" && (
+          <>
+            <header className="dashboard-header">
+              <div>
+                <p className="eyebrow">ONBOARDING · FACEBOOK</p>
+                <h1>Connect Facebook Page</h1>
+                <p>Authorize your Facebook account and connect the Page that will run auctions.</p>
+              </div>
+
+              <button className="secondary-button" onClick={loadFacebookStatus} disabled={facebookLoading}>
+                {facebookLoading ? "Checking..." : "Refresh Status"}
+              </button>
+            </header>
+
+            {facebookMessage && (
+              <div className="success-message global-error">{facebookMessage}</div>
+            )}
+
+            <section className="onboarding-steps">
+              <div className="onboarding-step done">
+                <span>1</span>
+                <div><strong>Client Account</strong><small>{client?.name || "Account ready"}</small></div>
+              </div>
+              <div className={`onboarding-step ${facebookStatus?.connected ? "done" : "current"}`}>
+                <span>2</span>
+                <div><strong>Connect Facebook</strong><small>{facebookStatus?.connected ? "Connected" : "Authorization required"}</small></div>
+              </div>
+              <div className={`onboarding-step ${facebookStatus?.connected ? "done" : ""}`}>
+                <span>3</span>
+                <div><strong>Page Registration</strong><small>{facebookStatus?.connected ? `${facebookStatus.active_page_count || 0} active page(s)` : "Waiting for Facebook"}</small></div>
+              </div>
+              <div className="onboarding-step">
+                <span>4</span>
+                <div><strong>Optional Services</strong><small>Facebook and Online Payments can be configured anytime</small></div>
+              </div>
+            </section>
+
+            <section className="facebook-connect-card">
+              <div className="facebook-connect-copy">
+                <div className="facebook-icon">f</div>
+                <div>
+                  <h2>{facebookStatus?.connected ? "Facebook is connected" : "Connect your Facebook Page"}</h2>
+                  <p>Use the Facebook account that has management access to the Page you want to automate. You do not need your own Meta Developer app.</p>
+                </div>
+              </div>
+
+              <div className="facebook-connect-actions">
+                <button className="primary-button" onClick={connectFacebook}>
+                  {facebookStatus?.connected ? "Reconnect Facebook" : "Connect Facebook"}
+                </button>
+
+                <button
+                  className="secondary-button"
+                  type="button"
+                  onClick={() => setPage("dashboard")}
+                >
+                  {facebookStatus?.connected ? "Continue to Dashboard" : "Skip for Now"}
+                </button>
+              </div>
+            </section>
+
+            <section className="dashboard-panel">
+              <div className="panel-header">
+                <div>
+                  <h2>Connected Pages</h2>
+                  <p>Pages registered to this client. Access tokens are never shown in the browser.</p>
+                </div>
+                <StatusBadge status={facebookStatus?.connected ? "CONNECTED" : "NOT_CONNECTED"} />
+              </div>
+
+              <div className="table-wrapper">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Page</th>
+                      <th>Facebook Page ID</th>
+                      <th>Status</th>
+                      <th>Authorization</th>
+                      <th>Connected</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(facebookStatus?.pages || []).map((fbPage) => (
+                      <tr key={fbPage.fb_page_id}>
+                        <td>{fbPage.page_name || "Facebook Page"}</td>
+                        <td>{fbPage.fb_page_id || "-"}</td>
+                        <td><StatusBadge status={fbPage.status || "ACTIVE"} /></td>
+                        <td><StatusBadge status={fbPage.token_present ? "AUTHORIZED" : "RECONNECT"} /></td>
+                        <td>{formatDateTime(fbPage.connected_at)}</td>
+                      </tr>
+                    ))}
+
+                    {!facebookLoading && !(facebookStatus?.pages || []).length && (
+                      <tr>
+                        <td colSpan="5" className="empty-table-cell">No Facebook Page connected yet.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section className="setup-requirements-card">
+              <h2>What the client needs</h2>
+              <div className="requirements-grid">
+                <div><strong>Facebook account</strong><span>Use the account that manages the business Page.</span></div>
+                <div><strong>Page access</strong><span>The account must have enough Page permissions to authorize your automation.</span></div>
+                <div><strong>No developer setup</strong><span>Your platform's Meta app handles OAuth, webhook and API integration.</span></div>
+              </div>
+            </section>
+          </>
+        )}
+
+        {metaConnected && page === "facebook-chats" && (
+          <>
+            <header className="dashboard-header">
+              <div>
+                <p className="eyebrow">FACEBOOK · LIVE INBOX</p>
+                <h1>Facebook Chats</h1>
+                <p>View and reply to Messenger conversations live from Meta. Conversation content is not stored in EO2MATE.</p>
+              </div>
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => loadFacebookChats(chatPageFilter)}
+                disabled={chatLoading || !client?.client_id}
+              >
+                {chatLoading ? "Refreshing..." : "Refresh Inbox"}
+              </button>
+            </header>
+
+            <section className="dashboard-panel">
+              <div className="panel-header">
+                <div>
+                  <h2>Page Inbox</h2>
+                  <p>Facebook remains the source of truth. Messages are fetched only while this screen is in use.</p>
+                </div>
+                <StatusBadge status={chatPages.length ? "CONNECTED" : "NOT_CONNECTED"} />
+              </div>
+
+              {chatMessage && (
+                <div className="form-error" style={{ marginTop: 14 }}>
+                  {chatMessage}
+                </div>
+              )}
+
+              <div style={{ display: "grid", gridTemplateColumns: "minmax(260px, 360px) minmax(0, 1fr)", gap: 18, marginTop: 18 }}>
+                <div style={{ border: "1px solid #e5eaf0", borderRadius: 14, overflow: "hidden", background: "#fff", height: 620, display: "flex", flexDirection: "column" }}>
+                  <div style={{ padding: 14, borderBottom: "1px solid #e5eaf0", display: "grid", gap: 10 }}>
+                    <select
+                      value={chatPageFilter}
+                      onChange={async (event) => {
+                        const nextPage = event.target.value;
+                        setChatPageFilter(nextPage);
+                        await loadFacebookChats(nextPage);
+                      }}
+                      disabled={chatLoading || !chatPages.length}
+                    >
+                      {!chatPages.length && <option value="">No connected Page</option>}
+                      {chatPages.map((fbPage) => (
+                        <option key={fbPage.fb_page_id} value={fbPage.fb_page_id}>
+                          {fbPage.page_name || fbPage.fb_page_id}
+                        </option>
+                      ))}
+                    </select>
+
+                    <input
+                      type="search"
+                      value={chatSearch}
+                      onChange={(event) => setChatSearch(event.target.value)}
+                      placeholder="Search buyer"
+                    />
+                  </div>
+
+                  <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+                    {chatLoading ? (
+                      <div style={{ padding: 28, textAlign: "center", color: "#718096" }}>Loading live Messenger inbox...</div>
+                    ) : filteredChatConversations.length === 0 ? (
+                      <div style={{ padding: 28, textAlign: "center", color: "#718096" }}>
+                        <strong style={{ display: "block", color: "#263548", marginBottom: 6 }}>No conversations found</strong>
+                        <span style={{ fontSize: 13 }}>If this Page has Messenger conversations, check the Page token and Meta permissions.</span>
+                      </div>
+                    ) : (
+                      filteredChatConversations.map((conversation) => {
+                          const selected = chatSelectedConversation?.conversation_id === conversation.conversation_id;
+                          return (
+                            <button
+                              key={conversation.conversation_id}
+                              type="button"
+                              onClick={() => selectFacebookConversation(conversation)}
+                              style={{
+                                width: "100%",
+                                textAlign: "left",
+                                padding: "14px 16px",
+                                border: 0,
+                                borderBottom: "1px solid #edf1f5",
+                                background: selected ? "#f1f8f3" : "#fff",
+                                cursor: "pointer",
+                              }}
+                            >
+                              <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+                                <strong style={{ color: "#263548" }}>{conversation?.participant?.name || "Facebook User"}</strong>
+                                <span style={{ fontSize: 11, color: "#718096", whiteSpace: "nowrap" }}>
+                                  {conversation?.last_activity_at ? new Date(conversation.last_activity_at).toLocaleString() : ""}
+                                </span>
+                              </div>
+                              <div style={{ marginTop: 5, color: "#718096", fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                {conversation?.latest_message?.text || "Messenger conversation"}
+                              </div>
+                            </button>
+                          );
+                        })
+                    )}
+                  </div>
+                </div>
+
+                <div style={{ height: 620, minHeight: 620, maxHeight: 620, border: "1px solid #e5eaf0", borderRadius: 14, background: "#fff", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+                  <div style={{ padding: "16px 18px", borderBottom: "1px solid #e5eaf0", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
+                    <div style={{ minWidth: 0 }}>
+                      <strong>{chatSelectedConversation?.participant?.name || "Select a conversation"}</strong>
+                      <div style={{ fontSize: 12, color: "#718096", marginTop: 3 }}>
+                        {chatSelectedConversation
+                          ? `Messenger · ${chatPages.find((row) => row.fb_page_id === chatPageFilter)?.page_name || chatPageFilter}`
+                          : "Choose a Messenger conversation from the live Page inbox."}
+                      </div>
+                      {chatSelectedConversation && (
+                        <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                          <span
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              padding: "3px 8px",
+                              borderRadius: 999,
+                              fontSize: 11,
+                              fontWeight: 800,
+                              background:
+                                chatReplyWindow.status === "AVAILABLE"
+                                  ? "#e9f7ee"
+                                  : chatReplyWindow.status === "EXPIRED"
+                                    ? "#fff1f1"
+                                    : "#f2f4f7",
+                              color:
+                                chatReplyWindow.status === "AVAILABLE"
+                                  ? "#247a3c"
+                                  : chatReplyWindow.status === "EXPIRED"
+                                    ? "#b43d3d"
+                                    : "#667085",
+                            }}
+                          >
+                            {chatReplyWindow.label}
+                          </span>
+                          {chatReplyWindow.lastInboundAt && (
+                            <span style={{ fontSize: 11, color: "#8a98a8" }}>
+                              Last buyer message: {new Date(chatReplyWindow.lastInboundAt).toLocaleString()}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {chatPageFilter && (
+                      <button
+                        className="secondary-button"
+                        type="button"
+                        onClick={() =>
+                          window.open(
+                            `https://business.facebook.com/latest/inbox/all?asset_id=${encodeURIComponent(chatPageFilter)}`,
+                            "_blank",
+                            "noopener,noreferrer"
+                          )
+                        }
+                      >
+                        Open Meta Inbox
+                      </button>
+                    )}
+                  </div>
+
+                  <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 18, background: "#f8fafc" }}>
+                    {!chatSelectedConversation ? (
+                      <div style={{ height: "100%", display: "grid", placeItems: "center", color: "#718096", textAlign: "center" }}>
+                        Choose a Messenger conversation from the inbox to view its current message history.
+                      </div>
+                    ) : chatMessagesLoading ? (
+                      <div style={{ textAlign: "center", color: "#718096", padding: 30 }}>Loading messages from Meta...</div>
+                    ) : chatMessages.length === 0 ? (
+                      <div style={{ textAlign: "center", color: "#718096", padding: 30 }}>No messages returned for this conversation.</div>
+                    ) : (
+                      <div style={{ display: "grid", gap: 10 }}>
+                        {chatMessages.map((message) => {
+                          const outbound = message.direction === "OUTBOUND";
+                          return (
+                            <div key={message.id || `${message.created_time}-${message.text}`} style={{ display: "flex", justifyContent: outbound ? "flex-end" : "flex-start" }}>
+                              <div style={{
+                                maxWidth: "78%",
+                                padding: "10px 12px",
+                                borderRadius: 14,
+                                background: outbound ? "#dff3e4" : "#fff",
+                                border: "1px solid #e2e8f0",
+                                color: "#263548",
+                              }}>
+                                {message.text && <div style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{message.text}</div>}
+                                {message.attachments?.length > 0 && (
+                                  <div style={{ marginTop: message.text ? 8 : 0, fontSize: 12, color: "#718096" }}>
+                                    {message.attachments.length} attachment{message.attachments.length === 1 ? "" : "s"}
+                                  </div>
+                                )}
+                                <div style={{ marginTop: 5, fontSize: 10, color: "#8a98a8", textAlign: outbound ? "right" : "left" }}>
+                                  {message.created_time ? new Date(message.created_time).toLocaleString() : ""}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ padding: 14, borderTop: "1px solid #e5eaf0", flex: "0 0 auto", background: "#fff" }}>
+                    {chatSelectedConversation && chatReplyWindow.status === "EXPIRED" && (
+                      <div style={{ marginBottom: 10, padding: "9px 11px", borderRadius: 9, background: "#fff7ed", color: "#9a5412", fontSize: 12, lineHeight: 1.45 }}>
+                        Meta's standard reply window has expired. The conversation can still be viewed here, but normal API replies are disabled until the customer messages the Page again.
+                      </div>
+                    )}
+
+                    <div style={{ display: "flex", gap: 10 }}>
+                      <input
+                        type="text"
+                        value={chatDraft}
+                        onChange={(event) => setChatDraft(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" && !event.shiftKey) {
+                            event.preventDefault();
+                            sendFacebookChatMessage();
+                          }
+                        }}
+                        placeholder={
+                          chatReplyWindow.status === "EXPIRED"
+                            ? "Reply window expired — open Meta Inbox or wait for a new buyer message"
+                            : "Write a Messenger reply..."
+                        }
+                        disabled={!chatSelectedConversation || chatSending || chatReplyWindow.status === "EXPIRED"}
+                        maxLength={2000}
+                        style={{ flex: 1 }}
+                      />
+                      <button
+                        className="primary-button"
+                        type="button"
+                        onClick={sendFacebookChatMessage}
+                        disabled={
+                          !chatSelectedConversation ||
+                          !chatDraft.trim() ||
+                          chatSending ||
+                          chatReplyWindow.status === "EXPIRED"
+                        }
+                      >
+                        {chatSending ? "Sending..." : "Send"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </>
+        )}
+
+        {page === "users-staff" && (
+          <>
+            <header className="dashboard-header">
+              <div>
+                <p className="eyebrow">MAINTENANCE · ACCESS</p>
+                <h1>Users &amp; Staff</h1>
+                <p>Create and maintain client staff access without exposing platform administration.</p>
+              </div>
+              <button className="primary-button" type="button" onClick={() => setShowStaffForm((current) => !current)}>
+                {showStaffForm ? "Close Form" : "Add Staff"}
+              </button>
+            </header>
+
+            {showStaffForm && (
+              <section className="dashboard-panel" style={{ marginBottom: 18 }}>
+                <div className="panel-header">
+                  <div>
+                    <h2>Invite Client Staff</h2>
+                    <p>Prepare the account and permission role. Invitation delivery will be wired after the access-control backend is finalized.</p>
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14, marginTop: 16 }}>
+                  <label>
+                    <span>Full Name</span>
+                    <input
+                      value={staffDraft.name}
+                      onChange={(event) => setStaffDraft((current) => ({ ...current, name: event.target.value }))}
+                      placeholder="Staff name"
+                    />
+                  </label>
+                  <label>
+                    <span>Email</span>
+                    <input
+                      type="email"
+                      value={staffDraft.email}
+                      onChange={(event) => setStaffDraft((current) => ({ ...current, email: event.target.value }))}
+                      placeholder="staff@example.com"
+                    />
+                  </label>
+                  <label>
+                    <span>Role</span>
+                    <select value={staffDraft.role} onChange={(event) => setStaffDraft((current) => ({ ...current, role: event.target.value }))}>
+                      <option value="STAFF">Client Staff</option>
+                      <option value="ADMIN">Client Admin</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 16 }}>
+                  <button className="secondary-button" type="button" onClick={() => { setShowStaffForm(false); setStaffDraft({ name: "", email: "", role: "STAFF" }); }}>Cancel</button>
+                  <button className="primary-button" type="button" disabled title="Staff invitation backend will be connected after UI completion">Send Invitation</button>
+                </div>
+              </section>
+            )}
+
+            <section className="metrics-grid">
+              <MetricCard title="Client Admins" value="—" subtitle="Administrative users" />
+              <MetricCard title="Client Staff" value="—" subtitle="Operational users" />
+              <MetricCard title="Pending Invites" value="—" subtitle="Awaiting acceptance" />
+              <MetricCard title="Inactive Users" value="—" subtitle="Access disabled" />
+            </section>
+
+            <section className="dashboard-panel">
+              <div className="panel-header">
+                <div>
+                  <h2>Client Users</h2>
+                  <p>Role, status and access activity for this client only.</p>
+                </div>
+                <input type="search" value={staffSearch} onChange={(event) => setStaffSearch(event.target.value)} placeholder="Search users" style={{ maxWidth: 260 }} />
+              </div>
+
+              <div className="table-wrapper">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Email</th>
+                      <th>Role</th>
+                      <th>Status</th>
+                      <th>Last Login</th>
+                      <th>Added</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td colSpan="7" style={{ textAlign: "center", padding: 30, color: "#718096" }}>
+                        Staff accounts will appear here once client user provisioning is connected.
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div style={{ marginTop: 16, padding: 14, borderRadius: 12, background: "#f8fafc", fontSize: 13, color: "#526274" }}>
+                <strong style={{ color: "#263548" }}>Access model:</strong> Client Admin can manage staff and permitted sensitive settings. Client Staff receives only the modules and actions explicitly allowed for their role.
+              </div>
+            </section>
+          </>
+        )}
+
+        {page === "reports" && (
+          <>
+            <header className="dashboard-header">
+              <div>
+                <p className="eyebrow">REPORTS · INSIGHTS</p>
+                <h1>Reports &amp; Insights</h1>
+                <p>Operational reports plus EO2MATE insights designed to help clients decide what to sell, collect and improve next.</p>
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button className="secondary-button" type="button" onClick={exportReportExcel} disabled={!generatedReport}>Generate Excel</button>
+                <button className="secondary-button" type="button" onClick={printReport} disabled={!generatedReport}>Generate PDF</button>
+              </div>
+            </header>
+
             <section className="dashboard-panel report-filter-panel">
               <div className="panel-header report-filter-header">
                 <div>
@@ -2696,51 +3315,13 @@ export default function PortalPage({ session }) {
               </div>
               <form className="report-filter-form" onSubmit={generateReport}>
                 <div className="report-filter-grid">
-                  <label className="report-field">
-                    <span>Report Type <b>*</b></span>
-                    <select value={selectedReport} onChange={(event) => setSelectedReport(event.target.value)} required>
-                      <option value="" disabled>Select report type</option>
-                      {REPORT_CATALOG.map((report) => <option key={report.key} value={report.key}>{report.title}</option>)}
-                    </select>
-                  </label>
-                  <label className="report-field">
-                    <span>Date Range <b>*</b></span>
-                    <select value={reportDateRange} onChange={(event) => setReportDateRange(event.target.value)} required>
-                      <option value="" disabled>Select date range</option>
-                      <option value="7D">Last 7 days</option><option value="30D">Last 30 days</option><option value="MTD">Month to date</option><option value="YTD">Year to date</option><option value="CUSTOM">Custom range</option>
-                    </select>
-                  </label>
-                  <label className="report-field">
-                    <span>Facebook Page <b>*</b></span>
-                    <select value={reportPageFilter} onChange={(event) => setReportPageFilter(event.target.value)} required>
-                      <option value="" disabled>Select Facebook Page</option>
-                      <option value="ALL">All My Pages</option>
-                      {clientReportPages.map((fbPage) => (<option key={fbPage.fb_page_id} value={fbPage.fb_page_id}>{fbPage.page_name || fbPage.page_nm || fbPage.fb_page_id}</option>))}
-                    </select>
-                    <small>Only Facebook Pages connected to this client are available.</small>
-                  </label>
-                  {reportDateRange === "CUSTOM" && (<>
-                    <label className="report-field"><span>From <b>*</b></span><input type="date" required value={reportCustomFrom} onChange={(event) => setReportCustomFrom(event.target.value)} /></label>
-                    <label className="report-field"><span>To <b>*</b></span><input type="date" required value={reportCustomTo} onChange={(event) => setReportCustomTo(event.target.value)} /></label>
-                  </>)}
-                  <label className="report-field">
-                    <span>Sales Channel <b>*</b></span>
-                    <select value={reportChannelFilter} onChange={(event) => setReportChannelFilter(event.target.value)} required>
-                      <option value="" disabled>Select sales channel</option><option value="ALL">All channels</option><option value="AUCTION">Auction</option><option value="POST_MINING">Post Mining</option><option value="REGULAR_SALE">Regular Sale</option><option value="PREORDER">Pre-Order</option><option value="MANUAL">Manual / Other</option>
-                    </select>
-                  </label>
-                  <label className="report-field">
-                    <span>Status <b>*</b></span>
-                    <select value={reportStatusFilter} onChange={(event) => setReportStatusFilter(event.target.value)} required>
-                      <option value="" disabled>Select status</option><option value="ALL">All statuses</option><option value="ACTIVE">Active</option><option value="CLOSED">Closed</option><option value="PENDING">Pending</option><option value="PAID">Paid</option><option value="COMPLETED">Completed</option><option value="CANCELLED">Cancelled</option>
-                    </select>
-                  </label>
-                  <label className="report-field">
-                    <span>Sort By <b>*</b></span>
-                    <select value={reportSortBy} onChange={(event) => setReportSortBy(event.target.value)} required>
-                      <option value="" disabled>Select sort order</option><option value="DATE_DESC">Newest first</option><option value="DATE_ASC">Oldest first</option><option value="AMOUNT_DESC">Amount: high to low</option><option value="AMOUNT_ASC">Amount: low to high</option>
-                    </select>
-                  </label>
+                  <label className="report-field"><span>Report Type <b>*</b></span><select value={selectedReport} onChange={(event) => setSelectedReport(event.target.value)} required><option value="" disabled>Select report type</option>{REPORT_CATALOG.map((report) => <option key={report.key} value={report.key}>{report.title}</option>)}</select></label>
+                  <label className="report-field"><span>Date Range <b>*</b></span><select value={reportDateRange} onChange={(event) => setReportDateRange(event.target.value)} required><option value="" disabled>Select date range</option><option value="7D">Last 7 days</option><option value="30D">Last 30 days</option><option value="MTD">Month to date</option><option value="YTD">Year to date</option><option value="CUSTOM">Custom range</option></select></label>
+                  <label className="report-field"><span>Facebook Page <b>*</b></span><select value={reportPageFilter} onChange={(event) => setReportPageFilter(event.target.value)} required><option value="" disabled>Select Facebook Page</option><option value="ALL">All My Pages</option>{(automationPages || []).filter((fbPage) => !fbPage.client_id || String(fbPage.client_id) === String(client?.client_id || "")).map((fbPage) => (<option key={fbPage.fb_page_id} value={fbPage.fb_page_id}>{fbPage.page_name || fbPage.page_nm || fbPage.fb_page_id}</option>))}</select><small>Only Facebook Pages connected to this client are available.</small></label>
+                  {reportDateRange === "CUSTOM" && (<><label className="report-field"><span>From <b>*</b></span><input type="date" required value={reportCustomFrom} onChange={(event) => setReportCustomFrom(event.target.value)} /></label><label className="report-field"><span>To <b>*</b></span><input type="date" required value={reportCustomTo} onChange={(event) => setReportCustomTo(event.target.value)} /></label></>)}
+                  <label className="report-field"><span>Sales Channel <b>*</b></span><select value={reportChannelFilter} onChange={(event) => setReportChannelFilter(event.target.value)} required><option value="" disabled>Select sales channel</option><option value="ALL">All channels</option><option value="AUCTION">Auction</option><option value="POST_MINING">Post Mining</option><option value="REGULAR_SALE">Regular Sale</option><option value="PREORDER">Pre-Order</option><option value="MANUAL">Manual / Other</option></select></label>
+                  <label className="report-field"><span>Status <b>*</b></span><select value={reportStatusFilter} onChange={(event) => setReportStatusFilter(event.target.value)} required><option value="" disabled>Select status</option><option value="ALL">All statuses</option><option value="ACTIVE">Active</option><option value="CLOSED">Closed</option><option value="PENDING">Pending</option><option value="PAID">Paid</option><option value="COMPLETED">Completed</option><option value="CANCELLED">Cancelled</option></select></label>
+                  <label className="report-field"><span>Sort By <b>*</b></span><select value={reportSortBy} onChange={(event) => setReportSortBy(event.target.value)} required><option value="" disabled>Select sort order</option><option value="DATE_DESC">Newest first</option><option value="DATE_ASC">Oldest first</option><option value="AMOUNT_DESC">Amount: high to low</option><option value="AMOUNT_ASC">Amount: low to high</option></select></label>
                 </div>
                 {reportMessage && !generatedReport && <div className="info-banner report-filter-message">{reportMessage}</div>}
                 <div className="report-filter-actions">
