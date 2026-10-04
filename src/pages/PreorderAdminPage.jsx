@@ -67,11 +67,11 @@ export default function PreorderAdminPage({ client, onCreatePost }) {
 
     {workspaceTab==="DASHBOARD"&&!selected&&<>
       <section className="metrics-grid" style={{ marginBottom:18 }}>
-        <div className="metric-card"><span className="metric-title">Total Pre-Orders</span><strong className="metric-value">{summary.total}</strong><small className="metric-subtitle">All Pre-Order posts</small></div>
-        <div className="metric-card"><span className="metric-title">Active</span><strong className="metric-value">{summary.active}</strong><small className="metric-subtitle">Currently accepting orders</small></div>
-        <div className="metric-card"><span className="metric-title">Closed</span><strong className="metric-value">{summary.closed}</strong><small className="metric-subtitle">Closed, sold out or completed</small></div>
-        <div className="metric-card"><span className="metric-title">Items</span><strong className="metric-value">{summary.items}</strong><small className="metric-subtitle">Items across Pre-Orders</small></div>
-        <div className="metric-card"><span className="metric-title">Upcoming deadlines</span><strong className="metric-value">{summary.withDeadline}</strong><small className="metric-subtitle">Posts with future ordering deadlines</small></div>
+        <div className="metric-card"><div className="metric-title">Total Pre-Orders</div><div className="metric-value">{summary.total}</div><div className="metric-subtitle">All Pre-Order posts</div></div>
+        <div className="metric-card"><div className="metric-title">Active</div><div className="metric-value">{summary.active}</div><div className="metric-subtitle">Currently accepting orders</div></div>
+        <div className="metric-card"><div className="metric-title">Closed</div><div className="metric-value">{summary.closed}</div><div className="metric-subtitle">Closed, sold out or completed</div></div>
+        <div className="metric-card"><div className="metric-title">Items</div><div className="metric-value">{summary.items}</div><div className="metric-subtitle">Items across Pre-Orders</div></div>
+        <div className="metric-card"><div className="metric-title">Upcoming deadlines</div><div className="metric-value">{summary.withDeadline}</div><div className="metric-subtitle">Posts with future ordering deadlines</div></div>
       </section>
       <section className="dashboard-panel preorder-panel"><div className="panel-header"><div><h2>Pre-Order summary</h2><p>Quick operational view of your current Pre-Order activity.</p></div></div><div className="table-wrapper"><table><thead><tr><th>Type</th><th>Status</th><th>Deadline</th><th>Closure</th><th>Items</th><th></th></tr></thead><tbody>{posts.slice(0,8).map(p=><tr key={p.post_id}><td><strong>{pretty(p.post_type_code)}</strong></td><td><Badge value={p.status}/></td><td>{fmtDate(p.ends_at)}</td><td>{p.eo2mate_preorder_settings?.ordering_close_reason?<Badge value={p.eo2mate_preorder_settings.ordering_close_reason}/>:<span className="table-muted">—</span>}</td><td>{p.eo2mate_post_items?.length||0}</td><td><button className="table-action-button" type="button" onClick={()=>open(p)}>Reservations</button></td></tr>)}{!loading&&posts.length===0&&<tr><td colSpan="6" className="empty-table-cell">No Pre-Orders yet.</td></tr>}</tbody></table></div></section>
     </>}
