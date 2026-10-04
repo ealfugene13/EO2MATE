@@ -499,8 +499,8 @@ function SellingPostDetailPanel({ detail, loading, error, onClose }) {
         <div>
           <button className="secondary-button" type="button" onClick={onClose} style={{marginBottom:14}}>← Back to Posts</button>
           <p className="eyebrow">FACEBOOK SELLING · {String(detail.mode_code || "POST").replaceAll("_", " ")}</p>
-          <h1>{post.caption || `${mining ? "Mining" : "Regular Sale"} post`}</h1>
-          <p>{post.post_type_code || "—"} · Created {formatDateTime(post.created_at)}</p>
+          <h1>{mining ? "Mining Post Details" : "Regular Sale Post Details"}</h1>
+          <p>{post.post_type_code || "—"} · {detail.facebook_page || "Facebook Page"} · Created {formatDateTime(post.created_at)}</p>
         </div>
         <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}><StatusBadge status={post.status}/></div>
       </header>
@@ -516,6 +516,7 @@ function SellingPostDetailPanel({ detail, loading, error, onClose }) {
 
       {detailTab === "OVERVIEW" && <section className="dashboard-panel selling-card">
         <div className="panel-header"><div><h2>Post overview</h2><p>Facebook reference, lifecycle and source information.</p></div></div>
+        {post.caption && <div className="preorder-caption-card"><span>Facebook post caption</span><p>{post.caption}</p></div>}
         <div className="preorder-summary-grid">
           <div><span>Facebook Page</span><strong>{detail.facebook_page || "—"}</strong></div>
           <div><span>Post Type</span><strong>{post.post_type_code || "—"}</strong></div>
