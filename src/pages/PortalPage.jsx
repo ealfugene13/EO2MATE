@@ -476,36 +476,77 @@ function isMetaOperationalPage(page) {
 
 
 function SellingPostDetailPanel({ detail, loading, error, onClose }) {
-  if (loading) return <section className="dashboard-panel"><div className="panel-header"><div><h2>Post details</h2><p>Loading record details...</p></div></div></section>;
-  if (error) return <section className="dashboard-panel"><div className="dashboard-error global-error">{error}</div></section>;
+  const [detailTab, setDetailTab] = useState("OVERVIEW");
+  const [copied, setCopied] = useState("");
+  useEffect(() => { setDetailTab("OVERVIEW"); setCopied(""); }, [detail?.post_id, detail?.post?.post_id]);
+  const copyValue = async (label, value) => {
+    if (!value) return;
+    try { await navigator.clipboard.writeText(String(value)); setCopied(label); window.setTimeout(() => setCopied(""), 1400); } catch (_) {}
+  };
+  if (loading) return <section className="dashboard-panel selling-card"><div className="panel-header"><div><p className="eyebrow">POST DETAILS</p><h2>Loading post…</h2><p>Retrieving items and transaction activity.</p></div></div></section>;
+  if (error) return <section className="dashboard-panel selling-card"><div className="panel-header"><div><h2>Post details unavailable</h2><p className="dashboard-error global-error">{error}</p></div><button className="secondary-button" type="button" onClick={onClose}>Back to Posts</button></div></section>;
   if (!detail) return null;
   const post = detail.post || detail;
   const mining = detail.mode_code === "MINING";
+  const items = detail.items || [];
+  const activity = detail.activity || [];
+  const buyers = new Set(activity.map(a => a.fb_user_id).filter(Boolean)).size;
+  const value = mining ? activity.reduce((n,a)=>n + Number(a.claim_price||0),0) : items.reduce((n,i)=>n + Number(i.unit_price||0) * Number(i.quantity_limit||0),0);
+  const tabs = ["OVERVIEW","ITEMS", mining ? "CLAIMS" : "ORDERS"];
   return (
-    <section id="selling-post-detail" className="dashboard-panel selling-card">
-      <div className="panel-header">
-        <div><p className="eyebrow">{String(detail.mode_code || "POST").replaceAll("_", " ")}</p><h2>Post details</h2><p>{post.caption || "No post caption"}</p></div>
-        <button className="secondary-button" type="button" onClick={onClose}>Back to Posts</button>
-      </div>
-      <div className="preorder-summary-grid">
-        <div><span>Facebook Page</span><strong>{detail.facebook_page || "—"}</strong></div>
-        <div><span>Post Type</span><strong>{post.post_type_code || "—"}</strong></div>
-        <div><span>Status</span><strong>{post.status || "—"}</strong></div>
-        <div><span>Facebook Post ID</span><strong>{post.fb_post_id || "—"}</strong></div>
-        <div><span>Created</span><strong>{formatDateTime(post.created_at)}</strong></div>
-        <div><span>Ends</span><strong>{formatDateTime(post.ends_at)}</strong></div>
-      </div>
-      <div className="panel-header"><div><h3>Items</h3><p>Products/SKUs attached to this post.</p></div></div>
-      <div className="table-wrapper"><table><thead><tr><th>#</th><th>Item</th><th>Source</th><th>SKU / Inventory</th><th>Price</th><th>Qty</th><th>Status</th><th>Fulfillment</th></tr></thead><tbody>
-        {(detail.items || []).map((item) => <tr key={item.post_item_id}><td>{item.item_no ?? "—"}</td><td>{item.item_label || item.item_name_snapshot || "—"}</td><td>{item.item_source || "—"}</td><td>{item.item_code_snapshot || item.inventory_item_id || "—"}</td><td>{formatCurrency(item.unit_price)}</td><td>{item.quantity_limit ?? "—"}</td><td>{item.status || "—"}</td><td>{item.fulfillment_status || "—"}</td></tr>)}
-        {!(detail.items || []).length && <tr><td colSpan="8">No item records found.</td></tr>}
-      </tbody></table></div>
-      <div className="panel-header"><div><h3>{mining ? "Claims" : "Orders"}</h3><p>{mining ? "MINE / TAKE / LOCK activity for this post." : "Accepted and attempted Regular Sale orders for this post."}</p></div></div>
-      <div className="table-wrapper"><table><thead><tr><th>Buyer</th><th>{mining ? "Action" : "Requested"}</th><th>{mining ? "Claim Price" : "Accepted"}</th><th>Status</th><th>Facebook Comment</th><th>Comment</th><th>Time</th></tr></thead><tbody>
-        {(detail.activity || []).map((a) => <tr key={a.mining_claim_id || a.post_entry_id}><td>{a.fb_user_name || a.fb_user_id || "—"}</td><td>{mining ? (a.action_code || "—") : (a.requested_quantity ?? "—")}</td><td>{mining ? formatCurrency(a.claim_price) : (a.accepted_quantity ?? "—")}</td><td>{a.status || "—"}</td><td>{a.fb_comment_id || "—"}</td><td>{a.comment_text || "—"}</td><td>{formatDateTime(a.created_at || a.commented_at)}</td></tr>)}
-        {!(detail.activity || []).length && <tr><td colSpan="7">No {mining ? "claim" : "order"} records found.</td></tr>}
-      </tbody></table></div>
-    </section>
+    <div className="selling-detail-workspace">
+      <header className="dashboard-header selling-hero" style={{marginBottom:16}}>
+        <div>
+          <button className="secondary-button" type="button" onClick={onClose} style={{marginBottom:14}}>← Back to Posts</button>
+          <p className="eyebrow">FACEBOOK SELLING · {String(detail.mode_code || "POST").replaceAll("_", " ")}</p>
+          <h1>{post.caption || `${mining ? "Mining" : "Regular Sale"} post`}</h1>
+          <p>{post.post_type_code || "—"} · Created {formatDateTime(post.created_at)}</p>
+        </div>
+        <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}><StatusBadge status={post.status}/></div>
+      </header>
+
+      <section className="metrics-grid" style={{marginBottom:16}}>
+        <div className="metric-card"><span>Items</span><strong>{items.length}</strong><small>Products attached</small></div>
+        <div className="metric-card"><span>{mining ? "Claims" : "Orders"}</span><strong>{activity.length}</strong><small>Recorded activity</small></div>
+        <div className="metric-card"><span>Buyers</span><strong>{buyers}</strong><small>Unique customers</small></div>
+        <div className="metric-card"><span>{mining ? "Claimed value" : "Listed value"}</span><strong>{formatCurrency(value)}</strong><small>{mining ? "Total claim price" : "Price × quantity"}</small></div>
+      </section>
+
+      <section className="selling-tabs" style={{marginBottom:16}}><div>{tabs.map(t=><button key={t} type="button" className={detailTab===t?"primary-button":"secondary-button"} onClick={()=>setDetailTab(t)}>{t.charAt(0)+t.slice(1).toLowerCase()}</button>)}</div></section>
+
+      {detailTab === "OVERVIEW" && <section className="dashboard-panel selling-card">
+        <div className="panel-header"><div><h2>Post overview</h2><p>Facebook reference, lifecycle and source information.</p></div></div>
+        <div className="preorder-summary-grid">
+          <div><span>Facebook Page</span><strong>{detail.facebook_page || "—"}</strong></div>
+          <div><span>Post Type</span><strong>{post.post_type_code || "—"}</strong></div>
+          <div><span>Status</span><strong>{statusLabel(post.status) || "—"}</strong></div>
+          <div><span>Created</span><strong>{formatDateTime(post.created_at)}</strong></div>
+          <div><span>Starts</span><strong>{formatDateTime(post.starts_at)}</strong></div>
+          <div><span>Ends</span><strong>{formatDateTime(post.ends_at)}</strong></div>
+        </div>
+        <div className="panel-header"><div><h3>References</h3><p>Use these IDs when tracing a post in Meta or EO2MATE logs.</p></div></div>
+        <div className="preorder-summary-grid">
+          <div><span>EO2MATE Post ID</span><strong title={post.post_id}>{post.post_id || "—"}</strong>{post.post_id&&<button className="table-action-button" type="button" onClick={()=>copyValue("post",post.post_id)}>{copied==="post"?"Copied":"Copy"}</button>}</div>
+          <div><span>Facebook Post ID</span><strong title={post.fb_post_id}>{post.fb_post_id || "—"}</strong>{post.fb_post_id&&<button className="table-action-button" type="button" onClick={()=>copyValue("fb",post.fb_post_id)}>{copied==="fb"?"Copied":"Copy"}</button>}</div>
+        </div>
+      </section>}
+
+      {detailTab === "ITEMS" && <section className="dashboard-panel selling-card">
+        <div className="panel-header"><div><h2>Items</h2><p>Products and inventory references attached to this post.</p></div></div>
+        <div className="table-wrapper"><table><thead><tr><th>#</th><th>Item</th><th>Source</th><th>SKU / Inventory</th><th>Price</th><th>Qty</th><th>Status</th><th>Fulfillment</th></tr></thead><tbody>
+          {items.map(item => <tr key={item.post_item_id}><td>{item.item_no ?? "—"}</td><td><strong>{item.item_label || item.item_name_snapshot || "—"}</strong></td><td>{item.item_source || "—"}</td><td title={item.inventory_item_id}>{item.item_code_snapshot || item.inventory_item_id || "—"}</td><td>{formatCurrency(item.unit_price)}</td><td>{item.quantity_limit ?? "—"}</td><td><StatusBadge status={item.status}/></td><td>{statusLabel(item.fulfillment_status) || "—"}</td></tr>)}
+          {!items.length && <tr><td colSpan="8" className="empty-table-cell">No item records found.</td></tr>}
+        </tbody></table></div>
+      </section>}
+
+      {(detailTab === "CLAIMS" || detailTab === "ORDERS") && <section className="dashboard-panel selling-card">
+        <div className="panel-header"><div><h2>{mining ? "Claims" : "Orders"}</h2><p>{mining ? "MINE / TAKE / LOCK activity and claim value." : "Buyer order activity and accepted quantities."}</p></div></div>
+        <div className="table-wrapper"><table><thead><tr><th>Buyer</th><th>{mining ? "Action" : "Requested"}</th><th>{mining ? "Claim Price" : "Accepted"}</th><th>Status</th><th>Facebook Comment</th><th>Comment</th><th>Time</th></tr></thead><tbody>
+          {activity.map(a => <tr key={a.mining_claim_id || a.post_entry_id}><td><strong>{a.fb_user_name || a.fb_user_id || "—"}</strong></td><td>{mining ? (a.action_code || "—") : (a.requested_quantity ?? "—")}</td><td>{mining ? formatCurrency(a.claim_price) : (a.accepted_quantity ?? "—")}</td><td><StatusBadge status={a.status}/></td><td title={a.fb_comment_id}>{a.fb_comment_id || "—"}</td><td>{a.comment_text || "—"}</td><td>{formatDateTime(a.created_at || a.commented_at)}</td></tr>)}
+          {!activity.length && <tr><td colSpan="7" className="empty-table-cell">No {mining ? "claim" : "order"} records found.</td></tr>}
+        </tbody></table></div>
+      </section>}
+    </div>
   );
 }
 

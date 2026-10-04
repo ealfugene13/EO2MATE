@@ -11,11 +11,12 @@ export default function PreorderAdminPage({ client, onCreatePost }) {
   const [postSearch,setPostSearch]=useState(""), [postFilter,setPostFilter]=useState("ALL"), [postSort,setPostSort]=useState("NEWEST");
   const [posts,setPosts]=useState([]), [entries,setEntries]=useState([]);
   const [selected,setSelected]=useState(null), [notice,setNotice]=useState(""), [error,setError]=useState(""), [loading,setLoading]=useState(false);
+  const [detailTab,setDetailTab]=useState("OVERVIEW"), [copied,setCopied]=useState("");
 
   async function call(action,extra={}) { const {data,error}=await supabase.functions.invoke("eo2mate",{headers:{"x-eo2mate-route":"preorder-admin"},body:{action,client_id:client.client_id,...extra}}); if(error)throw error; if(!data?.success)throw new Error(data?.error||"Request failed"); return data; }
   async function load(){ setLoading(true); setError(""); try { const p=await call("LIST"); setPosts(p.posts||[]); } catch(e){setError(e.message)} finally{setLoading(false)} }
   useEffect(()=>{if(client?.client_id)load()},[client?.client_id]);
-  async function open(post){ setSelected(post); setError(""); try{const d=await call("ENTRIES",{post_id:post.post_id});setEntries(d.entries||[])}catch(e){setError(e.message)} }
+  async function open(post){ setSelected(post); setDetailTab("OVERVIEW"); setCopied(""); setError(""); try{const d=await call("ENTRIES",{post_id:post.post_id});setEntries(d.entries||[])}catch(e){setError(e.message)} }
   async function cancel(entry){const reason=window.prompt("Cancellation reason code (BUYER_REQUESTED, NO_PAYMENT, DUMMY_FAKE_SUSPECTED, NUISANCE_FAKE_ACTIVITY, OTHER):","BUYER_REQUESTED");if(!reason)return;try{await call("CANCEL_ENTRY",{post_entry_id:entry.post_entry_id,reason_code:reason});await open(selected);setNotice("Reservation cancelled and quantity released.")}catch(e){setError(e.message)}}
 
   const summary=useMemo(()=>{
@@ -84,58 +85,32 @@ export default function PreorderAdminPage({ client, onCreatePost }) {
       </section>
       <section className="dashboard-panel preorder-panel"><div className="panel-header"><div><h2>Pre-Order posts</h2><p>{posts.length} post{posts.length===1?"":"s"} · select a post to review reservations</p></div></div><div className="table-wrapper"><table><thead><tr><th>Type</th><th>Status</th><th>Ordering deadline</th><th>Closure</th><th>Items</th><th></th></tr></thead><tbody>{visiblePosts.map(p=><tr key={p.post_id} className={selected?.post_id===p.post_id?"selected-table-row":""}><td><strong>{pretty(p.post_type_code)}</strong></td><td><Badge value={p.status}/></td><td>{fmtDate(p.ends_at)}</td><td>{p.eo2mate_preorder_settings?.ordering_close_reason?<Badge value={p.eo2mate_preorder_settings.ordering_close_reason}/>:<span className="table-muted">—</span>}</td><td>{p.eo2mate_post_items?.length||0}</td><td><button className="table-action-button" type="button" onClick={()=>open(p)}>View</button></td></tr>)}{!loading&&posts.length===0&&<tr><td colSpan="6" className="empty-table-cell">No Pre-Orders yet.</td></tr>}</tbody></table></div></section></>}
 
-    {workspaceTab==="POSTS" && selected && (
-      <section id="preorder-post-detail" className="dashboard-panel preorder-panel selling-card">
-        <div className="panel-header">
-          <div>
-            <p className="eyebrow">{pretty(selected.post_type_code)} PRE-ORDER</p>
-            <h2>Post details & reservations</h2>
-            <p className="preorder-caption">{selected.caption||"No post caption"}</p>
-          </div>
-          <div style={{display:"flex",gap:8,alignItems:"center"}}>
-            <Badge value={selected.status}/>
-            <button className="secondary-button" type="button" onClick={()=>{setSelected(null);setEntries([])}}>Back to Posts</button>
-          </div>
-        </div>
-        <div className="preorder-summary-grid">
-          <div><span>Post ID</span><strong>{selected.post_id||"—"}</strong></div>
-          <div><span>Facebook Post ID</span><strong>{selected.fb_post_id||"—"}</strong></div>
-          <div><span>Post Type</span><strong>{pretty(selected.post_type_code)||"—"}</strong></div>
-          <div><span>Status</span><strong>{pretty(selected.status)||"—"}</strong></div>
-          <div><span>Created</span><strong>{fmtDate(selected.created_at)}</strong></div>
-          <div><span>Items</span><strong>{selected.eo2mate_post_items?.length||0}</strong></div>
-          <div><span>Reservations</span><strong>{entries.length}</strong></div>
-          <div><span>Deadline</span><strong>{fmtDate(selected.ends_at)}</strong></div>
-          <div><span>Closure</span><strong>{pretty(selected.eo2mate_preorder_settings?.ordering_close_reason)||"—"}</strong></div>
-        </div>
-        <div className="panel-header"><div><h3>Items</h3><p>Products attached to this Pre-Order post.</p></div></div>
-        <div className="table-wrapper">
-          <table>
-            <thead><tr><th>Item</th><th>Price</th><th>Quantity</th><th>Status</th><th>Fulfillment</th></tr></thead>
-            <tbody>
-              {(selected.eo2mate_post_items||[]).map(i=><tr key={i.post_item_id}><td><strong>{i.item_label||i.item_name_snapshot||"—"}</strong></td><td>{money(i.unit_price)}</td><td>{i.quantity_limit??"—"}</td><td><Badge value={i.status}/></td><td>{pretty(i.fulfillment_status)||"—"}</td></tr>)}
-              {!(selected.eo2mate_post_items||[]).length&&<tr><td colSpan="5" className="empty-table-cell">No item records for this post.</td></tr>}
-            </tbody>
-          </table>
-        </div>
-        <div className="panel-header"><div><h3>Reservations / Orders</h3><p>Buyer quantities, status and required down payment.</p></div></div>
-        <div className="table-wrapper">
-          <table>
-            <thead><tr><th>Buyer</th><th>Status</th><th>Requested</th><th>Accepted</th><th>Required DP</th><th></th></tr></thead>
-            <tbody>
-              {entries.map(e=><tr key={e.post_entry_id}>
-                <td><strong>{e.fb_user_name||e.fb_user_id||"—"}</strong></td>
-                <td><Badge value={e.status}/></td>
-                <td>{e.requested_quantity}</td>
-                <td>{e.accepted_quantity}</td>
-                <td>{money(e.required_down_payment_amount)}</td>
-                <td>{!["CANCELLED","REJECTED"].includes(String(e.status).toUpperCase())&&<button className="table-action-button danger-action" type="button" onClick={()=>cancel(e)}>Cancel</button>}</td>
-              </tr>)}
-              {entries.length===0&&<tr><td colSpan="6" className="empty-table-cell">No reservations for this post.</td></tr>}
-            </tbody>
-          </table>
-        </div>
-      </section>
-    )}
+    {workspaceTab==="POSTS" && selected && (()=>{
+      const items=selected.eo2mate_post_items||[];
+      const accepted=entries.filter(e=>["ACCEPTED","PARTIAL","CONFIRMED"].includes(String(e.status||"").toUpperCase()));
+      const buyers=new Set(accepted.map(e=>e.fb_user_id).filter(Boolean)).size;
+      const qty=accepted.reduce((n,e)=>n+Number(e.accepted_quantity||0),0);
+      const copy=async(label,value)=>{if(!value)return;try{await navigator.clipboard.writeText(String(value));setCopied(label);window.setTimeout(()=>setCopied(""),1400)}catch(_){}};
+      return <div className="selling-detail-workspace">
+        <header className="dashboard-header selling-hero" style={{marginBottom:16}}><div>
+          <button className="secondary-button" type="button" onClick={()=>{setSelected(null);setEntries([])}} style={{marginBottom:14}}>← Back to Posts</button>
+          <p className="eyebrow">FACEBOOK SELLING · PRE-ORDER</p><h1>{selected.caption||"Pre-Order post"}</h1><p>{pretty(selected.post_type_code)} · Created {fmtDate(selected.created_at)}</p>
+        </div><Badge value={selected.status}/></header>
+        <section className="metrics-grid" style={{marginBottom:16}}>
+          <div className="metric-card"><span>Items</span><strong>{items.length}</strong><small>Products attached</small></div>
+          <div className="metric-card"><span>Reservations</span><strong>{entries.length}</strong><small>Buyer entries</small></div>
+          <div className="metric-card"><span>Accepted qty</span><strong>{qty}</strong><small>Confirmed units</small></div>
+          <div className="metric-card"><span>Buyers</span><strong>{buyers}</strong><small>Unique accepted buyers</small></div>
+        </section>
+        <section className="selling-tabs" style={{marginBottom:16}}><div>{["OVERVIEW","ITEMS","ORDERS"].map(t=><button key={t} type="button" className={detailTab===t?"primary-button":"secondary-button"} onClick={()=>setDetailTab(t)}>{t.charAt(0)+t.slice(1).toLowerCase()}</button>)}</div></section>
+        {detailTab==="OVERVIEW"&&<section className="dashboard-panel preorder-panel selling-card"><div className="panel-header"><div><h2>Post overview</h2><p>Ordering lifecycle, deadline and Facebook references.</p></div></div>
+          <div className="preorder-summary-grid"><div><span>Post Type</span><strong>{pretty(selected.post_type_code)||"—"}</strong></div><div><span>Status</span><strong>{pretty(selected.status)||"—"}</strong></div><div><span>Created</span><strong>{fmtDate(selected.created_at)}</strong></div><div><span>Deadline</span><strong>{fmtDate(selected.ends_at)}</strong></div><div><span>Closure</span><strong>{pretty(selected.eo2mate_preorder_settings?.ordering_close_reason)||"—"}</strong></div><div><span>Items</span><strong>{items.length}</strong></div></div>
+          <div className="panel-header"><div><h3>References</h3><p>Copy IDs for tracing in EO2MATE or Meta.</p></div></div><div className="preorder-summary-grid"><div><span>EO2MATE Post ID</span><strong title={selected.post_id}>{selected.post_id||"—"}</strong>{selected.post_id&&<button className="table-action-button" type="button" onClick={()=>copy("post",selected.post_id)}>{copied==="post"?"Copied":"Copy"}</button>}</div><div><span>Facebook Post ID</span><strong title={selected.fb_post_id}>{selected.fb_post_id||"—"}</strong>{selected.fb_post_id&&<button className="table-action-button" type="button" onClick={()=>copy("fb",selected.fb_post_id)}>{copied==="fb"?"Copied":"Copy"}</button>}</div></div>
+        </section>}
+        {detailTab==="ITEMS"&&<section className="dashboard-panel preorder-panel selling-card"><div className="panel-header"><div><h2>Items</h2><p>Products attached to this Pre-Order post.</p></div></div><div className="table-wrapper"><table><thead><tr><th>Item</th><th>Price</th><th>Quantity</th><th>Status</th><th>Fulfillment</th></tr></thead><tbody>{items.map(i=><tr key={i.post_item_id}><td><strong>{i.item_label||i.item_name_snapshot||"—"}</strong></td><td>{money(i.unit_price)}</td><td>{i.quantity_limit??"—"}</td><td><Badge value={i.status}/></td><td>{pretty(i.fulfillment_status)||"—"}</td></tr>)}{!items.length&&<tr><td colSpan="5" className="empty-table-cell">No item records for this post.</td></tr>}</tbody></table></div></section>}
+        {detailTab==="ORDERS"&&<section className="dashboard-panel preorder-panel selling-card"><div className="panel-header"><div><h2>Reservations / Orders</h2><p>Buyer quantities, status and required down payment.</p></div></div><div className="table-wrapper"><table><thead><tr><th>Buyer</th><th>Status</th><th>Requested</th><th>Accepted</th><th>Required DP</th><th>Comment</th><th></th></tr></thead><tbody>{entries.map(e=><tr key={e.post_entry_id}><td><strong>{e.fb_user_name||e.fb_user_id||"—"}</strong></td><td><Badge value={e.status}/></td><td>{e.requested_quantity}</td><td>{e.accepted_quantity}</td><td>{money(e.required_down_payment_amount)}</td><td>{e.comment_text||"—"}</td><td>{!["CANCELLED","REJECTED"].includes(String(e.status).toUpperCase())&&<button className="table-action-button danger-action" type="button" onClick={()=>cancel(e)}>Cancel</button>}</td></tr>)}{entries.length===0&&<tr><td colSpan="7" className="empty-table-cell">No reservations for this post.</td></tr>}</tbody></table></div></section>}
+      </div>;
+    })()}
+
   </>;
 }
