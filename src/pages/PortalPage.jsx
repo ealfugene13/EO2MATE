@@ -2109,6 +2109,46 @@ export default function PortalPage({ session }) {
                 Posts
               </SidebarNavButton>
 
+              <SidebarNavButton
+                icon="auction"
+                className={`nav-item ${page === "auctions" || page === "facebook-post" ? "active" : ""}`}
+                onClick={() => { setAuctionWorkspaceTab("SUMMARY"); goToAuctions("ALL"); setMobileMenuOpen(false); }}
+              >
+                Auctions
+              </SidebarNavButton>
+
+              <SidebarNavButton
+                icon="mining"
+                className={`nav-item ${page === "post-mining" || page === "mining-create" ? "active" : ""}`}
+                onClick={() => { setMiningWorkspaceTab("SUMMARY"); navigateTo("post-mining"); }}
+              >
+                Mining
+              </SidebarNavButton>
+
+              <SidebarNavButton
+                icon="orders"
+                className={`nav-item ${page === "pre-order" || page === "pre-order-create" ? "active" : ""}`}
+                onClick={() => navigateTo("pre-order")}
+              >
+                Pre-Orders
+              </SidebarNavButton>
+
+              <SidebarNavButton
+                icon="sales"
+                className={`nav-item ${page === "regular-sale" ? "active" : ""}`}
+                onClick={() => { setRegularSaleWorkspaceTab("SUMMARY"); navigateTo("regular-sale"); }}
+              >
+                Regular Sales
+              </SidebarNavButton>
+
+              <SidebarNavButton
+                icon="sales"
+                className={`nav-item ${page === "live-selling" ? "active" : ""}`}
+                onClick={() => { setLiveSellingWorkspaceTab("DASHBOARD"); navigateTo("live-selling"); }}
+              >
+                Live Selling
+              </SidebarNavButton>
+
             </>
           )}
 
