@@ -15,7 +15,7 @@ export default function PreorderAdminPage({ client, onCreatePost }) {
   async function call(action,extra={}) { const {data,error}=await supabase.functions.invoke("eo2mate",{headers:{"x-eo2mate-route":"preorder-admin"},body:{action,client_id:client.client_id,...extra}}); if(error)throw error; if(!data?.success)throw new Error(data?.error||"Request failed"); return data; }
   async function load(){ setLoading(true); setError(""); try { const p=await call("LIST"); setPosts(p.posts||[]); } catch(e){setError(e.message)} finally{setLoading(false)} }
   useEffect(()=>{if(client?.client_id)load()},[client?.client_id]);
-  async function open(post){ setSelected(post); setError(""); try{const d=await call("ENTRIES",{post_id:post.post_id});setEntries(d.entries||[])}catch(e){setError(e.message)} }
+  async function open(post){ setSelected(post); setError(""); try{const d=await call("ENTRIES",{post_id:post.post_id});setEntries(d.entries||[]);window.setTimeout(()=>document.getElementById("preorder-post-detail")?.scrollIntoView({behavior:"smooth",block:"start"}),0)}catch(e){setError(e.message)} }
   async function cancel(entry){const reason=window.prompt("Cancellation reason code (BUYER_REQUESTED, NO_PAYMENT, DUMMY_FAKE_SUSPECTED, NUISANCE_FAKE_ACTIVITY, OTHER):","BUYER_REQUESTED");if(!reason)return;try{await call("CANCEL_ENTRY",{post_entry_id:entry.post_entry_id,reason_code:reason});await open(selected);setNotice("Reservation cancelled and quantity released.")}catch(e){setError(e.message)}}
 
   const summary=useMemo(()=>{
@@ -83,7 +83,7 @@ export default function PreorderAdminPage({ client, onCreatePost }) {
       <section className="dashboard-panel preorder-panel"><div className="panel-header"><div><h2>Pre-Order posts</h2><p>{posts.length} post{posts.length===1?"":"s"} · select a post to review reservations</p></div></div><div className="table-wrapper"><table><thead><tr><th>Type</th><th>Status</th><th>Ordering deadline</th><th>Closure</th><th>Items</th><th></th></tr></thead><tbody>{visiblePosts.map(p=><tr key={p.post_id} className={selected?.post_id===p.post_id?"selected-table-row":""}><td><strong>{pretty(p.post_type_code)}</strong></td><td><Badge value={p.status}/></td><td>{fmtDate(p.ends_at)}</td><td>{p.eo2mate_preorder_settings?.ordering_close_reason?<Badge value={p.eo2mate_preorder_settings.ordering_close_reason}/>:<span className="table-muted">—</span>}</td><td>{p.eo2mate_post_items?.length||0}</td><td><button className="table-action-button" type="button" onClick={()=>open(p)}>View</button></td></tr>)}{!loading&&posts.length===0&&<tr><td colSpan="6" className="empty-table-cell">No Pre-Orders yet.</td></tr>}</tbody></table></div></section></>}
 
     {workspaceTab==="POSTS" && selected && (
-      <section className="dashboard-panel preorder-panel selling-card">
+      <section id="preorder-post-detail" className="dashboard-panel preorder-panel selling-card">
         <div className="panel-header">
           <div>
             <p className="eyebrow">{pretty(selected.post_type_code)} PRE-ORDER</p>
