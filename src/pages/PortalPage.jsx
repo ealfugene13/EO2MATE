@@ -667,7 +667,12 @@ export default function PortalPage({ session }) {
   const [reportDateRange, setReportDateRange] = useState("30D");
   const [reportPageFilter, setReportPageFilter] = useState("ALL");
   const [reportChannelFilter, setReportChannelFilter] = useState("ALL");
+  const [reportStatusFilter, setReportStatusFilter] = useState("ALL");
+  const [reportSortBy, setReportSortBy] = useState("DATE_DESC");
+  const [reportCustomFrom, setReportCustomFrom] = useState("");
+  const [reportCustomTo, setReportCustomTo] = useState("");
   const [reportGeneratedAt, setReportGeneratedAt] = useState(null);
+  const [generatedReport, setGeneratedReport] = useState(null);
   const [reportMessage, setReportMessage] = useState("");
 
   // UI-first operational dashboards. Data wiring follows after UI approval.
@@ -688,18 +693,22 @@ export default function PortalPage({ session }) {
 
   const reportData = useMemo(() => {
     const now = new Date();
-    const start = new Date(now);
+    let start = new Date(now);
+    let end = new Date(now);
     if (reportDateRange === "7D") start.setDate(start.getDate() - 7);
     else if (reportDateRange === "30D") start.setDate(start.getDate() - 30);
     else if (reportDateRange === "MTD") start.setDate(1);
     else if (reportDateRange === "YTD") { start.setMonth(0); start.setDate(1); }
-    else start.setDate(start.getDate() - 30);
+    else if (reportDateRange === "CUSTOM") {
+      start = reportCustomFrom ? new Date(`${reportCustomFrom}T00:00:00`) : new Date(0);
+      end = reportCustomTo ? new Date(`${reportCustomTo}T23:59:59.999`) : now;
+    } else start.setDate(start.getDate() - 30);
     start.setHours(0,0,0,0);
     const inRange = (row) => {
       const raw = row?.created_at || row?.post_created_at || row?.paid_at || row?.updated_at;
       if (!raw) return true;
       const d = new Date(raw);
-      return !Number.isNaN(d.getTime()) && d >= start && d <= now;
+      return !Number.isNaN(d.getTime()) && d >= start && d <= end;
     };
     const pageMatches = (row) => reportPageFilter === "ALL" || String(row?.fb_page_id || row?.page_id || "") === String(reportPageFilter);
     const channelOf = (row) => String(row?.mode_code || row?.sale_type || row?.source_type || row?.order_source || row?.channel || row?.selling_mode || "").toUpperCase();
@@ -712,44 +721,97 @@ export default function PortalPage({ session }) {
       if (reportChannelFilter === "AUCTION") return c.includes("AUCTION") || Boolean(row?.auction_id || row?.auction_post_id);
       return c.includes(reportChannelFilter);
     };
-    const filteredOrders = (orders || []).filter((r) => inRange(r) && pageMatches(r) && channelMatches(r));
-    const filteredPayments = (payments || []).filter((r) => inRange(r) && pageMatches(r) && channelMatches(r));
-    const filteredAuctions = (auctions || []).filter((r) => inRange(r) && pageMatches(r));
-    const filteredDeliveries = (deliveries || []).filter((r) => inRange(r) && pageMatches(r));
-    const mining = (sellingPostRows.MINING || []).filter((r) => inRange(r) && pageMatches(r));
-    const regular = (sellingPostRows.REGULAR_SALE || []).filter((r) => inRange(r) && pageMatches(r));
-    const money = (r) => Number(r?.total_amount ?? r?.amount ?? r?.grand_total ?? r?.order_total ?? r?.value ?? r?.winning_amount ?? 0) || 0;
-    const paid = filteredPayments.filter((r) => ["PAID","SUCCESS","COMPLETED","SETTLED"].includes(String(r?.status || r?.payment_status || r?.provider_status || "").toUpperCase()));
-    const pending = filteredPayments.filter((r) => ["PENDING","AWAITING_PAYMENT","READY_FOR_PAYMENT","UNPAID"].includes(String(r?.status || r?.payment_status || r?.provider_status || "").toUpperCase()));
+    const statusOf = (row) => String(row?.status || row?.order_status || row?.payment_status || row?.provider_status || row?.delivery_status || "").toUpperCase();
+    const statusMatches = (row) => reportStatusFilter === "ALL" || statusOf(row) === reportStatusFilter;
+    const baseFilter = (r) => inRange(r) && pageMatches(r) && channelMatches(r) && statusMatches(r);
+    const filteredOrders = (orders || []).filter(baseFilter);
+    const filteredPayments = (payments || []).filter(baseFilter);
+    const filteredAuctions = (auctions || []).filter((r) => inRange(r) && pageMatches(r) && statusMatches(r));
+    const filteredDeliveries = (deliveries || []).filter((r) => inRange(r) && pageMatches(r) && statusMatches(r));
+    const mining = (sellingPostRows.MINING || []).filter((r) => inRange(r) && pageMatches(r) && statusMatches(r));
+    const regular = (sellingPostRows.REGULAR_SALE || []).filter((r) => inRange(r) && pageMatches(r) && statusMatches(r));
+    const money = (r) => Number(r?.total_amount ?? r?.amount ?? r?.grand_total ?? r?.order_total ?? r?.value ?? r?.winning_amount ?? r?.claim_price ?? 0) || 0;
+    const paid = filteredPayments.filter((r) => ["PAID","SUCCESS","COMPLETED","SETTLED"].includes(statusOf(r)));
+    const pending = filteredPayments.filter((r) => ["PENDING","AWAITING_PAYMENT","READY_FOR_PAYMENT","UNPAID"].includes(statusOf(r)));
     const gross = filteredOrders.reduce((a,r)=>a+money(r),0);
     const paidValue = paid.reduce((a,r)=>a+money(r),0);
     const buyers = new Set(filteredOrders.map(r=>r.fb_user_id || r.buyer_id || r.customer_id || r.psid).filter(Boolean));
-    const rows = filteredOrders.slice(0,100).map((r) => ({
-      Date: r.created_at || r.updated_at || "",
-      Reference: r.order_group_no || r.order_no || r.order_group_id || r.order_id || r.id || "—",
-      Channel: channelOf(r) || "—",
-      Buyer: r.buyer_name || r.fb_user_name || r.customer_name || r.fb_user_id || "—",
-      Status: r.status || r.order_status || "—",
+
+    let sourceRows = filteredOrders;
+    if (selectedReport === "payment-collection") sourceRows = filteredPayments;
+    else if (selectedReport === "auction-performance") sourceRows = filteredAuctions;
+    else if (selectedReport === "post-mining-performance") sourceRows = mining;
+    else if (selectedReport === "order-fulfillment") sourceRows = filteredDeliveries;
+
+    let rows = sourceRows.map((r) => ({
+      Date: r.created_at || r.post_created_at || r.paid_at || r.updated_at || "",
+      Reference: r.order_group_no || r.order_no || r.reference_no || r.fb_post_id || r.order_group_id || r.order_id || r.auction_id || r.post_id || r.payment_id || r.delivery_id || r.id || "—",
+      Channel: channelOf(r) || (selectedReport === "auction-performance" ? "AUCTION" : selectedReport === "post-mining-performance" ? "MINING" : "—"),
+      Buyer: r.buyer_name || r.fb_user_name || r.customer_name || r.fb_user_id || r.psid || "—",
+      Status: r.status || r.order_status || r.payment_status || r.provider_status || r.delivery_status || "—",
       Amount: money(r),
     }));
-    return { filteredOrders, filteredPayments, filteredAuctions, filteredDeliveries, mining, regular, paid, pending, gross, paidValue, buyers: buyers.size, rows };
-  }, [orders, payments, auctions, deliveries, sellingPostRows, reportDateRange, reportPageFilter, reportChannelFilter]);
+    rows.sort((a,b) => {
+      if (reportSortBy === "AMOUNT_DESC") return Number(b.Amount)-Number(a.Amount);
+      if (reportSortBy === "AMOUNT_ASC") return Number(a.Amount)-Number(b.Amount);
+      const ad = new Date(a.Date).getTime() || 0, bd = new Date(b.Date).getTime() || 0;
+      return reportSortBy === "DATE_ASC" ? ad-bd : bd-ad;
+    });
+    rows = rows.slice(0,500);
+    return { filteredOrders, filteredPayments, filteredAuctions, filteredDeliveries, mining, regular, paid, pending, gross, paidValue, buyers: buyers.size, rows, start, end };
+  }, [orders, payments, auctions, deliveries, sellingPostRows, reportDateRange, reportCustomFrom, reportCustomTo, reportPageFilter, reportChannelFilter, reportStatusFilter, reportSortBy, selectedReport]);
 
-  function exportReportCsv(excel = false) {
-    const rows = reportData.rows;
+  function currentReportParameters() {
+    return {
+      report: REPORT_CATALOG.find((x) => x.key === selectedReport)?.title || selectedReport,
+      dateRange: reportDateRange,
+      from: reportDateRange === "CUSTOM" ? reportCustomFrom : reportData.start?.toISOString?.().slice(0,10),
+      to: reportDateRange === "CUSTOM" ? reportCustomTo : reportData.end?.toISOString?.().slice(0,10),
+      page: reportPageFilter,
+      channel: reportChannelFilter,
+      status: reportStatusFilter,
+      sortBy: reportSortBy,
+    };
+  }
+
+  useEffect(() => {
+    setGeneratedReport(null);
+    setReportGeneratedAt(null);
+    setReportMessage("");
+  }, [selectedReport, reportDateRange, reportCustomFrom, reportCustomTo, reportPageFilter, reportChannelFilter, reportStatusFilter, reportSortBy]);
+
+  function generateReport() {
+    if (reportDateRange === "CUSTOM" && (!reportCustomFrom || !reportCustomTo)) {
+      setReportMessage("Select both From and To dates for a custom report range.");
+      return;
+    }
+    const generatedAt = new Date();
+    setGeneratedReport({ data: reportData, parameters: currentReportParameters(), generatedAt });
+    setReportGeneratedAt(generatedAt);
+    setReportMessage(`Report generated with ${reportData.rows.length} matching records.`);
+  }
+
+  function exportReportExcel() {
+    if (!generatedReport) return;
+    const { data, parameters, generatedAt } = generatedReport;
     const headers = ["Date","Reference","Channel","Buyer","Status","Amount"];
-    const escape = (v) => `"${String(v ?? "").replaceAll('"','""')}"`;
-    const csv = [headers.join(","), ...rows.map(r => headers.map(h=>escape(r[h])).join(","))].join("\n");
-    const blob = new Blob(["\ufeff" + csv], { type: excel ? "application/vnd.ms-excel;charset=utf-8" : "text/csv;charset=utf-8" });
+    const esc = (v) => String(v ?? "").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;");
+    const parameterRows = Object.entries(parameters).map(([k,v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join("");
+    const dataRows = data.rows.map(r => `<tr>${headers.map(h=>`<td>${esc(r[h])}</td>`).join("")}</tr>`).join("");
+    const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"></head><body><table><tr><th colspan="2">EO2MATE Report Parameters</th></tr><tr><td>Generated</td><td>${esc(generatedAt.toLocaleString())}</td></tr>${parameterRows}</table><br/><table><tr>${headers.map(h=>`<th>${h}</th>`).join("")}</tr>${dataRows}</table></body></html>`;
+    const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8" });
     const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href=url;
-    a.download = `EO2MATE-${selectedReport}-${new Date().toISOString().slice(0,10)}.${excel ? "xls" : "csv"}`; a.click(); URL.revokeObjectURL(url);
+    a.download = `EO2MATE-${String(parameters.report || "report").replace(/[^a-z0-9]+/gi,"-")}-${generatedAt.toISOString().slice(0,10)}.xls`; a.click(); URL.revokeObjectURL(url);
   }
 
   function printReport() {
+    if (!generatedReport) return;
+    const { data, parameters, generatedAt } = generatedReport;
     const w = window.open("", "_blank", "width=1000,height=760");
-    if (!w) { setReportMessage("Pop-up blocked. Allow pop-ups to export PDF."); return; }
-    const rows = reportData.rows.map(r=>`<tr><td>${r.Date||""}</td><td>${r.Reference}</td><td>${r.Channel}</td><td>${r.Buyer}</td><td>${r.Status}</td><td>₱${Number(r.Amount||0).toLocaleString()}</td></tr>`).join("");
-    w.document.write(`<html><head><title>EO2MATE Report</title><style>body{font-family:Arial;padding:28px;color:#172235}h1{margin-bottom:4px}small{color:#667085}table{width:100%;border-collapse:collapse;margin-top:20px;font-size:12px}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background:#f4f6f8}.kpi{display:inline-block;margin:16px 24px 8px 0}.kpi b{display:block;font-size:22px}</style></head><body><h1>${REPORT_CATALOG.find(x=>x.key===selectedReport)?.title || "EO2MATE Report"}</h1><small>Generated ${new Date().toLocaleString()}</small><div><span class="kpi">Gross Sales<b>₱${reportData.gross.toLocaleString()}</b></span><span class="kpi">Orders<b>${reportData.filteredOrders.length}</b></span><span class="kpi">Paid<b>${reportData.paid.length}</b></span><span class="kpi">Buyers<b>${reportData.buyers}</b></span></div><table><thead><tr><th>Date</th><th>Reference</th><th>Channel</th><th>Buyer</th><th>Status</th><th>Amount</th></tr></thead><tbody>${rows || '<tr><td colspan="6">No matching records.</td></tr>'}</tbody></table><script>window.onload=()=>window.print()<\/script></body></html>`); w.document.close();
+    if (!w) { setReportMessage("Pop-up blocked. Allow pop-ups to generate PDF."); return; }
+    const rows = data.rows.map(r=>`<tr><td>${r.Date||""}</td><td>${r.Reference}</td><td>${r.Channel}</td><td>${r.Buyer}</td><td>${r.Status}</td><td>₱${Number(r.Amount||0).toLocaleString()}</td></tr>`).join("");
+    const params = Object.entries(parameters).map(([k,v])=>`<span><b>${k}:</b> ${v || "—"}</span>`).join("");
+    w.document.write(`<html><head><title>EO2MATE Report</title><style>@page{size:A4 landscape;margin:12mm}body{font-family:Arial;padding:12px;color:#172235}h1{margin-bottom:4px}small{color:#667085}.params{display:flex;flex-wrap:wrap;gap:8px 18px;margin:14px 0;font-size:11px}.kpi{display:inline-block;margin:10px 24px 8px 0}.kpi b{display:block;font-size:20px}table{width:100%;border-collapse:collapse;margin-top:16px;font-size:10px}th,td{border:1px solid #ddd;padding:6px;text-align:left}th{background:#f4f6f8}</style></head><body><h1>${parameters.report}</h1><small>Generated ${generatedAt.toLocaleString()}</small><div class="params">${params}</div><div><span class="kpi">Gross Sales<b>₱${data.gross.toLocaleString()}</b></span><span class="kpi">Orders<b>${data.filteredOrders.length}</b></span><span class="kpi">Paid<b>${data.paid.length}</b></span><span class="kpi">Buyers<b>${data.buyers}</b></span></div><table><thead><tr><th>Date</th><th>Reference</th><th>Channel</th><th>Buyer</th><th>Status</th><th>Amount</th></tr></thead><tbody>${rows || '<tr><td colspan="6">No matching records.</td></tr>'}</tbody></table><script>window.onload=()=>window.print()<\/script></body></html>`); w.document.close();
   }
 
   useEffect(() => {
@@ -3222,9 +3284,8 @@ export default function PortalPage({ session }) {
                 <p>Operational reports plus EO2MATE insights designed to help clients decide what to sell, collect and improve next.</p>
               </div>
               <div style={{ display: "flex", gap: 8 }}>
-                <button className="secondary-button" type="button" onClick={() => exportReportCsv(true)}>Excel</button>
-                <button className="secondary-button" type="button" onClick={() => exportReportCsv(false)}>CSV</button>
-                <button className="secondary-button" type="button" onClick={printReport}>PDF</button>
+                <button className="secondary-button" type="button" onClick={exportReportExcel} disabled={!generatedReport}>Generate Excel</button>
+                <button className="secondary-button" type="button" onClick={printReport} disabled={!generatedReport}>Generate PDF</button>
               </div>
             </header>
 
@@ -3246,6 +3307,12 @@ export default function PortalPage({ session }) {
                     <option value="CUSTOM">Custom range</option>
                   </select>
                 </label>
+                {reportDateRange === "CUSTOM" && (
+                  <>
+                    <label><span>From</span><input type="date" value={reportCustomFrom} onChange={(event) => setReportCustomFrom(event.target.value)} /></label>
+                    <label><span>To</span><input type="date" value={reportCustomTo} onChange={(event) => setReportCustomTo(event.target.value)} /></label>
+                  </>
+                )}
                 <label>
                   <span>Facebook Page</span>
                   <select value={reportPageFilter} onChange={(event) => setReportPageFilter(event.target.value)}>
@@ -3264,6 +3331,18 @@ export default function PortalPage({ session }) {
                     <option value="REGULAR_SALE">Regular Sale</option>
                     <option value="PREORDER">Pre-Order</option>
                     <option value="MANUAL">Manual / Other</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Status</span>
+                  <select value={reportStatusFilter} onChange={(event) => setReportStatusFilter(event.target.value)}>
+                    <option value="ALL">All statuses</option><option value="ACTIVE">Active</option><option value="CLOSED">Closed</option><option value="PENDING">Pending</option><option value="PAID">Paid</option><option value="COMPLETED">Completed</option><option value="CANCELLED">Cancelled</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Sort By</span>
+                  <select value={reportSortBy} onChange={(event) => setReportSortBy(event.target.value)}>
+                    <option value="DATE_DESC">Newest first</option><option value="DATE_ASC">Oldest first</option><option value="AMOUNT_DESC">Amount: high to low</option><option value="AMOUNT_ASC">Amount: low to high</option>
                   </select>
                 </label>
               </div>
@@ -3296,6 +3375,7 @@ export default function PortalPage({ session }) {
 
             {(() => {
               const report = REPORT_CATALOG.find((item) => item.key === selectedReport) || REPORT_CATALOG[0];
+              const displayData = generatedReport?.data || reportData;
               return (
                 <section className="dashboard-panel">
                   <div className="panel-header">
@@ -3326,25 +3406,25 @@ export default function PortalPage({ session }) {
                   )}
 
                   <div className="metrics-grid" style={{ marginTop: 18 }}>
-                    <MetricCard title="Gross Sales" value={formatCurrency(reportData.gross)} subtitle={`${reportData.filteredOrders.length} matching orders`} />
-                    <MetricCard title="Paid" value={reportData.paid.length} subtitle={formatCurrency(reportData.paidValue)} />
-                    <MetricCard title="Pending" value={reportData.pending.length} subtitle="Payments awaiting completion" />
-                    <MetricCard title="Buyers" value={reportData.buyers} subtitle="Unique matching buyers" />
-                    <MetricCard title="Auctions" value={reportData.filteredAuctions.length} subtitle="Matching auction records" />
-                    <MetricCard title="Deliveries" value={reportData.filteredDeliveries.length} subtitle="Matching delivery records" />
+                    <MetricCard title="Gross Sales" value={formatCurrency(displayData.gross)} subtitle={`${displayData.filteredOrders.length} matching orders`} />
+                    <MetricCard title="Paid" value={displayData.paid.length} subtitle={formatCurrency(displayData.paidValue)} />
+                    <MetricCard title="Pending" value={displayData.pending.length} subtitle="Payments awaiting completion" />
+                    <MetricCard title="Buyers" value={displayData.buyers} subtitle="Unique matching buyers" />
+                    <MetricCard title="Auctions" value={displayData.filteredAuctions.length} subtitle="Matching auction records" />
+                    <MetricCard title="Deliveries" value={displayData.filteredDeliveries.length} subtitle="Matching delivery records" />
                   </div>
 
                   {reportGeneratedAt && (
                     <div className="table-wrapper" style={{ marginTop: 18 }}>
                       <table><thead><tr><th>Date</th><th>Reference</th><th>Channel</th><th>Buyer</th><th>Status</th><th>Amount</th></tr></thead><tbody>
-                        {reportData.rows.map((r, i) => <tr key={`${r.Reference}-${i}`}><td>{formatDateTime(r.Date)}</td><td>{r.Reference}</td><td>{r.Channel}</td><td>{r.Buyer}</td><td><StatusBadge status={r.Status} /></td><td>{formatCurrency(r.Amount)}</td></tr>)}
-                        {!reportData.rows.length && <tr><td colSpan="6" className="empty-table-cell">No records match the selected report filters.</td></tr>}
+                        {displayData.rows.map((r, i) => <tr key={`${r.Reference}-${i}`}><td>{formatDateTime(r.Date)}</td><td>{r.Reference}</td><td>{r.Channel}</td><td>{r.Buyer}</td><td><StatusBadge status={r.Status} /></td><td>{formatCurrency(r.Amount)}</td></tr>)}
+                        {!displayData.rows.length && <tr><td colSpan="6" className="empty-table-cell">No records match the selected report filters.</td></tr>}
                       </tbody></table>
                     </div>
                   )}
                   {reportMessage && <div className="info-banner" style={{ marginTop: 12 }}>{reportMessage}</div>}
                   <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
-                    <button className="primary-button" type="button" onClick={() => { setReportGeneratedAt(new Date()); setReportMessage(`Report generated from ${reportData.filteredOrders.length} matching orders.`); }}>Generate Report</button>
+                    <button className="primary-button" type="button" onClick={generateReport}>Generate Report</button>
                   </div>
                 </section>
               );
