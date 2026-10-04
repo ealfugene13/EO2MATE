@@ -7,7 +7,6 @@ const keyOf = (x) => `${x.mode_code}|${x.event_code}|${x.channel_code}`;
 export default function AutomatedMessagesPage({ client }) {
   const [catalog, setCatalog] = useState([]);
   const [templates, setTemplates] = useState([]);
-  const [mode, setMode] = useState("ALL");
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState(null);
   const [text, setText] = useState("");
@@ -63,11 +62,24 @@ export default function AutomatedMessagesPage({ client }) {
     });
   }, [catalog, templates]);
 
-  const modes = useMemo(() => ["ALL", ...Array.from(new Set(catalog.map((x) => x.mode_code))).sort()], [catalog]);
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return rows.filter((r) => (mode === "ALL" || r.mode_code === mode) && (!q || `${r.event_code} ${r.channel_code} ${r.description} ${r.effective_text}`.toLowerCase().includes(q)));
-  }, [rows, mode, query]);
+    return rows.filter((r) => !q || `${r.mode_code} ${r.event_code} ${r.channel_code} ${r.description} ${r.effective_text}`.toLowerCase().includes(q));
+  }, [rows, query]);
+
+  const grouped = useMemo(() => {
+    const order = ["AUCTION", "MINING", "PREORDER", "REGULAR_SALE", "LIVE_SELLING", "LIVE_MINING", "SHARED", "GENERAL"];
+    const map = new Map();
+    for (const row of filtered) {
+      const key = String(row.mode_code || "GENERAL").toUpperCase();
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(row);
+    }
+    return [...map.entries()].sort(([a], [b]) => {
+      const ai = order.indexOf(a), bi = order.indexOf(b);
+      return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi) || a.localeCompare(b);
+    });
+  }, [filtered]);
 
   function beginEdit(row) { setEditing(row); setText(row.effective_text || ""); setError(""); setNotice(""); }
 
@@ -101,19 +113,25 @@ export default function AutomatedMessagesPage({ client }) {
 
     <section className="dashboard-panel automated-messages-panel">
       <div className="panel-header"><div><h2>Message templates</h2><p>EO2MATE defaults remain active until you save a client override. Reset any customized message at any time.</p></div><div className="template-count">{filtered.length} message{filtered.length === 1 ? "" : "s"}</div></div>
-      <div className="automated-message-toolbar">
-        <select className="filter-select" value={mode} onChange={(e) => setMode(e.target.value)}>{modes.map((m) => <option key={m} value={m}>{m === "ALL" ? "All modules" : pretty(m)}</option>)}</select>
-        <input className="search-input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search event, channel or message..." />
+      <div className="automated-message-toolbar automated-message-toolbar-single">
+        <input className="search-input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search post type, event, channel or message..." />
       </div>
-      <div className="message-template-grid">
-        {filtered.map((r) => <article className="message-template-card" key={keyOf(r)}>
-          <div className="message-template-head"><div><span className="message-channel">{pretty(r.mode_code)} · {pretty(r.channel_code)}</span><h3>{pretty(r.event_code)}</h3></div><span className={r.override ? "override-pill" : "default-pill"}>{r.override ? "Client override" : "EO2MATE default"}</span></div>
-          <div className="message-description">{r.description}</div>
-          <p>{r.effective_text}</p>
-          {r.variables?.length > 0 && <div className="template-variable-row">{r.variables.map((v) => <code key={v}>{`{{${v}}}`}</code>)}</div>}
-          <div className="message-template-actions">{r.override && <button className="table-action-button" type="button" onClick={() => reset(r)}>Reset</button>}<button className="table-action-button" type="button" onClick={() => beginEdit(r)}>Edit message</button></div>
-        </article>)}
-        {!loading && filtered.length === 0 && <div className="empty-message-state">No automated messages match this filter.</div>}
+      <div className="message-type-sections">
+        {grouped.map(([group, groupRows]) => <section className="message-type-section" key={group}>
+          <div className="message-type-heading"><div><span className="message-type-kicker">POST TYPE</span><h3>{pretty(group)}</h3></div><span className="template-count">{groupRows.length} message{groupRows.length === 1 ? "" : "s"}</span></div>
+          <div className="table-wrapper automated-message-table-wrap"><table className="data-table automated-message-table">
+            <thead><tr><th>Event / Channel</th><th>EO2MATE Default</th><th>Client Override</th><th>Effective Message</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody>{groupRows.map((r) => <tr key={keyOf(r)}>
+              <td><strong>{pretty(r.event_code)}</strong><small>{pretty(r.channel_code)}</small>{r.description && <small>{r.description}</small>}</td>
+              <td><div className="message-cell-text">{r.default_text}</div></td>
+              <td><div className="message-cell-text">{r.override?.message_text || <span className="muted-cell">No override</span>}</div></td>
+              <td><div className="message-cell-text effective-message-cell">{r.effective_text}</div>{r.variables?.length > 0 && <div className="template-variable-row compact">{r.variables.map((v) => <code key={v}>{`{{${v}}}`}</code>)}</div>}</td>
+              <td><span className={r.override ? "override-pill" : "default-pill"}>{r.override ? "Customized" : "System default"}</span></td>
+              <td><div className="message-table-actions">{r.override && <button className="table-action-button" type="button" onClick={() => reset(r)}>Reset</button>}<button className="table-action-button" type="button" onClick={() => beginEdit(r)}>Edit</button></div></td>
+            </tr>)}</tbody>
+          </table></div>
+        </section>)}
+        {!loading && grouped.length === 0 && <div className="empty-message-state">No automated messages match this search.</div>}
       </div>
     </section>
 
