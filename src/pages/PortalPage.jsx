@@ -485,8 +485,6 @@ export default function PortalPage({ session }) {
   const [payments, setPayments] = useState([]);
   const [paymentGroups, setPaymentGroups] = useState([]);
   const [deliveries, setDeliveries] = useState([]);
-  const [regularSalePosts, setRegularSalePosts] = useState([]);
-  const [miningPosts, setMiningPosts] = useState([]);
 
   const [page, setPage] = useState("dashboard");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -582,9 +580,147 @@ export default function PortalPage({ session }) {
   const [regularSaleWorkspaceTab, setRegularSaleWorkspaceTab] = useState("SUMMARY");
   const [liveSellingWorkspaceTab, setLiveSellingWorkspaceTab] = useState("DASHBOARD");
   const [miningStatusFilter, setMiningStatusFilter] = useState("ALL");
+  const [sellingPostRows, setSellingPostRows] = useState({ REGULAR_SALE: [], MINING: [] });
+  const [sellingPostLoading, setSellingPostLoading] = useState(false);
+  const [sellingPostError, setSellingPostError] = useState("");
   const [inventoryTab, setInventoryTab] = useState("SUMMARY");
   const [salesTab, setSalesTab] = useState("SUMMARY");
   const [purchasesTab, setPurchasesTab] = useState("SUMMARY");
+
+  useEffect(() => {
+    if (!client?.client_id || !metaConnected) return;
+
+    let cancelled = false;
+
+    async function loadSellingPostRows() {
+      setSellingPostLoading(true);
+      setSellingPostError("");
+
+      try {
+        const { data: posts, error: postsError } = await supabase
+          .from("eo2mate_posts")
+          .select("post_id, client_id, page_id, mode_code, post_type_code, fb_post_id, status, created_at")
+          .eq("client_id", client.client_id)
+          .in("mode_code", ["REGULAR_SALE", "MINING"])
+          .order("created_at", { ascending: false });
+
+        if (postsError) throw postsError;
+
+        const postRows = posts || [];
+        const postIds = postRows.map((post) => post.post_id);
+        const pageIds = [...new Set(postRows.map((post) => post.page_id).filter(Boolean))];
+
+        const [itemsResult, entriesResult, claimsResult, pagesResult] = await Promise.all([
+          postIds.length
+            ? supabase.from("eo2mate_post_items").select("post_item_id, post_id, unit_price").in("post_id", postIds)
+            : Promise.resolve({ data: [], error: null }),
+          postIds.length
+            ? supabase.from("eo2mate_post_entries").select("post_entry_id, post_id, post_item_id, fb_user_id, accepted_quantity, status").in("post_id", postIds)
+            : Promise.resolve({ data: [], error: null }),
+          postIds.length
+            ? supabase.from("eo2mate_mining_claims").select("mining_claim_id, post_id, post_item_id, fb_user_id, claim_price, status, superseded_at").in("post_id", postIds)
+            : Promise.resolve({ data: [], error: null }),
+          pageIds.length
+            ? supabase.from("fb_pages").select("page_id, page_nm").in("page_id", pageIds)
+            : Promise.resolve({ data: [], error: null }),
+        ]);
+
+        const firstError = itemsResult.error || entriesResult.error || claimsResult.error || pagesResult.error;
+        if (firstError) throw firstError;
+
+        const items = itemsResult.data || [];
+        const entries = entriesResult.data || [];
+        const claims = claimsResult.data || [];
+        const pageNames = new Map((pagesResult.data || []).map((pageRow) => [pageRow.page_id, pageRow.page_nm]));
+        const itemPrices = new Map(items.map((item) => [item.post_item_id, Number(item.unit_price || 0)]));
+        const excludedMiningStatuses = new Set(["INVALID", "REJECTED", "CANCELLED", "SUPERSEDED"]);
+
+        const rows = postRows.map((post) => {
+          const postItems = items.filter((item) => item.post_id === post.post_id);
+
+          if (post.mode_code === "MINING") {
+            const validClaims = claims.filter((claim) =>
+              claim.post_id === post.post_id &&
+              !claim.superseded_at &&
+              !excludedMiningStatuses.has(String(claim.status || "").toUpperCase())
+            );
+
+            return {
+              ...post,
+              facebook_page: pageNames.get(post.page_id) || "—",
+              items: postItems.length,
+              transactions: validClaims.length,
+              buyer_ids: [...new Set(validClaims.map((claim) => claim.fb_user_id).filter(Boolean))],
+              buyers: new Set(validClaims.map((claim) => claim.fb_user_id).filter(Boolean)).size,
+              value: validClaims.reduce((sum, claim) => sum + Number(claim.claim_price || 0), 0),
+              quantity: validClaims.length,
+            };
+          }
+
+          const acceptedEntries = entries.filter((entry) =>
+            entry.post_id === post.post_id && Number(entry.accepted_quantity || 0) > 0
+          );
+
+          return {
+            ...post,
+            facebook_page: pageNames.get(post.page_id) || "—",
+            items: postItems.length,
+            transactions: acceptedEntries.length,
+            buyer_ids: [...new Set(acceptedEntries.map((entry) => entry.fb_user_id).filter(Boolean))],
+            buyers: new Set(acceptedEntries.map((entry) => entry.fb_user_id).filter(Boolean)).size,
+            value: acceptedEntries.reduce(
+              (sum, entry) => sum + Number(entry.accepted_quantity || 0) * Number(itemPrices.get(entry.post_item_id) || 0),
+              0
+            ),
+            quantity: acceptedEntries.reduce((sum, entry) => sum + Number(entry.accepted_quantity || 0), 0),
+          };
+        });
+
+        if (!cancelled) {
+          setSellingPostRows({
+            REGULAR_SALE: rows.filter((row) => row.mode_code === "REGULAR_SALE"),
+            MINING: rows.filter((row) => row.mode_code === "MINING"),
+          });
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Failed to load selling post records", error);
+          setSellingPostError(error?.message || "Unable to load selling post records.");
+        }
+      } finally {
+        if (!cancelled) setSellingPostLoading(false);
+      }
+    }
+
+    loadSellingPostRows();
+    return () => { cancelled = true; };
+  }, [client?.client_id, metaConnected]);
+
+  const regularSaleStats = useMemo(() => {
+    const rows = sellingPostRows.REGULAR_SALE || [];
+    return {
+      total: rows.length,
+      active: rows.filter((row) => String(row.status || "").toUpperCase() === "ACTIVE").length,
+      soldOut: rows.filter((row) => ["CLOSED", "SOLD_OUT"].includes(String(row.status || "").toUpperCase())).length,
+      orders: rows.reduce((sum, row) => sum + row.transactions, 0),
+      itemsSold: rows.reduce((sum, row) => sum + row.quantity, 0),
+      value: rows.reduce((sum, row) => sum + row.value, 0),
+      buyers: new Set(rows.flatMap((row) => row.buyer_ids || [])).size,
+    };
+  }, [sellingPostRows.REGULAR_SALE]);
+
+  const miningStats = useMemo(() => {
+    const rows = sellingPostRows.MINING || [];
+    return {
+      total: rows.length,
+      active: rows.filter((row) => String(row.status || "").toUpperCase() === "ACTIVE").length,
+      completed: rows.filter((row) => ["CLOSED", "COMPLETED"].includes(String(row.status || "").toUpperCase())).length,
+      cancelled: rows.filter((row) => String(row.status || "").toUpperCase() === "CANCELLED").length,
+      claims: rows.reduce((sum, row) => sum + row.transactions, 0),
+      buyers: new Set(rows.flatMap((row) => row.buyer_ids || [])).size,
+      value: rows.reduce((sum, row) => sum + row.value, 0),
+    };
+  }, [sellingPostRows.MINING]);
 
   const filteredChatConversations = useMemo(() => {
     const query = chatSearch.trim().toLowerCase();
@@ -1236,8 +1372,6 @@ export default function PortalPage({ session }) {
         paymentResult,
         paymentGroupResult,
         deliveryResult,
-        regularSalePostResult,
-        miningPostResult,
       ] = await Promise.all([
         supabase
           .from("client_auction_list")
@@ -1264,20 +1398,6 @@ export default function PortalPage({ session }) {
           .from("client_delivery_list")
           .select("*")
           .order("created_at", { ascending: false }),
-
-        supabase
-          .from("eo2mate_posts")
-          .select("*")
-          .eq("client_id", clientUser.client_id)
-          .eq("mode_code", "REGULAR_SALE")
-          .order("created_at", { ascending: false }),
-
-        supabase
-          .from("eo2mate_posts")
-          .select("*")
-          .eq("client_id", clientUser.client_id)
-          .eq("mode_code", "MINING")
-          .order("created_at", { ascending: false }),
       ]);
 
       if (auctionResult.error) throw auctionResult.error;
@@ -1285,16 +1405,12 @@ export default function PortalPage({ session }) {
       if (paymentResult.error) throw paymentResult.error;
       if (paymentGroupResult.error) throw paymentGroupResult.error;
       if (deliveryResult.error) throw deliveryResult.error;
-      if (regularSalePostResult.error) throw regularSalePostResult.error;
-      if (miningPostResult.error) throw miningPostResult.error;
 
       setAuctions(auctionResult.data || []);
       setOrders(orderResult.data || []);
       setPayments(paymentResult.data || []);
       setPaymentGroups(paymentGroupResult.data || []);
       setDeliveries(deliveryResult.data || []);
-      setRegularSalePosts(regularSalePostResult.data || []);
-      setMiningPosts(miningPostResult.data || []);
 
       /*
        * Facebook is optional for workspace access.
@@ -1988,51 +2104,39 @@ export default function PortalPage({ session }) {
 
               <SidebarNavButton
                 icon="create"
-                className={`nav-item ${page === "posts" ? "active" : ""}`}
-                onClick={() => navigateTo("posts")}
+                className={`nav-item ${page === "posts" || page === "facebook-post" || page === "post-mining" || page === "pre-order" || page === "regular-sale" || page.includes("auction") ? "active" : ""}`}
+                onClick={() => setPostsExpanded((value) => !value)}
+                aria-expanded={postsExpanded}
               >
-                Create Post
+                <span className="nav-parent-label">Posts <span className="nav-chevron">{postsExpanded ? "▾" : "›"}</span></span>
               </SidebarNavButton>
 
-              <SidebarNavButton
-                icon="auction"
-                className={`nav-item ${page === "auctions" || page.includes("auction") ? "active" : ""}`}
-                onClick={() => { setAuctionWorkspaceTab("SUMMARY"); goToAuctions("ALL"); setMobileMenuOpen(false); }}
-              >
-                Auctions
-              </SidebarNavButton>
+              {postsExpanded && (
+                <div className="nav-submenu">
+                  <button type="button" className={`nav-subitem ${page === "posts" ? "active" : ""}`} onClick={() => navigateTo("posts")}>Create Post</button>
 
-              <SidebarNavButton
-                icon="mining"
-                className={`nav-item ${page === "post-mining" || page === "mining-create" ? "active" : ""}`}
-                onClick={() => { setMiningWorkspaceTab("SUMMARY"); navigateTo("post-mining"); }}
-              >
-                Mining
-              </SidebarNavButton>
+                  <div className="nav-subgroup-label" style={{ margin: "10px 12px 4px", fontSize: 10, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", opacity: .65 }}>Auctions</div>
+                  <button type="button" className={`nav-subitem ${page === "auctions" ? "active" : ""}`} onClick={() => { setAuctionWorkspaceTab("SUMMARY"); goToAuctions("ALL"); setMobileMenuOpen(false); }}>Dashboard / Summary</button>
+                  <button type="button" className={`nav-subitem ${page === "facebook-post" ? "active" : ""}`} onClick={() => navigateTo("facebook-post")}>Create Post</button>
 
-              <SidebarNavButton
-                icon="orders"
-                className={`nav-item ${page === "pre-order" || page === "pre-order-create" ? "active" : ""}`}
-                onClick={() => navigateTo("pre-order")}
-              >
-                Pre-Orders
-              </SidebarNavButton>
+                  <div className="nav-subgroup-label" style={{ margin: "10px 12px 4px", fontSize: 10, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", opacity: .65 }}>Mining</div>
+                  <button type="button" className={`nav-subitem ${page === "post-mining" ? "active" : ""}`} onClick={() => { setMiningWorkspaceTab("SUMMARY"); navigateTo("post-mining"); }}>Dashboard / Summary</button>
+                  <button type="button" className={`nav-subitem ${page === "mining-create" ? "active" : ""}`} onClick={() => navigateTo("mining-create")}>Create Post</button>
 
-              <SidebarNavButton
-                icon="sales"
-                className={`nav-item ${page === "regular-sale" ? "active" : ""}`}
-                onClick={() => { setRegularSaleWorkspaceTab("SUMMARY"); navigateTo("regular-sale"); }}
-              >
-                Regular Sales
-              </SidebarNavButton>
+                  <div className="nav-subgroup-label" style={{ margin: "10px 12px 4px", fontSize: 10, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", opacity: .65 }}>Pre-Orders</div>
+                  <button type="button" className={`nav-subitem ${page === "pre-order" ? "active" : ""}`} onClick={() => navigateTo("pre-order")}>Dashboard / Summary</button>
+                  <button type="button" className={`nav-subitem ${page === "pre-order-create" ? "active" : ""}`} onClick={() => navigateTo("pre-order-create")}>Create Post</button>
 
-              <SidebarNavButton
-                icon="sales"
-                className={`nav-item ${page === "live-selling" ? "active" : ""}`}
-                onClick={() => { setLiveSellingWorkspaceTab("DASHBOARD"); navigateTo("live-selling"); }}
-              >
-                Live Selling
-              </SidebarNavButton>
+                  <div className="nav-subgroup-label" style={{ margin: "10px 12px 4px", fontSize: 10, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", opacity: .65 }}>Regular Sales</div>
+                  <button type="button" className={`nav-subitem ${page === "regular-sale" ? "active" : ""}`} onClick={() => { setRegularSaleWorkspaceTab("SUMMARY"); navigateTo("regular-sale"); }}>Dashboard / Summary</button>
+                  <button type="button" className={`nav-subitem ${page === "regular-sale" && regularSaleWorkspaceTab === "POSTING" ? "active" : ""}`} onClick={() => { setRegularSaleWorkspaceTab("POSTING"); navigateTo("regular-sale"); }}>Create Post</button>
+
+                  <div className="nav-subgroup-label" style={{ margin: "10px 12px 4px", fontSize: 10, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", opacity: .65 }}>Live Selling</div>
+                  <button type="button" className={`nav-subitem ${page === "live-selling" ? "active" : ""}`} onClick={() => { setLiveSellingWorkspaceTab("DASHBOARD"); navigateTo("live-selling"); }}>Dashboard / Summary</button>
+                  <button type="button" className="nav-subitem" disabled title="Live Selling post creation is coming soon">Create Post <span className="coming-soon-pill">Soon</span></button>
+                </div>
+              )}
+
             </>
           )}
 
@@ -2276,12 +2380,12 @@ export default function PortalPage({ session }) {
             </header>
 
             <section className="metrics-grid">
-              <MetricCard title="Total posts" value={regularSalePosts.length} subtitle="All Regular Sale posts" />
-              <MetricCard title="Active" value={regularSalePosts.filter((post) => String(post.status || "").toUpperCase() === "ACTIVE").length} subtitle="Currently accepting orders" />
-              <MetricCard title="Sold out" value={regularSalePosts.filter((post) => ["SOLD_OUT", "FULL", "CLOSED"].includes(String(post.status || "").toUpperCase())).length} subtitle="Closed after stock sold out" />
-              <MetricCard title="Orders" value="0" subtitle="Accepted customer orders" />
-              <MetricCard title="Items sold" value="0" subtitle="Total allocated quantity" />
-              <MetricCard title="Sales value" value={formatCurrency(0)} subtitle="Gross Regular Sale value" />
+              <MetricCard title="Total posts" value={regularSaleStats.total} subtitle="All Regular Sale posts" />
+              <MetricCard title="Active" value={regularSaleStats.active} subtitle="Currently accepting orders" />
+              <MetricCard title="Sold out" value={regularSaleStats.soldOut} subtitle="Closed after stock sold out" />
+              <MetricCard title="Orders" value={regularSaleStats.orders} subtitle="Accepted customer orders" />
+              <MetricCard title="Items sold" value={regularSaleStats.itemsSold} subtitle="Total allocated quantity" />
+              <MetricCard title="Sales value" value={formatCurrency(regularSaleStats.value)} subtitle="Gross Regular Sale value" />
             </section>
 
             <section className="dashboard-panel" style={{ marginBottom: 18 }}>
@@ -2321,7 +2425,7 @@ export default function PortalPage({ session }) {
                   </div>
                   <div className="metrics-grid">
                     <MetricCard title="Sell-through rate" value="—" subtitle="Sold quantity versus offered stock" />
-                    <MetricCard title="Unique buyers" value="0" subtitle="Regular Sale customers" />
+                    <MetricCard title="Unique buyers" value={regularSaleStats.buyers} subtitle="Regular Sale customers" />
                     <MetricCard title="Remaining items" value="0" subtitle="Available quantity" />
                     <MetricCard title="Paid value" value={formatCurrency(0)} subtitle="Collected Regular Sale sales" />
                     <MetricCard title="Pending value" value={formatCurrency(0)} subtitle="Awaiting payment" />
@@ -2341,18 +2445,19 @@ export default function PortalPage({ session }) {
                   <table>
                     <thead><tr><th>Post</th><th>Facebook Page</th><th>Status</th><th>Items</th><th>Orders</th><th>Buyers</th><th>Value</th><th>Created</th></tr></thead>
                     <tbody>
-                      {regularSalePosts.length === 0 ? (
-                        <tr><td colSpan="8">No Regular Sale records yet.</td></tr>
-                      ) : regularSalePosts.map((post) => (
-                        <tr key={post.post_id}>
-                          <td>{post.post_type_code || "-"}</td>
-                          <td>{post.facebook_page_name || post.page_name || post.fb_page_id || "-"}</td>
-                          <td>{post.status || "-"}</td>
-                          <td>{post.item_count ?? "-"}</td>
-                          <td>{post.order_count ?? "-"}</td>
-                          <td>{post.buyer_count ?? "-"}</td>
-                          <td>{post.sales_value != null ? formatCurrency(post.sales_value) : "-"}</td>
-                          <td>{formatDateTime(post.created_at)}</td>
+                      {sellingPostLoading && <tr><td colSpan="8">Loading Regular Sale records...</td></tr>}
+                      {!sellingPostLoading && sellingPostError && <tr><td colSpan="8">{sellingPostError}</td></tr>}
+                      {!sellingPostLoading && !sellingPostError && !(sellingPostRows.REGULAR_SALE || []).length && <tr><td colSpan="8">No Regular Sale records yet.</td></tr>}
+                      {!sellingPostLoading && !sellingPostError && (sellingPostRows.REGULAR_SALE || []).map((row) => (
+                        <tr key={row.post_id}>
+                          <td>{row.post_type_code || "—"}</td>
+                          <td>{row.facebook_page}</td>
+                          <td>{row.status || "—"}</td>
+                          <td>{row.items}</td>
+                          <td>{row.transactions}</td>
+                          <td>{row.buyers}</td>
+                          <td>{formatCurrency(row.value)}</td>
+                          <td>{formatDateTime(row.created_at)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -3311,14 +3416,14 @@ export default function PortalPage({ session }) {
             </header>
 
             <section className="metrics-grid">
-              <MetricCard title="Total posts" value={miningPosts.length} subtitle="All mining posts" />
-              <MetricCard title="Active" value={miningPosts.filter((post) => String(post.status || "").toUpperCase() === "ACTIVE").length} subtitle="Currently accepting MINE" />
+              <MetricCard title="Total posts" value={miningStats.total} subtitle="All mining posts" />
+              <MetricCard title="Active" value={miningStats.active} subtitle="Currently accepting MINE" />
               <MetricCard title="Live Mining" value="0" subtitle="Active live sessions" />
-              <MetricCard title="Completed" value={miningPosts.filter((post) => ["COMPLETED", "CLOSED", "FULL"].includes(String(post.status || "").toUpperCase())).length} subtitle="Closed mining posts" />
-              <MetricCard title="Cancelled" value={miningPosts.filter((post) => String(post.status || "").toUpperCase() === "CANCELLED").length} subtitle="Cancelled posts" />
-              <MetricCard title="Total claims" value="0" subtitle="Recorded MINE claims" />
-              <MetricCard title="Unique buyers" value="0" subtitle="Mining customers" />
-              <MetricCard title="Claimed value" value={formatCurrency(0)} subtitle="Gross claimed sales" />
+              <MetricCard title="Completed" value={miningStats.completed} subtitle="Closed mining posts" />
+              <MetricCard title="Cancelled" value={miningStats.cancelled} subtitle="Cancelled posts" />
+              <MetricCard title="Total claims" value={miningStats.claims} subtitle="Recorded MINE claims" />
+              <MetricCard title="Unique buyers" value={miningStats.buyers} subtitle="Mining customers" />
+              <MetricCard title="Claimed value" value={formatCurrency(miningStats.value)} subtitle="Gross claimed sales" />
             </section>
 
             <section className="dashboard-panel" style={{ marginBottom: 18 }}>
@@ -3384,18 +3489,19 @@ export default function PortalPage({ session }) {
                   <table>
                     <thead><tr><th>Post</th><th>Facebook Page</th><th>Status</th><th>Items</th><th>Claims</th><th>Buyers</th><th>Value</th><th>Created</th></tr></thead>
                     <tbody>
-                      {miningPosts.length === 0 ? (
-                        <tr><td colSpan="8">No Post Mining records yet.</td></tr>
-                      ) : miningPosts.map((post) => (
-                        <tr key={post.post_id}>
-                          <td>{post.post_type_code || "-"}</td>
-                          <td>{post.facebook_page_name || post.page_name || post.fb_page_id || "-"}</td>
-                          <td>{post.status || "-"}</td>
-                          <td>{post.item_count ?? "-"}</td>
-                          <td>{post.claim_count ?? "-"}</td>
-                          <td>{post.buyer_count ?? "-"}</td>
-                          <td>{post.claimed_value != null ? formatCurrency(post.claimed_value) : "-"}</td>
-                          <td>{formatDateTime(post.created_at)}</td>
+                      {sellingPostLoading && <tr><td colSpan="8">Loading Post Mining records...</td></tr>}
+                      {!sellingPostLoading && sellingPostError && <tr><td colSpan="8">{sellingPostError}</td></tr>}
+                      {!sellingPostLoading && !sellingPostError && !(sellingPostRows.MINING || []).length && <tr><td colSpan="8">No Post Mining records yet.</td></tr>}
+                      {!sellingPostLoading && !sellingPostError && (sellingPostRows.MINING || []).map((row) => (
+                        <tr key={row.post_id}>
+                          <td>{row.post_type_code || "—"}</td>
+                          <td>{row.facebook_page}</td>
+                          <td>{row.status || "—"}</td>
+                          <td>{row.items}</td>
+                          <td>{row.transactions}</td>
+                          <td>{row.buyers}</td>
+                          <td>{formatCurrency(row.value)}</td>
+                          <td>{formatDateTime(row.created_at)}</td>
                         </tr>
                       ))}
                     </tbody>
