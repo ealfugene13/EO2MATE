@@ -2452,7 +2452,7 @@ export default function PortalPage({ session }) {
             <button
               type="button"
               className="secondary-button icon-only-nav"
-              onClick={() => navigateTo("dashboard")
+              onClick={() => navigateTo("dashboard")}
               aria-label="Back to main dashboard"
               title="Back to main dashboard"
             >
