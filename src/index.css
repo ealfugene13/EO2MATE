@@ -2753,3 +2753,41 @@ button.post-type-card:hover { transform: translateY(-2px); border-color: #bcdcc3
 
 /* Automated Messages — grouped by post type */
 .automated-message-toolbar-single{grid-template-columns:minmax(0,1fr)}.message-type-sections{display:flex;flex-direction:column;gap:18px;padding:18px;background:#f7f9fb}.message-type-section{overflow:hidden;border:1px solid var(--eo2-border);border-radius:14px;background:#fff}.message-type-heading{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:16px 18px;border-bottom:1px solid var(--eo2-border)}.message-type-heading h3{margin:3px 0 0;color:var(--eo2-navy-900);font-size:16px}.message-type-kicker{font-size:8px;font-weight:900;letter-spacing:.1em;color:#8290a3}.automated-message-table-wrap{border:0;border-radius:0}.automated-message-table{min-width:1100px}.automated-message-table th{white-space:nowrap}.automated-message-table td{vertical-align:top}.automated-message-table td:first-child{min-width:165px}.automated-message-table td:first-child strong,.automated-message-table td:first-child small{display:block}.automated-message-table td:first-child small{margin-top:5px;color:#7a8798;font-size:9px;line-height:1.35}.message-cell-text{max-width:280px;white-space:pre-wrap;overflow-wrap:anywhere;color:#526274;font-size:10px;line-height:1.5}.effective-message-cell{color:#26364d;font-weight:650}.muted-cell{color:#9aa5b4;font-style:italic}.message-table-actions{display:flex;gap:7px;white-space:nowrap}.template-variable-row.compact{margin:8px 0 0;gap:4px}.template-variable-row.compact code{font-size:8px;padding:3px 5px}@media(max-width:700px){.message-type-sections{padding:12px}.message-type-heading{align-items:flex-start;flex-direction:column}}
+
+/* Automated Messages v4.2 — fit tables to viewport without horizontal scrolling */
+.message-type-section,
+.automated-message-table-wrap { width:100%; max-width:100%; min-width:0; }
+.automated-message-table-wrap { overflow-x:hidden !important; }
+.automated-message-table { width:100% !important; min-width:0 !important; table-layout:fixed; }
+.automated-message-table th,
+.automated-message-table td { min-width:0 !important; white-space:normal !important; overflow-wrap:anywhere; word-break:break-word; }
+.automated-message-table th { padding:11px 10px; font-size:8px; line-height:1.25; }
+.automated-message-table td { padding:12px 10px; }
+.automated-message-table th:nth-child(1), .automated-message-table td:nth-child(1) { width:19%; }
+.automated-message-table th:nth-child(2), .automated-message-table td:nth-child(2) { width:22%; }
+.automated-message-table th:nth-child(3), .automated-message-table td:nth-child(3) { width:14%; }
+.automated-message-table th:nth-child(4), .automated-message-table td:nth-child(4) { width:25%; }
+.automated-message-table th:nth-child(5), .automated-message-table td:nth-child(5) { width:11%; }
+.automated-message-table th:nth-child(6), .automated-message-table td:nth-child(6) { width:9%; }
+.message-cell-text { max-width:none !important; font-size:9px; line-height:1.42; }
+.message-table-actions { flex-wrap:wrap; white-space:normal; }
+.message-table-actions .secondary-button { min-width:0; padding:7px 9px; font-size:9px; }
+.template-variable-row.compact code { max-width:100%; overflow-wrap:anywhere; }
+@media (max-width:1100px) {
+  .message-type-sections { padding:12px; gap:14px; }
+  .message-type-heading { padding:13px 14px; }
+  .automated-message-table th { padding:9px 7px; font-size:7px; }
+  .automated-message-table td { padding:10px 7px; }
+  .message-cell-text, .automated-message-table td:first-child small { font-size:8px; }
+  .automated-message-table td:first-child strong { font-size:9px; }
+  .template-variable-row.compact code { font-size:7px; padding:2px 4px; }
+  .template-count { font-size:8px; }
+}
+@media (max-width:820px) {
+  .automated-message-table th:nth-child(3), .automated-message-table td:nth-child(3) { display:none; }
+  .automated-message-table th:nth-child(1), .automated-message-table td:nth-child(1) { width:22%; }
+  .automated-message-table th:nth-child(2), .automated-message-table td:nth-child(2) { width:25%; }
+  .automated-message-table th:nth-child(4), .automated-message-table td:nth-child(4) { width:30%; }
+  .automated-message-table th:nth-child(5), .automated-message-table td:nth-child(5) { width:13%; }
+  .automated-message-table th:nth-child(6), .automated-message-table td:nth-child(6) { width:10%; }
+}
