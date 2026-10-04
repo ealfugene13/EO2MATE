@@ -531,7 +531,7 @@ function SellingPostDetailPanel({ detail, loading, error, onClose }) {
         <div className="panel-header"><div><h2>Post overview</h2><p>Facebook reference, lifecycle and source information.</p></div></div>
         {post.caption && <div className="preorder-caption-card"><span>Facebook post caption</span><p>{post.caption}</p></div>}
         <div className="preorder-summary-grid">
-          <div><span>Facebook Page</span><strong>{detail.facebook_page || "—"}</strong></div>
+          <div><span>Facebook Page *</span><strong>{detail.facebook_page || "—"}</strong></div>
           <div><span>Post Type</span><strong>{post.post_type_code || "—"}</strong></div>
           <div><span>Status</span><strong>{statusLabel(post.status) || "—"}</strong></div>
           <div><span>Created</span><strong>{formatDateTime(post.created_at)}</strong></div>
@@ -663,12 +663,12 @@ export default function PortalPage({ session }) {
   const [staffSearch, setStaffSearch] = useState("");
   const [showStaffForm, setShowStaffForm] = useState(false);
   const [staffDraft, setStaffDraft] = useState({ name: "", email: "", role: "STAFF" });
-  const [selectedReport, setSelectedReport] = useState("opportunity");
-  const [reportDateRange, setReportDateRange] = useState("30D");
-  const [reportPageFilter, setReportPageFilter] = useState("ALL");
-  const [reportChannelFilter, setReportChannelFilter] = useState("ALL");
-  const [reportStatusFilter, setReportStatusFilter] = useState("ALL");
-  const [reportSortBy, setReportSortBy] = useState("DATE_DESC");
+  const [selectedReport, setSelectedReport] = useState("");
+  const [reportDateRange, setReportDateRange] = useState("");
+  const [reportPageFilter, setReportPageFilter] = useState("");
+  const [reportChannelFilter, setReportChannelFilter] = useState("");
+  const [reportStatusFilter, setReportStatusFilter] = useState("");
+  const [reportSortBy, setReportSortBy] = useState("");
   const [reportCustomFrom, setReportCustomFrom] = useState("");
   const [reportCustomTo, setReportCustomTo] = useState("");
   const [reportGeneratedAt, setReportGeneratedAt] = useState(null);
@@ -780,15 +780,31 @@ export default function PortalPage({ session }) {
     setReportMessage("");
   }, [selectedReport, reportDateRange, reportCustomFrom, reportCustomTo, reportPageFilter, reportChannelFilter, reportStatusFilter, reportSortBy]);
 
-  function generateReport() {
-    if (reportDateRange === "CUSTOM" && (!reportCustomFrom || !reportCustomTo)) {
-      setReportMessage("Select both From and To dates for a custom report range.");
+  function generateReport(event) {
+    event?.preventDefault?.();
+    const missing = [];
+    if (!selectedReport) missing.push("Report Type");
+    if (!reportDateRange) missing.push("Date Range");
+    if (!reportPageFilter) missing.push("Facebook Page");
+    if (!reportChannelFilter) missing.push("Sales Channel");
+    if (!reportStatusFilter) missing.push("Status");
+    if (!reportSortBy) missing.push("Sort By");
+    if (reportDateRange === "CUSTOM" && (!reportCustomFrom || !reportCustomTo)) missing.push("From and To dates");
+    if (missing.length) {
+      setGeneratedReport(null);
+      setReportGeneratedAt(null);
+      setReportMessage(`Complete the required report parameters: ${missing.join(", ")}.`);
+      return;
+    }
+    if (reportDateRange === "CUSTOM" && new Date(reportCustomFrom) > new Date(reportCustomTo)) {
+      setReportMessage("The From date cannot be later than the To date.");
       return;
     }
     const generatedAt = new Date();
-    setGeneratedReport({ data: reportData, parameters: currentReportParameters(), generatedAt });
+    const snapshot = { ...reportData, rows: [...reportData.rows] };
+    setGeneratedReport({ data: snapshot, parameters: currentReportParameters(), generatedAt });
     setReportGeneratedAt(generatedAt);
-    setReportMessage(`Report generated with ${reportData.rows.length} matching records.`);
+    setReportMessage(`Report generated successfully with ${snapshot.rows.length} matching record${snapshot.rows.length === 1 ? "" : "s"}.`);
   }
 
   function exportReportExcel() {
@@ -3296,10 +3312,19 @@ export default function PortalPage({ session }) {
                   <p>The same filters will apply to previews and exported files.</p>
                 </div>
               </div>
+              <form onSubmit={generateReport}>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginTop: 14 }}>
                 <label>
-                  <span>Date Range</span>
-                  <select value={reportDateRange} onChange={(event) => setReportDateRange(event.target.value)}>
+                  <span>Report Type *</span>
+                  <select value={selectedReport} onChange={(event) => setSelectedReport(event.target.value)} required>
+                    <option value="" disabled>Select report type</option>
+                    {REPORT_CATALOG.map((report) => <option key={report.key} value={report.key}>{report.title}</option>)}
+                  </select>
+                </label>
+                <label>
+                  <span>Date Range *</span>
+                  <select value={reportDateRange} onChange={(event) => setReportDateRange(event.target.value)} required>
+                    <option value="" disabled>Select date range</option>
                     <option value="7D">Last 7 days</option>
                     <option value="30D">Last 30 days</option>
                     <option value="MTD">Month to date</option>
@@ -3309,13 +3334,14 @@ export default function PortalPage({ session }) {
                 </label>
                 {reportDateRange === "CUSTOM" && (
                   <>
-                    <label><span>From</span><input type="date" value={reportCustomFrom} onChange={(event) => setReportCustomFrom(event.target.value)} /></label>
-                    <label><span>To</span><input type="date" value={reportCustomTo} onChange={(event) => setReportCustomTo(event.target.value)} /></label>
+                    <label><span>From *</span><input type="date" required value={reportCustomFrom} onChange={(event) => setReportCustomFrom(event.target.value)} /></label>
+                    <label><span>To *</span><input type="date" required value={reportCustomTo} onChange={(event) => setReportCustomTo(event.target.value)} /></label>
                   </>
                 )}
                 <label>
                   <span>Facebook Page</span>
-                  <select value={reportPageFilter} onChange={(event) => setReportPageFilter(event.target.value)}>
+                  <select value={reportPageFilter} onChange={(event) => setReportPageFilter(event.target.value)} required>
+                    <option value="" disabled>Select Facebook Page</option>
                     <option value="ALL">All Pages</option>
                     {(automationPages || []).map((fbPage) => (
                       <option key={fbPage.fb_page_id} value={fbPage.fb_page_id}>{fbPage.page_name || fbPage.page_nm || fbPage.fb_page_id}</option>
@@ -3323,8 +3349,9 @@ export default function PortalPage({ session }) {
                   </select>
                 </label>
                 <label>
-                  <span>Sales Channel</span>
-                  <select value={reportChannelFilter} onChange={(event) => setReportChannelFilter(event.target.value)}>
+                  <span>Sales Channel *</span>
+                  <select value={reportChannelFilter} onChange={(event) => setReportChannelFilter(event.target.value)} required>
+                    <option value="" disabled>Select sales channel</option>
                     <option value="ALL">All channels</option>
                     <option value="AUCTION">Auction</option>
                     <option value="POST_MINING">Post Mining</option>
@@ -3334,18 +3361,25 @@ export default function PortalPage({ session }) {
                   </select>
                 </label>
                 <label>
-                  <span>Status</span>
-                  <select value={reportStatusFilter} onChange={(event) => setReportStatusFilter(event.target.value)}>
+                  <span>Status *</span>
+                  <select value={reportStatusFilter} onChange={(event) => setReportStatusFilter(event.target.value)} required>
+                    <option value="" disabled>Select status</option>
                     <option value="ALL">All statuses</option><option value="ACTIVE">Active</option><option value="CLOSED">Closed</option><option value="PENDING">Pending</option><option value="PAID">Paid</option><option value="COMPLETED">Completed</option><option value="CANCELLED">Cancelled</option>
                   </select>
                 </label>
                 <label>
-                  <span>Sort By</span>
-                  <select value={reportSortBy} onChange={(event) => setReportSortBy(event.target.value)}>
+                  <span>Sort By *</span>
+                  <select value={reportSortBy} onChange={(event) => setReportSortBy(event.target.value)} required>
+                    <option value="" disabled>Select sort order</option>
                     <option value="DATE_DESC">Newest first</option><option value="DATE_ASC">Oldest first</option><option value="AMOUNT_DESC">Amount: high to low</option><option value="AMOUNT_ASC">Amount: low to high</option>
                   </select>
                 </label>
               </div>
+              {reportMessage && !generatedReport && <div className="info-banner" style={{ marginTop: 12 }}>{reportMessage}</div>}
+              <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
+                <button className="primary-button" type="submit">Generate Report</button>
+              </div>
+              </form>
             </section>
 
             <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 14, marginBottom: 18 }}>
@@ -3374,7 +3408,12 @@ export default function PortalPage({ session }) {
             </section>
 
             {(() => {
-              const report = REPORT_CATALOG.find((item) => item.key === selectedReport) || REPORT_CATALOG[0];
+              const report = REPORT_CATALOG.find((item) => item.key === selectedReport);
+              if (!report) return (
+                <section className="dashboard-panel">
+                  <div className="panel-header"><div><p className="eyebrow">REPORT PREVIEW</p><h2>Select report parameters</h2><p>Complete the required fields above, then click Generate Report.</p></div></div>
+                </section>
+              );
               const displayData = generatedReport?.data || reportData;
               return (
                 <section className="dashboard-panel">
@@ -3423,9 +3462,7 @@ export default function PortalPage({ session }) {
                     </div>
                   )}
                   {reportMessage && <div className="info-banner" style={{ marginTop: 12 }}>{reportMessage}</div>}
-                  <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
-                    <button className="primary-button" type="button" onClick={generateReport}>Generate Report</button>
-                  </div>
+
                 </section>
               );
             })()}
