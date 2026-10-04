@@ -474,6 +474,41 @@ function isMetaOperationalPage(page) {
   return META_OPERATIONAL_PAGES.has(page) || String(page || "").includes("auction");
 }
 
+
+function SellingPostDetailPanel({ detail, loading, error, onClose }) {
+  if (loading) return <section className="dashboard-panel"><div className="panel-header"><div><h2>Post details</h2><p>Loading record details...</p></div></div></section>;
+  if (error) return <section className="dashboard-panel"><div className="dashboard-error global-error">{error}</div></section>;
+  if (!detail) return null;
+  const post = detail.post || detail;
+  const mining = detail.mode_code === "MINING";
+  return (
+    <section className="dashboard-panel selling-card">
+      <div className="panel-header">
+        <div><p className="eyebrow">{String(detail.mode_code || "POST").replaceAll("_", " ")}</p><h2>Post details</h2><p>{post.caption || "No post caption"}</p></div>
+        <button className="secondary-button" type="button" onClick={onClose}>Close details</button>
+      </div>
+      <div className="preorder-summary-grid">
+        <div><span>Facebook Page</span><strong>{detail.facebook_page || "—"}</strong></div>
+        <div><span>Post Type</span><strong>{post.post_type_code || "—"}</strong></div>
+        <div><span>Status</span><strong>{post.status || "—"}</strong></div>
+        <div><span>Facebook Post ID</span><strong>{post.fb_post_id || "—"}</strong></div>
+        <div><span>Created</span><strong>{formatDateTime(post.created_at)}</strong></div>
+        <div><span>Ends</span><strong>{formatDateTime(post.ends_at)}</strong></div>
+      </div>
+      <div className="panel-header"><div><h3>Items</h3><p>Products/SKUs attached to this post.</p></div></div>
+      <div className="table-wrapper"><table><thead><tr><th>#</th><th>Item</th><th>Source</th><th>SKU / Inventory</th><th>Price</th><th>Qty</th><th>Status</th><th>Fulfillment</th></tr></thead><tbody>
+        {(detail.items || []).map((item) => <tr key={item.post_item_id}><td>{item.item_no ?? "—"}</td><td>{item.item_label || item.item_name_snapshot || "—"}</td><td>{item.item_source || "—"}</td><td>{item.item_code_snapshot || item.inventory_item_id || "—"}</td><td>{formatCurrency(item.unit_price)}</td><td>{item.quantity_limit ?? "—"}</td><td>{item.status || "—"}</td><td>{item.fulfillment_status || "—"}</td></tr>)}
+        {!(detail.items || []).length && <tr><td colSpan="8">No item records found.</td></tr>}
+      </tbody></table></div>
+      <div className="panel-header"><div><h3>{mining ? "Claims" : "Orders"}</h3><p>{mining ? "MINE / TAKE / LOCK activity for this post." : "Accepted and attempted Regular Sale orders for this post."}</p></div></div>
+      <div className="table-wrapper"><table><thead><tr><th>Buyer</th><th>{mining ? "Action" : "Requested"}</th><th>{mining ? "Claim Price" : "Accepted"}</th><th>Status</th><th>Facebook Comment</th><th>Comment</th><th>Time</th></tr></thead><tbody>
+        {(detail.activity || []).map((a) => <tr key={a.mining_claim_id || a.post_entry_id}><td>{a.fb_user_name || a.fb_user_id || "—"}</td><td>{mining ? (a.action_code || "—") : (a.requested_quantity ?? "—")}</td><td>{mining ? formatCurrency(a.claim_price) : (a.accepted_quantity ?? "—")}</td><td>{a.status || "—"}</td><td>{a.fb_comment_id || "—"}</td><td>{a.comment_text || "—"}</td><td>{formatDateTime(a.created_at || a.commented_at)}</td></tr>)}
+        {!(detail.activity || []).length && <tr><td colSpan="7">No {mining ? "claim" : "order"} records found.</td></tr>}
+      </tbody></table></div>
+    </section>
+  );
+}
+
 export default function PortalPage({ session }) {
   const [client, setClient] = useState(null);
   const [platformAdmin, setPlatformAdmin] = useState(null);
@@ -582,6 +617,9 @@ export default function PortalPage({ session }) {
   const [sellingPostRows, setSellingPostRows] = useState({ REGULAR_SALE: [], MINING: [] });
   const [sellingPostLoading, setSellingPostLoading] = useState(false);
   const [sellingPostError, setSellingPostError] = useState("");
+  const [sellingPostDetail, setSellingPostDetail] = useState(null);
+  const [sellingPostDetailLoading, setSellingPostDetailLoading] = useState(false);
+  const [sellingPostDetailError, setSellingPostDetailError] = useState("");
   const [inventoryTab, setInventoryTab] = useState("SUMMARY");
   const [salesTab, setSalesTab] = useState("SUMMARY");
   const [purchasesTab, setPurchasesTab] = useState("SUMMARY");
@@ -694,6 +732,30 @@ export default function PortalPage({ session }) {
     loadSellingPostRows();
     return () => { cancelled = true; };
   }, [client?.client_id]);
+
+  async function openSellingPostDetail(row) {
+    if (!row?.post_id) return;
+    setSellingPostDetailLoading(true);
+    setSellingPostDetailError("");
+    setSellingPostDetail(null);
+    try {
+      const [postResult, itemsResult, activityResult] = await Promise.all([
+        supabase.from("eo2mate_posts").select("post_id, client_id, page_id, mode_code, post_type_code, fb_post_id, caption, status, starts_at, ends_at, cancelled_at, cancellation_reason, created_at, updated_at").eq("post_id", row.post_id).single(),
+        supabase.from("eo2mate_post_items").select("post_item_id, post_id, item_no, item_label, fb_object_id, item_source, inventory_item_id, inventory_owner_id, item_code_snapshot, item_name_snapshot, unit_price, quantity_limit, max_quantity_per_buyer, status, close_reason, fulfillment_status, created_at, closed_at").eq("post_id", row.post_id).order("item_no"),
+        row.mode_code === "MINING"
+          ? supabase.from("eo2mate_mining_claims").select("mining_claim_id, post_id, post_item_id, fb_comment_id, fb_user_id, fb_user_name, comment_text, action_code, claim_price, status, superseded_at, created_at").eq("post_id", row.post_id).order("created_at", { ascending: false })
+          : supabase.from("eo2mate_post_entries").select("post_entry_id, post_id, post_item_id, fb_comment_id, fb_user_id, fb_user_name, comment_text, requested_quantity, accepted_quantity, required_down_payment_amount, status, invalid_reason, commented_at, created_at").eq("post_id", row.post_id).order("created_at", { ascending: false }),
+      ]);
+      const firstError = postResult.error || itemsResult.error || activityResult.error;
+      if (firstError) throw firstError;
+      setSellingPostDetail({ ...row, post: postResult.data, items: itemsResult.data || [], activity: activityResult.data || [] });
+    } catch (error) {
+      console.error("Failed to load selling post detail", error);
+      setSellingPostDetailError(error?.message || "Unable to load post details.");
+    } finally {
+      setSellingPostDetailLoading(false);
+    }
+  }
 
   const regularSaleStats = useMemo(() => {
     const rows = sellingPostRows.REGULAR_SALE || [];
@@ -2455,11 +2517,11 @@ export default function PortalPage({ session }) {
                 </div>
                 <div className="table-wrapper">
                   <table>
-                    <thead><tr><th>Post</th><th>Facebook Page</th><th>Status</th><th>Items</th><th>Orders</th><th>Buyers</th><th>Value</th><th>Created</th></tr></thead>
+                    <thead><tr><th>Post</th><th>Facebook Page</th><th>Status</th><th>Items</th><th>Orders</th><th>Buyers</th><th>Value</th><th>Created</th><th>Action</th></tr></thead>
                     <tbody>
-                      {sellingPostLoading && <tr><td colSpan="8">Loading Regular Sale records...</td></tr>}
-                      {!sellingPostLoading && sellingPostError && <tr><td colSpan="8">{sellingPostError}</td></tr>}
-                      {!sellingPostLoading && !sellingPostError && !(sellingPostRows.REGULAR_SALE || []).length && <tr><td colSpan="8">No Regular Sale records yet.</td></tr>}
+                      {sellingPostLoading && <tr><td colSpan="9">Loading Regular Sale records...</td></tr>}
+                      {!sellingPostLoading && sellingPostError && <tr><td colSpan="9">{sellingPostError}</td></tr>}
+                      {!sellingPostLoading && !sellingPostError && !(sellingPostRows.REGULAR_SALE || []).length && <tr><td colSpan="9">No Regular Sale records yet.</td></tr>}
                       {!sellingPostLoading && !sellingPostError && (sellingPostRows.REGULAR_SALE || []).map((row) => (
                         <tr key={row.post_id}>
                           <td>{row.post_type_code || "—"}</td>
@@ -2470,12 +2532,17 @@ export default function PortalPage({ session }) {
                           <td>{row.buyers}</td>
                           <td>{formatCurrency(row.value)}</td>
                           <td>{formatDateTime(row.created_at)}</td>
+                          <td><button className="table-action-button" type="button" onClick={() => openSellingPostDetail(row)}>Details</button></td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
               </section>
+            )}
+
+            {regularSaleWorkspaceTab === "POSTS" && (sellingPostDetailLoading || sellingPostDetailError || sellingPostDetail?.mode_code === "REGULAR_SALE") && (
+              <SellingPostDetailPanel detail={sellingPostDetail} loading={sellingPostDetailLoading} error={sellingPostDetailError} onClose={() => setSellingPostDetail(null)} />
             )}
 
             {regularSaleWorkspaceTab === "POSTING" && (
@@ -3499,11 +3566,11 @@ export default function PortalPage({ session }) {
                 </div>
                 <div className="table-wrapper">
                   <table>
-                    <thead><tr><th>Post</th><th>Facebook Page</th><th>Status</th><th>Items</th><th>Claims</th><th>Buyers</th><th>Value</th><th>Created</th></tr></thead>
+                    <thead><tr><th>Post</th><th>Facebook Page</th><th>Status</th><th>Items</th><th>Claims</th><th>Buyers</th><th>Value</th><th>Created</th><th>Action</th></tr></thead>
                     <tbody>
-                      {sellingPostLoading && <tr><td colSpan="8">Loading Post Mining records...</td></tr>}
+                      {sellingPostLoading && <tr><td colSpan="9">Loading Post Mining records...</td></tr>}
                       {!sellingPostLoading && sellingPostError && <tr><td colSpan="8">{sellingPostError}</td></tr>}
-                      {!sellingPostLoading && !sellingPostError && !(sellingPostRows.MINING || []).length && <tr><td colSpan="8">No Post Mining records yet.</td></tr>}
+                      {!sellingPostLoading && !sellingPostError && !(sellingPostRows.MINING || []).length && <tr><td colSpan="9">No Post Mining records yet.</td></tr>}
                       {!sellingPostLoading && !sellingPostError && (sellingPostRows.MINING || []).map((row) => (
                         <tr key={row.post_id}>
                           <td>{row.post_type_code || "—"}</td>
@@ -3514,12 +3581,17 @@ export default function PortalPage({ session }) {
                           <td>{row.buyers}</td>
                           <td>{formatCurrency(row.value)}</td>
                           <td>{formatDateTime(row.created_at)}</td>
+                          <td><button className="table-action-button" type="button" onClick={() => openSellingPostDetail(row)}>Details</button></td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
               </section>
+            )}
+
+            {miningWorkspaceTab === "POSTS" && (sellingPostDetailLoading || sellingPostDetailError || sellingPostDetail?.mode_code === "MINING") && (
+              <SellingPostDetailPanel detail={sellingPostDetail} loading={sellingPostDetailLoading} error={sellingPostDetailError} onClose={() => setSellingPostDetail(null)} />
             )}
 
             {miningWorkspaceTab === "LIVE MINING" && (
@@ -3767,7 +3839,7 @@ export default function PortalPage({ session }) {
                 </section>
                 <section className="dashboard-panel">
                   <div className="panel-header"><div><h2>Auction list</h2><p>{filteredAuctions.length} record(s)</p></div></div>
-                  <div className="table-wrapper"><table><thead><tr><th>Item</th><th>Status</th><th>Highest bid</th><th>Bidder</th><th>Valid bidders</th><th>Ends</th><th>Payment</th></tr></thead><tbody>{filteredAuctions.map((auction) => (<tr key={auction.auction_item_id} className="clickable-row" onClick={() => openAuction(auction.auction_item_id)}><td>{auction.item_label}</td><td><StatusBadge status={auction.ui_status} /></td><td>{formatCurrency(auction.highest_bid)}</td><td>{auction.highest_bidder_name || "-"}</td><td>{auction.valid_bidder_count}/{auction.min_bidder_count}</td><td>{formatDateTime(auction.auction_end_dt)}</td><td>{auction.payment_status || "-"}</td></tr>))}</tbody></table></div>
+                  <div className="table-wrapper"><table><thead><tr><th>Item</th><th>Status</th><th>Highest bid</th><th>Bidder</th><th>Valid bidders</th><th>Ends</th><th>Payment</th><th>Action</th></tr></thead><tbody>{filteredAuctions.map((auction) => (<tr key={auction.auction_item_id}><td>{auction.item_label}</td><td><StatusBadge status={auction.ui_status} /></td><td>{formatCurrency(auction.highest_bid)}</td><td>{auction.highest_bidder_name || "-"}</td><td>{auction.valid_bidder_count}/{auction.min_bidder_count}</td><td>{formatDateTime(auction.auction_end_dt)}</td><td>{auction.payment_status || "-"}</td><td><button className="table-action-button" type="button" onClick={() => openAuction(auction.auction_item_id)}>Details</button></td></tr>))}</tbody></table></div>
                 </section>
               </>
             )}

@@ -87,7 +87,7 @@ export default function PreorderAdminPage({ client, onCreatePost }) {
         <div className="panel-header">
           <div>
             <p className="eyebrow">{pretty(selected.post_type_code)} PRE-ORDER</p>
-            <h2>Reservations</h2>
+            <h2>Post details & reservations</h2>
             <p className="preorder-caption">{selected.caption||"No post caption"}</p>
           </div>
           <div style={{display:"flex",gap:8,alignItems:"center"}}>
@@ -96,11 +96,27 @@ export default function PreorderAdminPage({ client, onCreatePost }) {
           </div>
         </div>
         <div className="preorder-summary-grid">
+          <div><span>Post ID</span><strong>{selected.post_id||"—"}</strong></div>
+          <div><span>Facebook Post ID</span><strong>{selected.fb_post_id||"—"}</strong></div>
+          <div><span>Post Type</span><strong>{pretty(selected.post_type_code)||"—"}</strong></div>
+          <div><span>Status</span><strong>{pretty(selected.status)||"—"}</strong></div>
+          <div><span>Created</span><strong>{fmtDate(selected.created_at)}</strong></div>
           <div><span>Items</span><strong>{selected.eo2mate_post_items?.length||0}</strong></div>
           <div><span>Reservations</span><strong>{entries.length}</strong></div>
           <div><span>Deadline</span><strong>{fmtDate(selected.ends_at)}</strong></div>
           <div><span>Closure</span><strong>{pretty(selected.eo2mate_preorder_settings?.ordering_close_reason)||"—"}</strong></div>
         </div>
+        <div className="panel-header"><div><h3>Items</h3><p>Products attached to this Pre-Order post.</p></div></div>
+        <div className="table-wrapper">
+          <table>
+            <thead><tr><th>Item</th><th>Price</th><th>Quantity</th><th>Status</th><th>Fulfillment</th></tr></thead>
+            <tbody>
+              {(selected.eo2mate_post_items||[]).map(i=><tr key={i.post_item_id}><td><strong>{i.item_label||i.item_name_snapshot||"—"}</strong></td><td>{money(i.unit_price)}</td><td>{i.quantity_limit??"—"}</td><td><Badge value={i.status}/></td><td>{pretty(i.fulfillment_status)||"—"}</td></tr>)}
+              {!(selected.eo2mate_post_items||[]).length&&<tr><td colSpan="5" className="empty-table-cell">No item records for this post.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+        <div className="panel-header"><div><h3>Reservations / Orders</h3><p>Buyer quantities, status and required down payment.</p></div></div>
         <div className="table-wrapper">
           <table>
             <thead><tr><th>Buyer</th><th>Status</th><th>Requested</th><th>Accepted</th><th>Required DP</th><th></th></tr></thead>
