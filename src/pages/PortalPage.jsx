@@ -751,6 +751,7 @@ export default function PortalPage({ session }) {
 
   const [automationControls, setAutomationControls] = useState([]);
   const [automationPages, setAutomationPages] = useState([]);
+  const [paymentAutomation, setPaymentAutomation] = useState({ payment_automation_enabled: true, payment_automation_reason: null });
   const [automationControlLoading, setAutomationControlLoading] = useState(false);
   const [automationControlMessage, setAutomationControlMessage] = useState("");
   const [automationModal, setAutomationModal] = useState(null);
@@ -1346,6 +1347,7 @@ export default function PortalPage({ session }) {
 
       setAutomationControls(data.controls || []);
       setAutomationPages(data.pages || []);
+      setPaymentAutomation(data.payment_automation || { payment_automation_enabled: true, payment_automation_reason: null });
       return data;
     } catch (error) {
       setAutomationControlMessage(
@@ -1614,12 +1616,18 @@ export default function PortalPage({ session }) {
     setAutomationControlMessage("");
 
     try {
+      const isPaymentAutomationChange = automationModal.kind === "PAYMENT_AUTOMATION";
       const { data, error } = await supabase.functions.invoke(
         "eo2mate",
         {
           method: "POST",
           headers: { "x-eo2mate-route": "automation-admin" },
-          body: {
+          body: isPaymentAutomationChange ? {
+            action: "SET_PAYMENT_AUTOMATION",
+            client_id: client.client_id,
+            is_enabled: automationModal.enabled,
+            reason: automationReason.trim() || null,
+          } : {
             action: "SET",
             client_id: client.client_id,
             scope_type: automationModal.scopeType,
@@ -1636,7 +1644,7 @@ export default function PortalPage({ session }) {
       }
 
       setAutomationControlMessage(
-        `${automationModal.label} automation ${automationModal.enabled ? "enabled" : "disabled"}.`
+        `${automationModal.label} ${automationModal.enabled ? "enabled" : "disabled"}.`
       );
       setAutomationModal(null);
       setAutomationReason("");
@@ -3720,6 +3728,54 @@ export default function PortalPage({ session }) {
                   Client-level ON/OFF is locked to SUPER_ADMIN so a subscription-suspended client cannot reactivate itself.
                 </div>
               )}
+            </section>
+
+            <section className="dashboard-panel automation-control-panel payment-automation-panel">
+              <div className="panel-header">
+                <div>
+                  <p className="eyebrow">PAYMENT MODE</p>
+                  <h2>Payment automation</h2>
+                  <p>Control whether EO2MATE may automatically provide payment or checkout links to buyers.</p>
+                </div>
+              </div>
+
+              <div className={`payment-automation-notice ${paymentAutomation.payment_automation_enabled !== false ? "enabled" : "manual"}`}>
+                <div>
+                  <strong>{paymentAutomation.payment_automation_enabled !== false ? "Automated payment mode" : "Manual payment mode"}</strong>
+                  <span>
+                    {paymentAutomation.payment_automation_enabled !== false
+                      ? "EO2MATE may send payment instructions and secure checkout links through supported buyer flows."
+                      : "Selling remains active, but EO2MATE will not issue payment links in winner/order replies or through payment Messenger commands."}
+                  </span>
+                  {paymentAutomation.payment_automation_enabled === false && paymentAutomation.payment_automation_reason && (
+                    <small>Reason: {paymentAutomation.payment_automation_reason}</small>
+                  )}
+                </div>
+                <StatusBadge status={paymentAutomation.payment_automation_enabled !== false ? "ACTIVE" : "MANUAL"} />
+              </div>
+
+              <div className="automation-control-row client-scope">
+                <div className={`automation-switch-orb ${paymentAutomation.payment_automation_enabled !== false ? "enabled" : "disabled"}`}><span /></div>
+                <div className="automation-control-copy">
+                  <strong>Enable payment automation</strong>
+                  <span>When OFF, Auction, Mining, Pre-Order and Regular Sale continue recording winners/orders, while payment links and !PAY link delivery are suppressed.</span>
+                </div>
+                <button
+                  type="button"
+                  className={paymentAutomation.payment_automation_enabled !== false ? "control-off-button" : "control-on-button"}
+                  disabled={automationControlLoading || !["ADMIN", "OWNER", "SUPER_ADMIN"].includes(String(client?.role || "").toUpperCase())}
+                  onClick={() => {
+                    setAutomationReason("");
+                    setAutomationModal({
+                      kind: "PAYMENT_AUTOMATION",
+                      label: "Payment automation",
+                      enabled: !(paymentAutomation.payment_automation_enabled !== false),
+                    });
+                  }}
+                >
+                  {paymentAutomation.payment_automation_enabled !== false ? "Disable" : "Enable"}
+                </button>
+              </div>
             </section>
 
             <section className="dashboard-panel automation-control-panel">
