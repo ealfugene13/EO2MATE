@@ -1894,12 +1894,14 @@ export default function InventoryPage({
           display: grid;
           grid-template-columns:
             repeat(auto-fill, minmax(280px, 1fr));
-          gap: 14px;
+          gap: 22px;
+          padding: 8px;
         }
 
         .inventory-item-card {
-          border: 1px solid rgba(148,163,184,.20);
-          border-radius: 17px;
+          border: 1px solid rgba(148,163,184,.28);
+          border-radius: 18px;
+          box-shadow: 0 8px 24px rgba(15,23,42,.045);
           overflow: hidden;
           background: rgba(255,255,255,.025);
           display: flex;
@@ -1918,7 +1920,10 @@ export default function InventoryPage({
         .inventory-item-image img {
           width: 100%;
           height: 100%;
-          object-fit: cover;
+          object-fit: contain;
+          object-position: center;
+          padding: 16px;
+          box-sizing: border-box;
         }
 
         .inventory-image-placeholder {
@@ -1931,7 +1936,7 @@ export default function InventoryPage({
         }
 
         .inventory-item-body {
-          padding: 15px;
+          padding: 20px;
           display: grid;
           gap: 12px;
         }
@@ -1993,8 +1998,26 @@ export default function InventoryPage({
 
         .inventory-card-actions {
           display: flex;
-          gap: 7px;
+          gap: 10px;
           flex-wrap: wrap;
+          padding-top: 2px;
+        }
+
+        .inventory-item-action {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 7px;
+          min-height: 38px;
+          padding: 8px 12px;
+          border-radius: 10px;
+          font-weight: 700;
+        }
+
+        .inventory-item-action > span {
+          font-size: 16px;
+          line-height: 1;
+          opacity: .78;
         }
 
         .inventory-status {
@@ -2115,7 +2138,10 @@ export default function InventoryPage({
         .inventory-image-tile img {
           width: 100%;
           aspect-ratio: 1;
-          object-fit: cover;
+          object-fit: contain;
+          object-position: center;
+          padding: 16px;
+          box-sizing: border-box;
           display: block;
         }
 
@@ -2762,7 +2788,7 @@ export default function InventoryPage({
                                 <div className="inventory-card-actions">
                                   <button
                                     type="button"
-                                    className="secondary-button"
+                                    className="secondary-button inventory-item-action"
                                     onClick={
                                       () =>
                                         openEditItem(
@@ -2770,12 +2796,12 @@ export default function InventoryPage({
                                         )
                                     }
                                   >
-                                    Edit
+                                    <span aria-hidden="true">✎</span> Edit
                                   </button>
 
                                   <button
                                     type="button"
-                                    className="secondary-button"
+                                    className="secondary-button inventory-item-action"
                                     onClick={
                                       () =>
                                         openStock(
@@ -2783,12 +2809,12 @@ export default function InventoryPage({
                                         )
                                     }
                                   >
-                                    Stock
+                                    <span aria-hidden="true">↕</span> Stock
                                   </button>
 
                                   <button
                                     type="button"
-                                    className="secondary-button"
+                                    className="secondary-button inventory-item-action"
                                     onClick={
                                       () =>
                                         openImages(
@@ -2796,7 +2822,7 @@ export default function InventoryPage({
                                         )
                                     }
                                   >
-                                    Images
+                                    <span aria-hidden="true">▧</span> Images
                                   </button>
                                 </div>
                               </div>

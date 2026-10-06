@@ -2582,7 +2582,7 @@ export default function PortalPage({ session }) {
         {metaConnected && page === "pre-order" && (
           <>
             <section className="dashboard-panel" style={{ marginBottom: 18 }}>
-              <div className="preorder-top-actions">
+              <div className="preorder-primary-nav">
                 <button type="button" className="primary-button">Dashboard / Summary</button>
                 <button type="button" className="secondary-button" onClick={() => navigateTo("pre-order-create")}>Create Post</button>
               </div>
@@ -3170,10 +3170,10 @@ export default function PortalPage({ session }) {
                 <StatusBadge status={paymentAutomation.payment_automation_enabled !== false ? "ACTIVE" : "MANUAL"} />
               </div>
 
-              <div className="automation-control-row client-scope">
-                <div className="automation-control-copy">
+              <div className="payment-automation-setting-row">
+                <div className="payment-automation-setting-copy">
                   <strong>Automated payment</strong>
-                  <span>Turn on to send supported checkout and payment links automatically. Turn off to keep selling active while handling payment manually.</span>
+                  <span>Automatically send supported checkout and payment links. Turn off to handle buyer payments manually.</span>
                 </div>
                 <button
                   type="button"
