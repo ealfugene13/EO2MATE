@@ -2493,16 +2493,21 @@ export default function PortalPage({ session }) {
               <MetricCard title="Sales value" value={formatCurrency(regularSaleStats.value)} subtitle="Gross Regular Sale value" />
             </section>
 
-            <section className="dashboard-panel" style={{ marginBottom: 18 }}>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {["SUMMARY", "POSTS", "POSTING"].map((tab) => (
+            <section className="dashboard-panel selling-workspace-nav-panel" style={{ marginBottom: 18 }}>
+              <div className="selling-workspace-nav">
+                {[
+                  { key: "SUMMARY", label: "Summary", icon: "dashboard" },
+                  { key: "POSTS", label: "Posts", icon: "sales" },
+                  { key: "POSTING", label: "Create Post", icon: "create" },
+                ].map((tab) => (
                   <button
-                    key={tab}
+                    key={tab.key}
                     type="button"
-                    className={regularSaleWorkspaceTab === tab ? "primary-button" : "secondary-button"}
-                    onClick={() => setRegularSaleWorkspaceTab(tab)}
+                    className={regularSaleWorkspaceTab === tab.key ? "primary-button" : "secondary-button"}
+                    onClick={() => setRegularSaleWorkspaceTab(tab.key)}
                   >
-                    {tab === "POSTING" ? "Create Post" : tab.charAt(0) + tab.slice(1).toLowerCase()}
+                    <span className="selling-nav-icon"><NavIcon type={tab.icon} /></span>
+                    <span>{tab.label}</span>
                   </button>
                 ))}
               </div>
@@ -2621,14 +2626,22 @@ export default function PortalPage({ session }) {
               <MetricCard title="Items sold" value="0" subtitle="Allocated quantity" />
               <MetricCard title="Sales value" value={formatCurrency(0)} subtitle="Gross live-selling value" />
             </section>
-            <section className="dashboard-panel" style={{ marginBottom: 18 }}>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {["DASHBOARD", "SUMMARY", "POSTS"].map((tab) => (
-                  <button key={tab} type="button" className={liveSellingWorkspaceTab === tab ? "primary-button" : "secondary-button"} onClick={() => setLiveSellingWorkspaceTab(tab)}>
-                    {tab.charAt(0) + tab.slice(1).toLowerCase()}
+            <section className="dashboard-panel selling-workspace-nav-panel" style={{ marginBottom: 18 }}>
+              <div className="selling-workspace-nav">
+                {[
+                  { key: "DASHBOARD", label: "Dashboard", icon: "dashboard" },
+                  { key: "SUMMARY", label: "Summary", icon: "reports" },
+                  { key: "POSTS", label: "Posts", icon: "sales" },
+                ].map((tab) => (
+                  <button key={tab.key} type="button" className={liveSellingWorkspaceTab === tab.key ? "primary-button" : "secondary-button"} onClick={() => setLiveSellingWorkspaceTab(tab.key)}>
+                    <span className="selling-nav-icon"><NavIcon type={tab.icon} /></span>
+                    <span>{tab.label}</span>
                   </button>
                 ))}
-                <button type="button" className="secondary-button" disabled title="Coming soon">Create Post · Soon</button>
+                <button type="button" className="secondary-button" disabled title="Coming soon">
+                  <span className="selling-nav-icon"><NavIcon type="create" /></span>
+                  <span>Create Post · Soon</span>
+                </button>
               </div>
             </section>
             <section className="dashboard-panel">
@@ -3311,19 +3324,29 @@ export default function PortalPage({ session }) {
               <MetricCard title="Claimed value" value={formatCurrency(miningStats.value)} subtitle="Gross claimed sales" />
             </section>
 
-            <section className="dashboard-panel" style={{ marginBottom: 18 }}>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {["SUMMARY", "POSTS", "LIVE MINING", "CLAIMS", "BUYERS"].map((tab) => (
+            <section className="dashboard-panel selling-workspace-nav-panel" style={{ marginBottom: 18 }}>
+              <div className="selling-workspace-nav">
+                {[
+                  { key: "SUMMARY", label: "Summary", icon: "dashboard" },
+                  { key: "POSTS", label: "Posts", icon: "mining" },
+                  { key: "LIVE MINING", label: "Live Mining", icon: "reports" },
+                  { key: "CLAIMS", label: "Claims", icon: "orders" },
+                  { key: "BUYERS", label: "Buyers", icon: "users" },
+                ].map((tab) => (
                   <button
-                    key={tab}
+                    key={tab.key}
                     type="button"
-                    className={miningWorkspaceTab === tab ? "primary-button" : "secondary-button"}
-                    onClick={() => setMiningWorkspaceTab(tab)}
+                    className={miningWorkspaceTab === tab.key ? "primary-button" : "secondary-button"}
+                    onClick={() => setMiningWorkspaceTab(tab.key)}
                   >
-                    {tab === "LIVE MINING" ? "Live Mining" : tab.charAt(0) + tab.slice(1).toLowerCase()}
+                    <span className="selling-nav-icon"><NavIcon type={tab.icon} /></span>
+                    <span>{tab.label}</span>
                   </button>
                 ))}
-                <button type="button" className="secondary-button" onClick={() => navigateTo("mining-create")}>Create Post</button>
+                <button type="button" className="secondary-button" onClick={() => navigateTo("mining-create")}>
+                  <span className="selling-nav-icon"><NavIcon type="create" /></span>
+                  <span>Create Post</span>
+                </button>
               </div>
             </section>
 
@@ -3581,14 +3604,23 @@ export default function PortalPage({ session }) {
               <MetricCard title="Winning value" value={formatCurrency(auctions.reduce((sum, a) => sum + Number(a.highest_bid || 0), 0))} subtitle="Current / final highest bids" />
             </section>
 
-            <section className="dashboard-panel" style={{ marginBottom: 18 }}>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {["SUMMARY", "AUCTIONS", "BIDS", "WINNERS"].map((tab) => (
-                  <button key={tab} type="button" className={auctionWorkspaceTab === tab ? "primary-button" : "secondary-button"} onClick={() => setAuctionWorkspaceTab(tab)}>
-                    {tab.charAt(0) + tab.slice(1).toLowerCase()}
+            <section className="dashboard-panel selling-workspace-nav-panel" style={{ marginBottom: 18 }}>
+              <div className="selling-workspace-nav">
+                {[
+                  { key: "SUMMARY", label: "Summary", icon: "dashboard" },
+                  { key: "AUCTIONS", label: "Auctions", icon: "auction" },
+                  { key: "BIDS", label: "Bids", icon: "sales" },
+                  { key: "WINNERS", label: "Winners", icon: "users" },
+                ].map((tab) => (
+                  <button key={tab.key} type="button" className={auctionWorkspaceTab === tab.key ? "primary-button" : "secondary-button"} onClick={() => setAuctionWorkspaceTab(tab.key)}>
+                    <span className="selling-nav-icon"><NavIcon type={tab.icon} /></span>
+                    <span>{tab.label}</span>
                   </button>
                 ))}
-                <button type="button" className="secondary-button" onClick={() => navigateTo("facebook-post")}>Create Post</button>
+                <button type="button" className="secondary-button" onClick={() => navigateTo("facebook-post")}>
+                  <span className="selling-nav-icon"><NavIcon type="create" /></span>
+                  <span>Create Post</span>
+                </button>
               </div>
             </section>
 

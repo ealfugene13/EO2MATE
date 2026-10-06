@@ -1910,7 +1910,7 @@ export default function InventoryPage({
         }
 
         .inventory-item-image {
-          aspect-ratio: 16 / 10;
+          height: 220px;
           background: rgba(148,163,184,.08);
           display: grid;
           place-items: center;
@@ -1918,11 +1918,12 @@ export default function InventoryPage({
         }
 
         .inventory-item-image img {
+          display: block;
           width: 100%;
           height: 100%;
           object-fit: contain;
           object-position: center;
-          padding: 16px;
+          padding: 0;
           box-sizing: border-box;
         }
 
@@ -1997,21 +1998,24 @@ export default function InventoryPage({
         }
 
         .inventory-card-actions {
-          display: flex;
-          gap: 10px;
-          flex-wrap: wrap;
-          padding-top: 2px;
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 8px;
+          padding-top: 4px;
         }
 
         .inventory-item-action {
+          width: 100%;
+          min-width: 0;
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          gap: 7px;
+          gap: 6px;
           min-height: 38px;
-          padding: 8px 12px;
+          padding: 8px 9px;
           border-radius: 10px;
           font-weight: 700;
+          white-space: nowrap;
         }
 
         .inventory-item-action > span {

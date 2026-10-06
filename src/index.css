@@ -3071,3 +3071,116 @@ button.post-type-card:hover { transform: translateY(-2px); border-color: #bcdcc3
  .preorder-primary-nav>button,.preorder-workspace-actions>button{flex:1 1 145px!important}
  .inventory-page .dashboard-panel{padding:18px!important}.inventory-page .inventory-toolbar{padding:2px 2px 16px!important}.inventory-page .inventory-toolbar-actions{justify-content:flex-start!important}
 }
+
+/* EO2MATE v8 - selling workspace navigation + inventory card alignment */
+.selling-workspace-nav-panel{
+  padding:14px 16px!important;
+}
+.selling-workspace-nav{
+  display:flex!important;
+  align-items:center!important;
+  flex-wrap:wrap!important;
+  gap:12px!important;
+}
+.selling-workspace-nav>button{
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:7px!important;
+  margin:0!important;
+  min-height:42px!important;
+  padding:10px 16px!important;
+  border-radius:10px!important;
+  line-height:1.1!important;
+}
+.selling-nav-icon{
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  width:18px!important;
+  height:18px!important;
+  flex:0 0 18px!important;
+}
+.selling-nav-icon>span{
+  width:18px!important;
+  height:18px!important;
+  min-width:18px!important;
+}
+.selling-nav-icon svg{
+  width:18px!important;
+  height:18px!important;
+}
+
+.inventory-page .dashboard-panel{
+  padding:30px!important;
+}
+.inventory-page .inventory-toolbar{
+  padding:2px 2px 22px!important;
+  margin:0 0 22px!important;
+  gap:22px!important;
+}
+.inventory-page .inventory-filter-grid{
+  padding:2px!important;
+  margin-bottom:24px!important;
+  gap:18px!important;
+}
+.inventory-page .inventory-card-grid{
+  padding:12px 2px 4px!important;
+  gap:24px!important;
+}
+.inventory-page .inventory-item-image{
+  height:220px!important;
+  min-height:220px!important;
+  padding:0!important;
+  display:grid!important;
+  place-items:center!important;
+  overflow:hidden!important;
+  background:#f8fafc!important;
+}
+.inventory-page .inventory-item-image img{
+  display:block!important;
+  width:100%!important;
+  height:100%!important;
+  max-width:100%!important;
+  max-height:100%!important;
+  margin:auto!important;
+  padding:0!important;
+  object-fit:contain!important;
+  object-position:center!important;
+}
+.inventory-page .inventory-card-actions{
+  display:grid!important;
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  align-items:stretch!important;
+  gap:8px!important;
+  margin-top:4px!important;
+  padding-top:4px!important;
+}
+.inventory-page .inventory-card-actions .inventory-item-action{
+  width:100%!important;
+  min-width:0!important;
+  max-width:none!important;
+  margin:0!important;
+  padding:8px 8px!important;
+  min-height:40px!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:6px!important;
+  white-space:nowrap!important;
+  font-size:.9rem!important;
+  border-radius:10px!important;
+}
+.inventory-page .inventory-card-actions .inventory-item-action>span{
+  flex:0 0 auto!important;
+  font-size:15px!important;
+}
+
+@media(max-width:760px){
+  .selling-workspace-nav{gap:10px!important}
+  .selling-workspace-nav>button{flex:1 1 145px!important}
+  .inventory-page .dashboard-panel{padding:20px!important}
+  .inventory-page .inventory-card-grid{gap:18px!important}
+  .inventory-page .inventory-card-actions{gap:6px!important}
+  .inventory-page .inventory-card-actions .inventory-item-action{font-size:.82rem!important;padding:8px 6px!important}
+}
