@@ -755,6 +755,7 @@ export default function PortalPage({ session }) {
   const [automationControlLoading, setAutomationControlLoading] = useState(false);
   const [automationControlMessage, setAutomationControlMessage] = useState("");
   const [automationModal, setAutomationModal] = useState(null);
+  const [automationModalError, setAutomationModalError] = useState("");
   const [automationReason, setAutomationReason] = useState("");
   const [automationPassword, setAutomationPassword] = useState("");
 
@@ -1264,6 +1265,7 @@ export default function PortalPage({ session }) {
     if (!client?.client_id) return;
 
     setAutomationControlLoading(true);
+    setAutomationModalError("");
     setAutomationControlMessage("");
 
     try {
@@ -1306,6 +1308,7 @@ export default function PortalPage({ session }) {
   }) {
     setAutomationReason("");
     setAutomationPassword("");
+    setAutomationModalError("");
     setAutomationModal({
       scopeType,
       scopeId,
@@ -1318,12 +1321,12 @@ export default function PortalPage({ session }) {
     if (!automationModal || !client?.client_id) return;
 
     if (!automationModal.enabled && !automationReason.trim()) {
-      setAutomationControlMessage("Please enter a reason before disabling automation.");
+      setAutomationModalError("Please enter a reason before disabling automation.");
       return;
     }
 
     if (!automationPassword) {
-      setAutomationControlMessage("Enter your current password to confirm this setup change.");
+      setAutomationModalError("Enter your current password to confirm this setup change.");
       return;
     }
 
@@ -1370,9 +1373,7 @@ export default function PortalPage({ session }) {
       setAutomationPassword("");
       await loadAutomationControls();
     } catch (error) {
-      setAutomationControlMessage(
-        error.message || "Unable to update automation control."
-      );
+      setAutomationModalError(error.message || "Unable to update automation control.");
     } finally {
       setAutomationControlLoading(false);
     }
@@ -2870,7 +2871,7 @@ export default function PortalPage({ session }) {
                 {reportMessage && !generatedReport && <div className="info-banner report-filter-message">{reportMessage}</div>}
                 <div className="report-filter-actions">
                   <button className="icon-button report-action-icon" type="button" title="Clear filters" aria-label="Clear filters" onClick={() => { setSelectedReport(""); setReportDateRange(""); setReportCustomFrom(""); setReportCustomTo(""); setReportPageFilter(""); setReportChannelFilter(""); setReportStatusFilter(""); setReportSortBy(""); setGeneratedReport(null); setReportMessage(""); }}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18"/><path d="M6 5l1 15h10l1-15"/><path d="M9 9v7"/><path d="M15 9v7"/></svg></button>
-                  <button className="primary-button report-short-action" type="submit"><NavIcon type="reports" /> Run</button>
+                  <button className="primary-button report-short-action" type="submit"><span className="report-run-icon"><NavIcon type="reports" /></span><span>Run</span></button>
                   <button className="secondary-button report-short-action" type="button" onClick={exportReportExcel} disabled={!generatedReport} title="Export Excel">▦ Excel</button>
                   <button className="secondary-button report-short-action" type="button" onClick={printReport} disabled={!generatedReport} title="Export PDF">▤ PDF</button>
                 </div>
@@ -3006,6 +3007,10 @@ export default function PortalPage({ session }) {
                     <input type="password" autoComplete="current-password" value={automationPassword} onChange={(e) => setAutomationPassword(e.target.value)} placeholder="Verify your password" />
                   </label>
 
+                  {automationModalError && (
+                    <div className="setup-modal-inline-error" role="alert">{automationModalError}</div>
+                  )}
+
                   <div className="control-modal-actions">
                     <button
                       type="button"
@@ -3014,6 +3019,7 @@ export default function PortalPage({ session }) {
                         setAutomationModal(null);
                         setAutomationReason("");
                         setAutomationPassword("");
+                        setAutomationModalError("");
                       }}
                       disabled={automationControlLoading}
                     >
@@ -3169,10 +3175,23 @@ export default function PortalPage({ session }) {
                   <strong>Enable payment automation</strong>
                   <span>When OFF, Auction, Mining, Pre-Order and Regular Sale continue recording winners/orders, while payment links and !PAY link delivery are suppressed.</span>
                 </div>
-                <label className="automation-toggle-control" title="Enable or disable payment automation">
-                  <input type="checkbox" checked={paymentAutomation.payment_automation_enabled !== false} disabled={automationControlLoading || !["ADMIN", "OWNER", "CLIENT_ADMIN", "SUPER_ADMIN"].includes(String(client?.role || "").toUpperCase())} onChange={(e) => { setAutomationReason(""); setAutomationPassword(""); setAutomationModal({ kind: "PAYMENT_AUTOMATION", label: "Payment automation", enabled: e.target.checked }); }} />
-                  <span className="automation-toggle-track"><span /></span>
-                </label>
+                <button
+                  type="button"
+                  className={`automation-toggle-button ${paymentAutomation.payment_automation_enabled !== false ? "is-on" : "is-off"}`}
+                  aria-pressed={paymentAutomation.payment_automation_enabled !== false}
+                  aria-label={paymentAutomation.payment_automation_enabled !== false ? "Disable payment automation" : "Enable payment automation"}
+                  title={paymentAutomation.payment_automation_enabled !== false ? "Turn payment automation off" : "Turn payment automation on"}
+                  disabled={automationControlLoading || !["ADMIN", "OWNER", "CLIENT_ADMIN", "SUPER_ADMIN"].includes(String(client?.role || "").toUpperCase())}
+                  onClick={() => {
+                    setAutomationReason("");
+                    setAutomationPassword("");
+                    setAutomationModalError("");
+                    setAutomationModal({ kind: "PAYMENT_AUTOMATION", label: "Payment automation", enabled: !(paymentAutomation.payment_automation_enabled !== false) });
+                  }}
+                >
+                  <span className="automation-toggle-button-track"><span /></span>
+                  <span className="automation-toggle-button-label">{paymentAutomation.payment_automation_enabled !== false ? "ON" : "OFF"}</span>
+                </button>
               </div>
             </section>
 
