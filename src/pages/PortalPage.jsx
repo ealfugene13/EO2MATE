@@ -11,6 +11,115 @@ import AccountSecurityPage from "./AccountSecurityPage";
 import PaymentMethodsSettings from "../components/PaymentMethodsSettings";
 
 
+
+function FloatingMetaMessenger({ clientId, enabled }) {
+  const [pages, setPages] = useState([]);
+  const [unread, setUnread] = useState(0);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [position, setPosition] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("eo2mateMessengerFloatPosition")) || { right: 22, bottom: 24 }; }
+    catch { return { right: 22, bottom: 24 }; }
+  });
+  const [drag, setDrag] = useState(null);
+
+  async function refreshNotifications() {
+    if (!enabled || !clientId) return;
+    try {
+      const { data, error } = await supabase.functions.invoke("meta", {
+        method: "POST",
+        headers: { "x-eo2mate-meta-route": "messenger-notifications" },
+        body: { client_id: clientId },
+      });
+      if (error || !data?.success) return;
+      setPages(data.pages || []);
+      setUnread(Number(data.total_unread || 0));
+    } catch { /* notification failure must never block the portal */ }
+  }
+
+  useEffect(() => {
+    if (!enabled || !clientId) return undefined;
+    refreshNotifications();
+    const timer = window.setInterval(refreshNotifications, 15000);
+    const onVisible = () => { if (document.visibilityState === "visible") refreshNotifications(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { window.clearInterval(timer); document.removeEventListener("visibilitychange", onVisible); };
+  }, [enabled, clientId]);
+
+  useEffect(() => {
+    if (!drag) return undefined;
+    const move = (event) => {
+      const point = event.touches?.[0] || event;
+      const size = 58;
+      const x = Math.min(Math.max(point.clientX - drag.dx, 8), window.innerWidth - size - 8);
+      const y = Math.min(Math.max(point.clientY - drag.dy, 8), window.innerHeight - size - 8);
+      setPosition({ left: x, top: y });
+    };
+    const end = () => {
+      setDrag(null);
+      setPosition((current) => {
+        const size = 58;
+        const left = current.left ?? (window.innerWidth - size - (current.right || 22));
+        const top = current.top ?? (window.innerHeight - size - (current.bottom || 24));
+        const snapped = left + size / 2 < window.innerWidth / 2
+          ? { left: 12, top }
+          : { right: 12, top };
+        localStorage.setItem("eo2mateMessengerFloatPosition", JSON.stringify(snapped));
+        return snapped;
+      });
+    };
+    window.addEventListener("mousemove", move); window.addEventListener("mouseup", end);
+    window.addEventListener("touchmove", move, { passive: false }); window.addEventListener("touchend", end);
+    return () => { window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", end); window.removeEventListener("touchmove", move); window.removeEventListener("touchend", end); };
+  }, [drag]);
+
+  async function openPage(page) {
+    const fbPageId = String(page?.fb_page_id || "");
+    if (!fbPageId) return;
+    // Clear EO2MATE's Page notification when the operator intentionally opens that Page inbox.
+    try {
+      await supabase.functions.invoke("meta", {
+        method: "POST",
+        headers: { "x-eo2mate-meta-route": "messenger-notifications" },
+        body: { client_id: clientId, action: "mark-read", fb_page_id: fbPageId },
+      });
+    } catch { /* Meta inbox should still open */ }
+    setPickerOpen(false);
+    setPages((current) => current.map((p) => String(p.fb_page_id) === fbPageId ? { ...p, unread_count: 0 } : p));
+    setUnread((current) => Math.max(0, current - Number(page?.unread_count || 0)));
+    window.open(`https://business.facebook.com/latest/inbox/all?asset_id=${encodeURIComponent(fbPageId)}`, "_blank", "noopener,noreferrer");
+  }
+
+  function activate() {
+    if (pages.length === 1) openPage(pages[0]);
+    else if (pages.length > 1) setPickerOpen((value) => !value);
+    else refreshNotifications();
+  }
+
+  if (!enabled) return null;
+  const style = position.left != null ? { left: position.left, top: position.top } : position.top != null ? { right: position.right ?? 12, top: position.top } : { right: position.right ?? 22, bottom: position.bottom ?? 24 };
+  return <div className="meta-messenger-float-wrap" style={style}>
+    {pickerOpen && pages.length > 1 && <div className="meta-messenger-page-picker">
+      <strong>Open Page Messenger</strong>
+      {pages.map((page) => <button key={page.fb_page_id} type="button" onClick={() => openPage(page)}>
+        <span>{page.page_name || "Facebook Page"}</span>
+        {Number(page.unread_count || 0) > 0 && <b>{Number(page.unread_count) > 99 ? "99+" : page.unread_count}</b>}
+      </button>)}
+    </div>}
+    <button
+      type="button"
+      className="meta-messenger-float"
+      aria-label={unread ? `Open Meta Messenger, ${unread} unread messages` : "Open Meta Messenger"}
+      title="Open Meta Messenger"
+      onMouseDown={(e) => { const r = e.currentTarget.getBoundingClientRect(); setDrag({ dx: e.clientX-r.left, dy: e.clientY-r.top }); }}
+      onTouchStart={(e) => { const p=e.touches[0], r=e.currentTarget.getBoundingClientRect(); setDrag({ dx:p.clientX-r.left, dy:p.clientY-r.top }); }}
+      onClick={() => { if (!drag) activate(); }}
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.48 2 2 6.15 2 11.27c0 2.91 1.45 5.5 3.72 7.2V22l3.4-1.87c.91.25 1.88.39 2.88.39 5.52 0 10-4.15 10-9.25S17.52 2 12 2Z"/><path className="meta-messenger-bolt" d="m6.8 14.2 3.4-3.6 2.1 2 4.9-2.8-3.4 3.6-2.1-2-4.9 2.8Z"/></svg>
+      {unread > 0 && <span className="meta-messenger-badge">{unread > 99 ? "99+" : unread}</span>}
+    </button>
+  </div>;
+}
+
 function NavIcon({ type }) {
   const common = {
     viewBox: "0 0 24 24",
@@ -660,11 +769,6 @@ export default function PortalPage({ session }) {
   const [chatSending, setChatSending] = useState(false);
   const [chatMessage, setChatMessage] = useState("");
   const [chatMetaWindowBlocked, setChatMetaWindowBlocked] = useState(false);
-  const [messengerLauncherPages, setMessengerLauncherPages] = useState([]);
-  const [messengerLauncherOpen, setMessengerLauncherOpen] = useState(false);
-  const [messengerLauncherUnread, setMessengerLauncherUnread] = useState(0);
-  const [messengerLauncherPos, setMessengerLauncherPos] = useState(null);
-  const [messengerLauncherDragging, setMessengerLauncherDragging] = useState(false);
   const [staffSearch, setStaffSearch] = useState("");
   const [showStaffForm, setShowStaffForm] = useState(false);
   const [staffDraft, setStaffDraft] = useState({ name: "", email: "", role: "STAFF" });
@@ -1319,76 +1423,6 @@ export default function PortalPage({ session }) {
   async function openFacebookChats() {
     setPage("facebook-chats");
     await loadFacebookChats(chatPageFilter);
-  }
-
-  function openMetaInbox(fbPageId) {
-    if (!fbPageId) return;
-    window.open(`https://business.facebook.com/latest/inbox/all?asset_id=${encodeURIComponent(fbPageId)}`, "_blank", "noopener,noreferrer");
-    setMessengerLauncherOpen(false);
-    try { localStorage.setItem(`eo2mate_meta_inbox_seen_${client?.client_id || "client"}`, String(Date.now())); } catch (_) {}
-    setMessengerLauncherUnread(0);
-  }
-
-  async function refreshMessengerLauncher() {
-    if (!client?.client_id || !metaConnected) return;
-    try {
-      const { data, error } = await supabase.functions.invoke("meta", {
-        method: "POST",
-        headers: { "x-eo2mate-meta-route": "chat-conversations" },
-        body: { client_id: client.client_id, limit: 25 },
-      });
-      if (error || !data?.success) return;
-      const pages = data.pages || [];
-      const conversations = data.conversations || [];
-      setMessengerLauncherPages(pages);
-      const explicitUnread = conversations.reduce((sum, row) => {
-        const count = Number(row?.unread_count ?? row?.unread ?? 0);
-        return sum + (Number.isFinite(count) && count > 0 ? count : 0);
-      }, 0);
-      if (explicitUnread > 0) { setMessengerLauncherUnread(explicitUnread); return; }
-      let seenAt = 0;
-      try { seenAt = Number(localStorage.getItem(`eo2mate_meta_inbox_seen_${client.client_id}`) || 0); } catch (_) {}
-      setMessengerLauncherUnread(conversations.some((row) => Number(row?.last_activity_ms || 0) > seenAt) ? 1 : 0);
-    } catch (_) {}
-  }
-
-  useEffect(() => {
-    if (!client?.client_id || !metaConnected) {
-      setMessengerLauncherPages([]);
-      setMessengerLauncherUnread(0);
-      return undefined;
-    }
-    refreshMessengerLauncher();
-    const timer = window.setInterval(refreshMessengerLauncher, 60000);
-    return () => window.clearInterval(timer);
-  }, [client?.client_id, metaConnected]);
-
-  function handleMessengerLauncherPointerDown(event) {
-    if (event.button !== undefined && event.button !== 0) return;
-    const node = event.currentTarget;
-    const rect = node.getBoundingClientRect();
-    const startX = event.clientX;
-    const startY = event.clientY;
-    const offsetX = startX - rect.left;
-    const offsetY = startY - rect.top;
-    let moved = false;
-    setMessengerLauncherDragging(true);
-    const onMove = (moveEvent) => {
-      if (Math.abs(moveEvent.clientX - startX) > 4 || Math.abs(moveEvent.clientY - startY) > 4) moved = true;
-      const maxX = Math.max(8, window.innerWidth - rect.width - 8);
-      const maxY = Math.max(8, window.innerHeight - rect.height - 8);
-      setMessengerLauncherPos({ x: Math.min(maxX, Math.max(8, moveEvent.clientX - offsetX)), y: Math.min(maxY, Math.max(8, moveEvent.clientY - offsetY)) });
-    };
-    const onUp = () => {
-      setMessengerLauncherDragging(false);
-      window.removeEventListener("pointermove", onMove);
-      if (!moved) {
-        if (messengerLauncherPages.length === 1) openMetaInbox(messengerLauncherPages[0].fb_page_id);
-        else setMessengerLauncherOpen((value) => !value);
-      }
-    };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp, { once: true });
   }
 
   async function selectFacebookConversation(conversation) {
@@ -2404,7 +2438,7 @@ export default function PortalPage({ session }) {
             <button className="logout-button" onClick={handleLogout}>Sign out</button>
           </div>
         </aside>
-      <main className="dashboard-content">
+        <main className="dashboard-content">
           {page === "account-security" ? (
             <AccountSecurityPage session={session} />
           ) : (
@@ -2660,26 +2694,6 @@ export default function PortalPage({ session }) {
           </button>
         </div>
       </aside>
-
-      {metaConnected && messengerLauncherPages.length > 0 && (
-        <div className={`meta-messenger-float ${messengerLauncherDragging ? "dragging" : ""}`} style={messengerLauncherPos ? { left: messengerLauncherPos.x, top: messengerLauncherPos.y, right: "auto", bottom: "auto" } : undefined}>
-          {messengerLauncherOpen && messengerLauncherPages.length > 1 && (
-            <div className="meta-messenger-page-menu" role="menu" aria-label="Choose Facebook Page inbox">
-              <div className="meta-messenger-page-menu-title">Open Meta Messenger</div>
-              {messengerLauncherPages.map((fbPage) => (
-                <button key={fbPage.fb_page_id} type="button" role="menuitem" onClick={() => openMetaInbox(fbPage.fb_page_id)}>
-                  <span className="meta-messenger-page-avatar"><NavIcon type="facebook" /></span>
-                  <span>{fbPage.page_name || fbPage.page_nm || "Facebook Page"}</span>
-                </button>
-              ))}
-            </div>
-          )}
-          <button type="button" className="meta-messenger-fab" aria-label="Open Facebook Page Messenger in Meta" title="Drag to move · Click to open Meta Messenger" onPointerDown={handleMessengerLauncherPointerDown}>
-            <NavIcon type="chat" />
-            {messengerLauncherUnread > 0 && <span className="meta-messenger-badge">{messengerLauncherUnread > 99 ? "99+" : messengerLauncherUnread}</span>}
-          </button>
-        </div>
-      )}
 
       <main className="dashboard-content">
         <div className="mobile-topbar">
@@ -4842,6 +4856,7 @@ export default function PortalPage({ session }) {
           </>
         )}
       </main>
+      <FloatingMetaMessenger clientId={client?.client_id} enabled={metaConnected} />
     </div>
   );
 }
