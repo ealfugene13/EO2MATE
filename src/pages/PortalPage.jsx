@@ -3177,7 +3177,7 @@ export default function PortalPage({ session }) {
                 </div>
                 <button
                   type="button"
-                  className={`automation-toggle-button ${paymentAutomation.payment_automation_enabled !== false ? "is-on" : "is-off"}`}
+                  className="payment-automation-toggle"
                   aria-pressed={paymentAutomation.payment_automation_enabled !== false}
                   aria-label={paymentAutomation.payment_automation_enabled !== false ? "Disable payment automation" : "Enable payment automation"}
                   title={paymentAutomation.payment_automation_enabled !== false ? "Turn payment automation off" : "Turn payment automation on"}
@@ -3189,8 +3189,8 @@ export default function PortalPage({ session }) {
                     setAutomationModal({ kind: "PAYMENT_AUTOMATION", label: "Payment automation", enabled: !(paymentAutomation.payment_automation_enabled !== false) });
                   }}
                 >
-                  <span className="automation-toggle-button-track"><span /></span>
-                  <span className="automation-toggle-button-label">{paymentAutomation.payment_automation_enabled !== false ? "ON" : "OFF"}</span>
+                  <span className={`automation-switch-orb ${paymentAutomation.payment_automation_enabled !== false ? "enabled" : "disabled"}`} aria-hidden="true"><span /></span>
+                  <span className="payment-automation-toggle-state">{paymentAutomation.payment_automation_enabled !== false ? "ON" : "OFF"}</span>
                 </button>
               </div>
             </section>

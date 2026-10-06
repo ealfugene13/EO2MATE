@@ -16,6 +16,7 @@ export default function AutomatedMessagesPage({ client }) {
   const [error, setError] = useState("");
   const [secureAction, setSecureAction] = useState(null);
   const [password, setPassword] = useState("");
+  const [modalError, setModalError] = useState("");
 
   async function call(action, extra = {}) {
     const { data, error: invokeError } = await supabase.functions.invoke("eo2mate", {
@@ -105,11 +106,11 @@ export default function AutomatedMessagesPage({ client }) {
     finally { setSaving(false); }
   }
 
-  function requestSecureAction(type, row = editing) { setPassword(""); setError(""); setSecureAction({ type, row }); }
+  function requestSecureAction(type, row = editing) { setPassword(""); setError(""); setModalError(""); setSecureAction({ type, row }); }
 
   async function verifyAndRun() {
-    if (!password) return setError("Enter your current password.");
-    setSaving(true); setError("");
+    if (!password) return setModalError("Enter your current password.");
+    setSaving(true); setModalError("");
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError || !user?.email) throw new Error("Unable to verify the signed-in account.");
@@ -117,7 +118,7 @@ export default function AutomatedMessagesPage({ client }) {
       if (verifyError) throw new Error("Incorrect password. No message changes were made.");
       const action = secureAction; setSecureAction(null); setPassword(""); setSaving(false);
       if (action.type === "SAVE") await saveVerified(); else await resetVerified(action.row);
-    } catch (e) { setError(e.message || "Unable to verify password."); setSaving(false); }
+    } catch (e) { setModalError(e.message || "Unable to verify password."); setSaving(false); }
   }
 
   return <>
@@ -152,7 +153,7 @@ export default function AutomatedMessagesPage({ client }) {
       </div>
     </section>
 
-    {secureAction && <div className="setup-modal-backdrop"><div className="setup-modal setup-password-modal" role="dialog" aria-modal="true"><div className="setup-modal-icon">🔒</div><div className="setup-modal-copy"><h3>Verify message change</h3><p>Enter your current EO2MATE password before {secureAction.type === "SAVE" ? "saving this client message override" : "resetting this message to the EO2MATE default"}.</p></div><label className="setup-password-field">Current password<input type="password" autoComplete="current-password" value={password} onChange={(e)=>setPassword(e.target.value)} /></label><div className="setup-modal-actions"><button className="secondary-button" type="button" onClick={()=>{setSecureAction(null);setPassword("")}} disabled={saving}>Cancel</button><button className="primary-button" type="button" onClick={verifyAndRun} disabled={saving}>{saving?"Verifying…":"Verify & Continue"}</button></div></div></div>}
+    {secureAction && <div className="setup-modal-backdrop"><div className="setup-modal setup-password-modal" role="dialog" aria-modal="true"><div className="setup-modal-icon">🔒</div><div className="setup-modal-copy"><h3>Verify message change</h3><p>Enter your current EO2MATE password before {secureAction.type === "SAVE" ? "saving this client message override" : "resetting this message to the EO2MATE default"}.</p></div><label className="setup-password-field">Current password<input type="password" autoComplete="current-password" value={password} onChange={(e)=>{setPassword(e.target.value);setModalError("")}} onKeyDown={(e)=>{if(e.key==="Enter"){e.preventDefault();verifyAndRun()}}} /></label>{modalError&&<div className="setup-modal-inline-error" role="alert">{modalError}</div>}<div className="setup-modal-actions"><button className="secondary-button" type="button" onClick={()=>{setSecureAction(null);setPassword("");setModalError("")}} disabled={saving}>Cancel</button><button className="primary-button" type="button" onClick={verifyAndRun} disabled={saving}>{saving?"Verifying…":"Verify & Continue"}</button></div></div></div>}
 
     {editing && <div className="eo2-modal-backdrop" role="presentation" onMouseDown={() => !saving && setEditing(null)}><div className="eo2-modal-card" role="dialog" aria-modal="true" onMouseDown={(e) => e.stopPropagation()}>
       <div className="eo2-modal-header"><div><p className="eyebrow">{pretty(editing.mode_code)} · {pretty(editing.channel_code)}</p><h2>{pretty(editing.event_code)}</h2><span>{editing.description}</span></div><button className="icon-button" type="button" onClick={() => setEditing(null)} disabled={saving}>×</button></div>
