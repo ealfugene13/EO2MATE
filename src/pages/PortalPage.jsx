@@ -12,9 +12,10 @@ import PaymentMethodsSettings from "../components/PaymentMethodsSettings";
 
 
 
-function FloatingMetaMessenger({ clientId, enabled }) {
+function FloatingMetaMessenger({ clientId }) {
   const [pages, setPages] = useState([]);
   const [unread, setUnread] = useState(0);
+  const [messengerAvailable, setMessengerAvailable] = useState(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [position, setPosition] = useState(() => {
     try { return JSON.parse(localStorage.getItem("eo2mateMessengerFloatPosition")) || { right: 22, bottom: 24 }; }
@@ -23,7 +24,7 @@ function FloatingMetaMessenger({ clientId, enabled }) {
   const [drag, setDrag] = useState(null);
 
   async function refreshNotifications() {
-    if (!enabled || !clientId) return;
+    if (!clientId) return;
     try {
       const { data, error } = await supabase.functions.invoke("meta", {
         method: "POST",
@@ -31,19 +32,21 @@ function FloatingMetaMessenger({ clientId, enabled }) {
         body: { client_id: clientId },
       });
       if (error || !data?.success) return;
-      setPages(data.pages || []);
+      const connectedPages = data.pages || [];
+      setPages(connectedPages);
       setUnread(Number(data.total_unread || 0));
+      setMessengerAvailable(connectedPages.length > 0);
     } catch { /* notification failure must never block the portal */ }
   }
 
   useEffect(() => {
-    if (!enabled || !clientId) return undefined;
+    if (!clientId) return undefined;
     refreshNotifications();
     const timer = window.setInterval(refreshNotifications, 5000);
     const onVisible = () => { if (document.visibilityState === "visible") refreshNotifications(); };
     document.addEventListener("visibilitychange", onVisible);
     return () => { window.clearInterval(timer); document.removeEventListener("visibilitychange", onVisible); };
-  }, [enabled, clientId]);
+  }, [clientId]);
 
   useEffect(() => {
     if (!drag) return undefined;
@@ -95,7 +98,7 @@ function FloatingMetaMessenger({ clientId, enabled }) {
     else refreshNotifications();
   }
 
-  if (!enabled) return null;
+  if (!clientId || messengerAvailable === false) return null;
   const style = position.left != null ? { left: position.left, top: position.top } : position.top != null ? { right: position.right ?? 12, top: position.top } : { right: position.right ?? 22, bottom: position.bottom ?? 24 };
   return <div className="meta-messenger-float-wrap" style={style}>
     {pickerOpen && pages.length > 1 && <div className="meta-messenger-page-picker">
@@ -4364,7 +4367,7 @@ export default function PortalPage({ session }) {
           </>
         )}
       </main>
-      <FloatingMetaMessenger clientId={client?.client_id} enabled={metaConnected} />
+      <FloatingMetaMessenger clientId={client?.client_id} />
     </div>
   );
 }
