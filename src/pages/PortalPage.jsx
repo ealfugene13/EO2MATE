@@ -39,7 +39,7 @@ function FloatingMetaMessenger({ clientId, enabled }) {
   useEffect(() => {
     if (!enabled || !clientId) return undefined;
     refreshNotifications();
-    const timer = window.setInterval(refreshNotifications, 15000);
+    const timer = window.setInterval(refreshNotifications, 5000);
     const onVisible = () => { if (document.visibilityState === "visible") refreshNotifications(); };
     document.addEventListener("visibilitychange", onVisible);
     return () => { window.clearInterval(timer); document.removeEventListener("visibilitychange", onVisible); };
