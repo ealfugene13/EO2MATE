@@ -250,12 +250,6 @@ function NavIcon({ type }) {
         <path d="m10 9 2 2 2-2" />
       </svg>
     ),
-    automation: (
-      <svg {...common}>
-        <circle cx="12" cy="12" r="3" />
-        <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21h-4v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3v-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1L7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.6V3h4v.1a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.1v4H21a1.7 1.7 0 0 0-1.6 1Z" />
-      </svg>
-    ),
     setup: (
       <svg {...common}>
         <path d="M4 21v-7" />
@@ -1297,11 +1291,6 @@ export default function PortalPage({ session }) {
     } finally {
       setAutomationControlLoading(false);
     }
-  }
-
-  async function openAutomationControl() {
-    setPage("setup");
-    await loadAutomationControls();
   }
 
   function requestAutomationChange({

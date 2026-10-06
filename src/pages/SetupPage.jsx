@@ -12,16 +12,6 @@ const SETTING_LABELS = {
   INVALID_COMMAND_REPLY_ENABLED: "Reply to invalid Messenger commands",
 };
 
-const COMMAND_ACTIONS = [
-  { value: "START_PAYMENT", label: "Start / resend payment" },
-  { value: "REFRESH_PAYMENT", label: "Refresh payment QR" },
-  { value: "HELP", label: "Show help / commands" },
-];
-
-const COMMAND_SCOPES = [
-  { value: "BUYER", label: "Buyer only" },
-];
-
 const CLIENT_EDITABLE_SETTING_KEYS = new Set([
   "PAYMENT_DEADLINE_HOURS",
   "PAYMENT_REOPEN_HOURS",
@@ -122,9 +112,7 @@ export default function SetupPage({ client }) {
   const [highlightedRow, setHighlightedRow] = useState("");
 
   const settingFormRef = useRef(null);
-  const commandFormRef = useRef(null);
   const settingValueRef = useRef(null);
-  const commandActionRef = useRef(null);
 
   const [editingSetting, setEditingSetting] = useState(null);
   const [settingForm, setSettingForm] = useState({
@@ -135,14 +123,7 @@ export default function SetupPage({ client }) {
     is_active: true,
   });
 
-  const [editingCommand, setEditingCommand] = useState(null);
-  const [commandForm, setCommandForm] = useState({
-    command_text: "",
-    action_code: "START_PAYMENT",
-    sender_scope: "BUYER",
-    description: "",
-    is_active: true,
-  });
+
 
   const isAdmin = ["ADMIN", "OWNER", "SUPER_ADMIN"].includes(
     String(client?.role || "").trim().toUpperCase()
@@ -251,45 +232,14 @@ export default function SetupPage({ client }) {
     });
   }
 
-  function showConfirmPopup({
-    title,
-    popupMessage,
-    confirmLabel = "Confirm",
-    type = "warning",
-    onConfirm,
-  }) {
-    setPopup({
-      open: true,
-      type,
-      title,
-      message: popupMessage,
-      confirmLabel,
-      showCancel: true,
-      onConfirm,
-    });
-  }
-
-  function focusEditor(section, rowKey) {
+  function focusSettingEditor(rowKey) {
     setHighlightedRow(rowKey);
 
     window.setTimeout(() => {
-      const target =
-        section === "setting"
-          ? settingFormRef.current
-          : commandFormRef.current;
-
-      target?.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      });
-
+      settingFormRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
       window.setTimeout(() => {
-        if (section === "setting") {
-          settingValueRef.current?.focus();
-          settingValueRef.current?.select?.();
-        } else {
-          commandActionRef.current?.focus();
-        }
+        settingValueRef.current?.focus();
+        settingValueRef.current?.select?.();
       }, 350);
     }, 50);
   }
@@ -318,7 +268,7 @@ export default function SetupPage({ client }) {
       is_active: row.is_active !== false,
     });
 
-    focusEditor("setting", `setting:${row.setting_key}`);
+    focusSettingEditor(`setting:${row.setting_key}`);
   }
 
   async function saveSetting(event) {
@@ -350,9 +300,6 @@ export default function SetupPage({ client }) {
           .from("eo2mate_settings")
           .update({
             setting_value: value,
-            value_type: settingForm.value_type,
-            description: settingForm.description || null,
-            is_active: settingForm.is_active,
             updated_at: new Date().toISOString(),
           })
           .eq("setting_id", existingOverride.setting_id);
@@ -388,217 +335,6 @@ export default function SetupPage({ client }) {
     }
   }
 
-  function deleteSetting(item) {
-    clearFeedback();
-
-    if (!isAdmin) return;
-
-    if (!item.override) {
-      showInfoPopup(
-        "System default protected",
-        "This is a global default. Edit it first to create a client override. Only client overrides can be deleted from this screen.",
-        "info"
-      );
-      return;
-    }
-
-    showConfirmPopup({
-      title: "Delete setting override?",
-      popupMessage:
-        `Delete the client override for ${item.override.setting_key}? ` +
-        "EO2MATE will immediately fall back to the global default value.",
-      confirmLabel: "Delete Override",
-      type: "danger",
-      onConfirm: async () => {
-        closePopup();
-        setLoading(true);
-
-        try {
-          const { error: deleteError } = await supabase
-            .from("eo2mate_settings")
-            .delete()
-            .eq("setting_id", item.override.setting_id);
-
-          if (deleteError) throw deleteError;
-
-          setMessage(
-            `${item.override.setting_key} override deleted. Global default restored.`
-          );
-          showInfoPopup(
-            "Override deleted",
-            `${item.override.setting_key} now uses the global default again.`,
-            "success"
-          );
-
-          if (editingSetting === item.override.setting_key) resetSettingForm();
-          await loadSetup();
-        } catch (err) {
-          setError(err.message || "Unable to delete setting override.");
-          showInfoPopup(
-            "Delete failed",
-            err.message || "Unable to delete setting override.",
-            "danger"
-          );
-        } finally {
-          setLoading(false);
-        }
-      },
-    });
-  }
-
-  function resetCommandForm() {
-    setEditingCommand(null);
-    setHighlightedRow("");
-    setCommandForm({
-      command_text: "",
-      action_code: "START_PAYMENT",
-      sender_scope: "BUYER",
-      description: "",
-      is_active: true,
-    });
-  }
-
-  function editCommand(item) {
-    const row = item.effective;
-    clearFeedback();
-    setEditingCommand(normalizeCommand(row.command_text));
-    setCommandForm({
-      command_text: normalizeCommand(row.command_text),
-      action_code: row.action_code || "START_PAYMENT",
-      sender_scope: row.sender_scope || "BUYER",
-      description: row.description || "",
-      is_active: row.is_active !== false,
-    });
-
-    focusEditor("command", `command:${normalizeCommand(row.command_text)}`);
-  }
-
-  async function saveCommand(event) {
-    event.preventDefault();
-    clearFeedback();
-
-    if (!isAdmin) {
-      setError("Admin or owner access is required.");
-      return;
-    }
-
-    const command = normalizeCommand(commandForm.command_text);
-
-    if (!command || !commandForm.action_code) {
-      setError("Command and action are required.");
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      const existingOverride = commands.find(
-        (row) =>
-          row.client_id === client.client_id &&
-          normalizeCommand(row.command_text) === command
-      );
-
-      if (existingOverride) {
-        const { error: updateError } = await supabase
-          .from("eo2mate_command_aliases")
-          .update({
-            command_text: command,
-            action_code: commandForm.action_code,
-            sender_scope: commandForm.sender_scope,
-            description: commandForm.description || null,
-            is_active: commandForm.is_active,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("command_alias_id", existingOverride.command_alias_id);
-
-        if (updateError) throw updateError;
-      } else {
-        const { error: insertError } = await supabase
-          .from("eo2mate_command_aliases")
-          .insert({
-            client_id: client.client_id,
-            command_text: command,
-            action_code: commandForm.action_code,
-            sender_scope: commandForm.sender_scope,
-            description: commandForm.description || null,
-            is_active: commandForm.is_active,
-          });
-
-        if (insertError) throw insertError;
-      }
-
-      setMessage(`${command} saved.`);
-      showInfoPopup(
-        editingCommand ? "Command updated" : "Command created",
-        `${command} was saved successfully. Active Messenger payment conversations will use this setup.`,
-        "success"
-      );
-      resetCommandForm();
-      await loadSetup();
-    } catch (err) {
-      setError(err.message || "Unable to save command.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function deleteCommand(item) {
-    clearFeedback();
-
-    if (!isAdmin) return;
-
-    if (!item.override) {
-      showInfoPopup(
-        "System command protected",
-        "This is a global command. Edit it first to create a client override. Only client overrides can be deleted from this screen.",
-        "info"
-      );
-      return;
-    }
-
-    const commandText = normalizeCommand(item.override.command_text);
-
-    showConfirmPopup({
-      title: "Delete command override?",
-      popupMessage:
-        `Delete the client override for "${commandText}"? ` +
-        "If a global command with the same text exists, EO2MATE will use that global command again.",
-      confirmLabel: "Delete Override",
-      type: "danger",
-      onConfirm: async () => {
-        closePopup();
-        setLoading(true);
-
-        try {
-          const { error: deleteError } = await supabase
-            .from("eo2mate_command_aliases")
-            .delete()
-            .eq("command_alias_id", item.override.command_alias_id);
-
-          if (deleteError) throw deleteError;
-
-          setMessage(`${commandText} override deleted.`);
-          showInfoPopup(
-            "Command override deleted",
-            `${commandText} was removed from this client's overrides.`,
-            "success"
-          );
-
-          if (editingCommand === commandText) resetCommandForm();
-          await loadSetup();
-        } catch (err) {
-          setError(err.message || "Unable to delete command override.");
-          showInfoPopup(
-            "Delete failed",
-            err.message || "Unable to delete command override.",
-            "danger"
-          );
-        } finally {
-          setLoading(false);
-        }
-      },
-    });
-  }
 
   return (
     <>
@@ -767,14 +503,7 @@ export default function SetupPage({ client }) {
                 const row = item.effective;
                 const key = normalizeCommand(row.command_text);
                 return (
-                  <tr
-                    key={key}
-                    className={
-                      highlightedRow === `command:${key}`
-                        ? "setup-row-selected"
-                        : ""
-                    }
-                  >
+                  <tr key={key}>
                     <td><strong>{key}</strong></td>
                     <td>{row.action_code}</td>
                     <td>
