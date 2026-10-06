@@ -16,7 +16,7 @@ export default function SetupPage({ client }) {
   const [settings,setSettings]=useState([]), [commands,setCommands]=useState([]), [loading,setLoading]=useState(false);
   const [message,setMessage]=useState(""), [error,setError]=useState("");
   const [edit,setEdit]=useState(null), [value,setValue]=useState("");
-  const [confirm,setConfirm]=useState(null), [password,setPassword]=useState(""), [verifying,setVerifying]=useState(false);
+  const [confirm,setConfirm]=useState(null), [password,setPassword]=useState(""), [verifying,setVerifying]=useState(false), [confirmError,setConfirmError]=useState("");
   const isAdmin=["ADMIN","OWNER","CLIENT_ADMIN","SUPER_ADMIN"].includes(String(client?.role||"").toUpperCase());
 
   async function load(){ if(!client?.client_id)return; setLoading(true);setError(""); try{
@@ -31,18 +31,18 @@ export default function SetupPage({ client }) {
   const mergedCommands=useMemo(()=>{const m=new Map();commands.filter(x=>!x.client_id).forEach(x=>m.set(norm(x.command_text),x));commands.filter(x=>x.client_id).forEach(x=>m.set(norm(x.command_text),x));return [...m.values()].filter(x=>ALLOWED_ACTIONS.has(norm(x.action_code))).sort((a,b)=>norm(a.command_text).localeCompare(norm(b.command_text)))},[commands]);
 
   function beginEdit(item){setEdit(item);setValue(String(item.effective.setting_value??""));setMessage("");setError("")}
-  function requestSave(e){e.preventDefault();if(!isAdmin)return setError("Admin access is required.");if(!edit)return; if(!String(value).trim())return setError("Value is required.");setPassword("");setConfirm({item:edit,value:String(value).trim()})}
-  async function verifyAndSave(){if(!password)return setError("Enter your current password.");setVerifying(true);setError("");try{
+  function requestSave(e){e.preventDefault();if(!isAdmin)return setError("Admin access is required.");if(!edit)return; if(!String(value).trim())return setError("Value is required.");setPassword("");setConfirmError("");setConfirm({item:edit,value:String(value).trim()})}
+  async function verifyAndSave(){if(!password){setConfirmError("Enter your current password.");return;}setVerifying(true);setConfirmError("");try{
     const {data:{user}}=await supabase.auth.getUser(); if(!user?.email)throw new Error("Unable to verify the signed-in account.");
     const {error:authError}=await supabase.auth.signInWithPassword({email:user.email,password}); if(authError)throw new Error("Incorrect password. No setup changes were made.");
     const key=confirm.item.effective.setting_key; const existing=confirm.item.override;
     if(existing){const {error:e}=await supabase.from("eo2mate_settings").update({setting_value:confirm.value,updated_at:new Date().toISOString()}).eq("setting_id",existing.setting_id);if(e)throw e;}
     else {const base=confirm.item.global||confirm.item.effective;const {error:e}=await supabase.from("eo2mate_settings").insert({client_id:client.client_id,setting_key:key,setting_value:confirm.value,value_type:base.value_type||"TEXT",description:base.description||null,is_active:base.is_active!==false});if(e)throw e;}
     setMessage(`${SETTING_LABELS[key]||key} updated.`);setEdit(null);setValue("");setConfirm(null);setPassword("");await load();
-  }catch(e){setError(e.message||"Unable to update setting.")}finally{setVerifying(false)}}
+  }catch(e){setConfirmError(e.message||"Unable to update setting.")}finally{setVerifying(false)}}
 
   return <>
-    {confirm&&<div className="setup-modal-backdrop"><div className="setup-modal setup-password-modal" role="dialog" aria-modal="true"><div className="setup-modal-icon">🔒</div><div className="setup-modal-copy"><h3>Verify setup change</h3><p>Enter your current EO2MATE password to change <strong>{SETTING_LABELS[confirm.item.effective.setting_key]||confirm.item.effective.setting_key}</strong>.</p></div><label className="setup-password-field">Current password<input type="password" autoComplete="current-password" value={password} onChange={e=>setPassword(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();verifyAndSave()}}}/></label><div className="setup-modal-actions"><button className="secondary-button" type="button" onClick={()=>{setConfirm(null);setPassword("")}} disabled={verifying}>Cancel</button><button className="primary-button" type="button" onClick={verifyAndSave} disabled={verifying}>{verifying?"Verifying…":"Verify & Save"}</button></div></div></div>}
+    {confirm&&<div className="setup-modal-backdrop"><div className="setup-modal setup-password-modal" role="dialog" aria-modal="true"><div className="setup-modal-icon">🔒</div><div className="setup-modal-copy"><h3>Verify setup change</h3><p>Enter your current EO2MATE password to change <strong>{SETTING_LABELS[confirm.item.effective.setting_key]||confirm.item.effective.setting_key}</strong>.</p></div><label className="setup-password-field">Current password<input type="password" autoComplete="current-password" value={password} onChange={e=>{setPassword(e.target.value);if(confirmError)setConfirmError("")}} onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();verifyAndSave()}}}/></label>{confirmError&&<div className="setup-modal-inline-error" role="alert">{confirmError}</div>}<div className="setup-modal-actions"><button className="secondary-button" type="button" onClick={()=>{setConfirm(null);setPassword("");setConfirmError("")}} disabled={verifying}>Cancel</button><button className="primary-button" type="button" onClick={verifyAndSave} disabled={verifying}>{verifying?"Verifying…":"Verify & Save"}</button></div></div></div>}
     <header className="dashboard-header"><div><p className="eyebrow">EO2MATE CONFIGURATION</p><h1>Setup</h1><p>Configure supported EO2MATE settings. Commands are system-defined and read-only.</p></div><button className="icon-button refresh-icon-button" type="button" onClick={load} disabled={loading} title="Refresh" aria-label="Refresh"><RefreshIcon/></button></header>
     {message&&<div className="success-message global-error">{message}</div>}{error&&<div className="dashboard-error global-error">{error}</div>}
     <section className="dashboard-panel setup-panel"><div className="panel-header"><div><h2>Runtime settings</h2><p>Only the setting value can be changed. Every change requires password verification.</p></div></div>

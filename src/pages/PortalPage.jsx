@@ -2682,7 +2682,7 @@ export default function PortalPage({ session }) {
               </div>
 
               <div className="facebook-connect-actions">
-                <button className={facebookStatus?.connected ? "icon-button facebook-reconnect-icon" : "primary-button"} onClick={connectFacebook} title={facebookStatus?.connected ? "Reconnect Facebook" : "Connect Facebook"} aria-label={facebookStatus?.connected ? "Reconnect Facebook" : "Connect Facebook"}>{facebookStatus?.connected ? <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v5h-5"/><path d="M4 18v-5h5"/><path d="M6.1 9a7 7 0 0 1 11.3-2.1L20 9"/><path d="M4 15l2.6 2.1A7 7 0 0 0 17.9 15"/></svg> : "Connect Facebook"}</button>
+                <button className={facebookStatus?.connected ? "icon-button facebook-reconnect-icon" : "primary-button"} onClick={connectFacebook} title={facebookStatus?.connected ? "Reconnect Facebook" : "Connect Facebook"} aria-label={facebookStatus?.connected ? "Reconnect Facebook" : "Connect Facebook"}>{facebookStatus?.connected ? <svg viewBox="0 0 24 24" aria-hidden="true" className="facebook-mark-icon"><path d="M13.6 21v-8h2.7l.4-3.1h-3.1V7.9c0-.9.3-1.5 1.6-1.5h1.7V3.6c-.3 0-1.3-.1-2.5-.1-2.5 0-4.2 1.5-4.2 4.3v2.1H7.4V13h2.8v8h3.4Z" fill="currentColor" stroke="none"/></svg> : "Connect Facebook"}</button>
               </div>
             </section>
 
@@ -2869,7 +2869,7 @@ export default function PortalPage({ session }) {
                 </div>
                 {reportMessage && !generatedReport && <div className="info-banner report-filter-message">{reportMessage}</div>}
                 <div className="report-filter-actions">
-                  <button className="icon-button report-action-icon" type="button" title="Clear filters" aria-label="Clear filters" onClick={() => { setSelectedReport(""); setReportDateRange(""); setReportCustomFrom(""); setReportCustomTo(""); setReportPageFilter(""); setReportChannelFilter(""); setReportStatusFilter(""); setReportSortBy(""); setGeneratedReport(null); setReportMessage(""); }}>×</button>
+                  <button className="icon-button report-action-icon" type="button" title="Clear filters" aria-label="Clear filters" onClick={() => { setSelectedReport(""); setReportDateRange(""); setReportCustomFrom(""); setReportCustomTo(""); setReportPageFilter(""); setReportChannelFilter(""); setReportStatusFilter(""); setReportSortBy(""); setGeneratedReport(null); setReportMessage(""); }}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18"/><path d="M6 5l1 15h10l1-15"/><path d="M9 9v7"/><path d="M15 9v7"/></svg></button>
                   <button className="primary-button report-short-action" type="submit"><NavIcon type="reports" /> Run</button>
                   <button className="secondary-button report-short-action" type="button" onClick={exportReportExcel} disabled={!generatedReport} title="Export Excel">▦ Excel</button>
                   <button className="secondary-button report-short-action" type="button" onClick={printReport} disabled={!generatedReport} title="Export PDF">▤ PDF</button>
@@ -3165,7 +3165,6 @@ export default function PortalPage({ session }) {
               </div>
 
               <div className="automation-control-row client-scope">
-                <div className={`automation-switch-orb ${paymentAutomation.payment_automation_enabled !== false ? "enabled" : "disabled"}`}><span /></div>
                 <div className="automation-control-copy">
                   <strong>Enable payment automation</strong>
                   <span>When OFF, Auction, Mining, Pre-Order and Regular Sale continue recording winners/orders, while payment links and !PAY link delivery are suppressed.</span>
@@ -3442,12 +3441,12 @@ export default function PortalPage({ session }) {
               flexWrap: "wrap",
             }}>
               <div style={{ minWidth: 260, flex: "1 1 520px" }}>
-                <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: ".14em", opacity: .72, marginBottom: 8 }}>EO2MATE CONTROL CENTER</div>
+                <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: ".14em", opacity: .72, marginBottom: 8 }}>EO2MATE BUSINESS OVERVIEW</div>
                 <h1 style={{ margin: 0, fontSize: "clamp(26px, 4vw, 38px)", lineHeight: 1.08 }}>
-                  {client?.name ? `Welcome, ${client.name}` : "Business dashboard"}
+                  {client?.name ? `${client.name} Dashboard` : "Business Dashboard"}
                 </h1>
                 <p style={{ margin: "10px 0 0", maxWidth: 720, color: "rgba(255,255,255,.78)", lineHeight: 1.55 }}>
-                  Sales, orders, payments, inventory and fulfillment — one operational view of your EO2MATE workspace.
+                  Monitor today’s selling activity, orders, payments, inventory and fulfillment from one clear operational dashboard.
                 </p>
               </div>
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
