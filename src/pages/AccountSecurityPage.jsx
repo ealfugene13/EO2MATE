@@ -7,7 +7,6 @@ export default function AccountSecurityPage({ session }) {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [mfaFactors, setMfaFactors] = useState([]);
-  const [aal, setAal] = useState(null);
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
@@ -15,14 +14,12 @@ export default function AccountSecurityPage({ session }) {
 
   async function loadSecurity() {
     setError("");
-    const [{ data: userData }, { data: factorData }, { data: aalData }] = await Promise.all([
+    const [{ data: userData }, { data: factorData }] = await Promise.all([
       supabase.auth.getUser(),
       supabase.auth.mfa.listFactors(),
-      supabase.auth.mfa.getAuthenticatorAssuranceLevel(),
     ]);
     if (userData?.user?.email) setEmail(userData.user.email);
     setMfaFactors(factorData?.totp || []);
-    setAal(aalData || null);
   }
 
   useEffect(() => { loadSecurity(); }, []);
@@ -108,9 +105,8 @@ export default function AccountSecurityPage({ session }) {
 
       <section className="settings-card account-security-card account-security-wide">
         <div className="account-security-card-heading"><div><h2>Authenticator</h2><p>Two-step verification protects this account after the password is accepted.</p></div><span className={`security-status ${verifiedTotp.length ? "ok" : "warn"}`}>{verifiedTotp.length ? "Enabled" : "Not enrolled"}</span></div>
-        <div className="security-summary-row"><span>Current assurance</span><strong>{aal?.currentLevel ? String(aal.currentLevel).toUpperCase() : "—"}</strong></div>
-        <div className="security-summary-row"><span>Verified TOTP factors</span><strong>{verifiedTotp.length}</strong></div>
-        <p className="account-security-help">EO2MATE does not display or store your authenticator secret here. Factor removal/recovery is intentionally not exposed until a secure recovery procedure is implemented.</p>
+        <div className="security-summary-row"><span>Two-step verification</span><strong>{verifiedTotp.length ? "Active" : "Not active"}</strong></div>
+        <p className="account-security-help">Authenticator secrets and internal security details are intentionally not displayed.</p>
       </section>
     </div>
   </>;

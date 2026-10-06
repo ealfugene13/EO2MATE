@@ -1,5 +1,5 @@
 import InventoryPage from "./InventoryPage";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../supabase";
 import SetupPage from "./SetupPage";
 import OnboardingPage from "./OnboardingPage";
@@ -22,6 +22,7 @@ function FloatingMetaMessenger({ clientId }) {
     catch { return { right: 22, bottom: 24 }; }
   });
   const [drag, setDrag] = useState(null);
+  const dragGestureRef = useRef({ active: false, moved: false, startX: 0, startY: 0 });
 
   async function refreshNotifications() {
     if (!clientId) return;
@@ -52,6 +53,8 @@ function FloatingMetaMessenger({ clientId }) {
     if (!drag) return undefined;
     const move = (event) => {
       const point = event.touches?.[0] || event;
+      const gesture = dragGestureRef.current;
+      if (Math.hypot(point.clientX - gesture.startX, point.clientY - gesture.startY) > 5) gesture.moved = true;
       const size = 58;
       const x = Math.min(Math.max(point.clientX - drag.dx, 8), window.innerWidth - size - 8);
       const y = Math.min(Math.max(point.clientY - drag.dy, 8), window.innerHeight - size - 8);
@@ -59,6 +62,7 @@ function FloatingMetaMessenger({ clientId }) {
     };
     const end = () => {
       setDrag(null);
+      window.setTimeout(() => { dragGestureRef.current.active = false; }, 0);
       setPosition((current) => {
         const size = 58;
         const left = current.left ?? (window.innerWidth - size - (current.right || 22));
@@ -113,9 +117,9 @@ function FloatingMetaMessenger({ clientId }) {
       className="meta-messenger-float"
       aria-label={unread ? `Open Meta Messenger, ${unread} unread messages` : "Open Meta Messenger"}
       title="Open Meta Messenger"
-      onMouseDown={(e) => { const r = e.currentTarget.getBoundingClientRect(); setDrag({ dx: e.clientX-r.left, dy: e.clientY-r.top }); }}
-      onTouchStart={(e) => { const p=e.touches[0], r=e.currentTarget.getBoundingClientRect(); setDrag({ dx:p.clientX-r.left, dy:p.clientY-r.top }); }}
-      onClick={() => { if (!drag) activate(); }}
+      onMouseDown={(e) => { const r = e.currentTarget.getBoundingClientRect(); dragGestureRef.current = { active: true, moved: false, startX: e.clientX, startY: e.clientY }; setDrag({ dx: e.clientX-r.left, dy: e.clientY-r.top }); }}
+      onTouchStart={(e) => { const p=e.touches[0], r=e.currentTarget.getBoundingClientRect(); dragGestureRef.current = { active: true, moved: false, startX: p.clientX, startY: p.clientY }; setDrag({ dx:p.clientX-r.left, dy:p.clientY-r.top }); }}
+      onClick={(e) => { if (dragGestureRef.current.moved) { e.preventDefault(); e.stopPropagation(); dragGestureRef.current.moved = false; return; } activate(); }}
     >
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.48 2 2 6.15 2 11.27c0 2.91 1.45 5.5 3.72 7.2V22l3.4-1.87c.91.25 1.88.39 2.88.39 5.52 0 10-4.15 10-9.25S17.52 2 12 2Z"/><path className="meta-messenger-bolt" d="m6.8 14.2 3.4-3.6 2.1 2 4.9-2.8-3.4 3.6-2.1-2-4.9 2.8Z"/></svg>
       {unread > 0 && <span className="meta-messenger-badge">{unread > 99 ? "99+" : unread}</span>}
@@ -2696,7 +2700,6 @@ export default function PortalPage({ session }) {
                   <thead>
                     <tr>
                       <th>Page</th>
-                      <th>Facebook Page ID</th>
                       <th>Status</th>
                       <th>Authorization</th>
                       <th>Connected</th>
@@ -2706,7 +2709,6 @@ export default function PortalPage({ session }) {
                     {(facebookStatus?.pages || []).map((fbPage) => (
                       <tr key={fbPage.fb_page_id}>
                         <td>{fbPage.page_name || "Facebook Page"}</td>
-                        <td>{fbPage.fb_page_id || "-"}</td>
                         <td><StatusBadge status={fbPage.status || "ACTIVE"} /></td>
                         <td><StatusBadge status={fbPage.token_present ? "AUTHORIZED" : "RECONNECT"} /></td>
                         <td>{formatDateTime(fbPage.connected_at)}</td>
@@ -2715,7 +2717,7 @@ export default function PortalPage({ session }) {
 
                     {!facebookLoading && !(facebookStatus?.pages || []).length && (
                       <tr>
-                        <td colSpan="5" className="empty-table-cell">No Facebook Page connected yet.</td>
+                        <td colSpan="4" className="empty-table-cell">No Facebook Page connected yet.</td>
                       </tr>
                     )}
                   </tbody>
@@ -2844,10 +2846,7 @@ export default function PortalPage({ session }) {
                 <h1>Reports &amp; Insights</h1>
                 <p>Operational reports plus EO2MATE insights designed to help clients decide what to sell, collect and improve next.</p>
               </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button className="secondary-button" type="button" onClick={exportReportExcel} disabled={!generatedReport}>Generate Excel</button>
-                <button className="secondary-button" type="button" onClick={printReport} disabled={!generatedReport}>Generate PDF</button>
-              </div>
+
             </header>
 
             <section className="dashboard-panel report-filter-panel">
@@ -2870,35 +2869,12 @@ export default function PortalPage({ session }) {
                 </div>
                 {reportMessage && !generatedReport && <div className="info-banner report-filter-message">{reportMessage}</div>}
                 <div className="report-filter-actions">
-                  <button className="secondary-button" type="button" onClick={() => { setSelectedReport(""); setReportDateRange(""); setReportCustomFrom(""); setReportCustomTo(""); setReportPageFilter(""); setReportChannelFilter(""); setReportStatusFilter(""); setReportSortBy(""); setGeneratedReport(null); setReportMessage(""); }}>Clear Filters</button>
+                  <button className="secondary-button" type="button" onClick={() => { setSelectedReport(""); setReportDateRange(""); setReportCustomFrom(""); setReportCustomTo(""); setReportPageFilter(""); setReportChannelFilter(""); setReportStatusFilter(""); setReportSortBy(""); setGeneratedReport(null); setReportMessage(""); }}>Clear</button>
                   <button className="primary-button" type="submit">Generate Report</button>
+                  <button className="secondary-button" type="button" onClick={exportReportExcel} disabled={!generatedReport}>Export Excel</button>
+                  <button className="secondary-button" type="button" onClick={printReport} disabled={!generatedReport}>Export PDF</button>
                 </div>
               </form>
-            </section>
-
-            <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 14, marginBottom: 18 }}>
-              {REPORT_CATALOG.map((report) => (
-                <button
-                  key={report.key}
-                  type="button"
-                  onClick={() => setSelectedReport(report.key)}
-                  style={{
-                    border: report.key === selectedReport ? "2px solid #2ea84a" : "1px solid #e3e9ef",
-                    background: report.featured ? "linear-gradient(135deg, #f1fff4 0%, #ffffff 65%)" : "#ffffff",
-                    borderRadius: 14,
-                    padding: 18,
-                    textAlign: "left",
-                    cursor: "pointer",
-                    boxShadow: report.key === selectedReport ? "0 8px 24px rgba(46,168,74,.10)" : "none",
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", marginBottom: 8 }}>
-                    <strong style={{ color: "#1e2d3d" }}>{report.title}</strong>
-                    <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: ".08em", color: report.featured ? "#20833a" : "#718096" }}>{report.featured ? "EO2MATE" : report.group.toUpperCase()}</span>
-                  </div>
-                  <div style={{ fontSize: 13, lineHeight: 1.5, color: "#607083" }}>{report.description}</div>
-                </button>
-              ))}
             </section>
 
             {(() => {
