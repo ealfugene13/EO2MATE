@@ -14,6 +14,8 @@ export default function AutomatedMessagesPage({ client }) {
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [secureAction, setSecureAction] = useState(null);
+  const [password, setPassword] = useState("");
 
   async function call(action, extra = {}) {
     const { data, error: invokeError } = await supabase.functions.invoke("eo2mate", {
@@ -83,7 +85,7 @@ export default function AutomatedMessagesPage({ client }) {
 
   function beginEdit(row) { setEditing(row); setText(row.effective_text || ""); setError(""); setNotice(""); }
 
-  async function save() {
+  async function saveVerified() {
     if (!editing || !text.trim()) return;
     setSaving(true); setError("");
     try {
@@ -93,7 +95,7 @@ export default function AutomatedMessagesPage({ client }) {
     finally { setSaving(false); }
   }
 
-  async function reset(row = editing) {
+  async function resetVerified(row = editing) {
     if (!row) return;
     setSaving(true); setError("");
     try {
@@ -101,6 +103,21 @@ export default function AutomatedMessagesPage({ client }) {
       setEditing(null); setNotice("Message reset to the EO2MATE default."); await load();
     } catch (e) { setError(e.message || "Unable to reset automated message."); }
     finally { setSaving(false); }
+  }
+
+  function requestSecureAction(type, row = editing) { setPassword(""); setError(""); setSecureAction({ type, row }); }
+
+  async function verifyAndRun() {
+    if (!password) return setError("Enter your current password.");
+    setSaving(true); setError("");
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user?.email) throw new Error("Unable to verify the signed-in account.");
+      const { error: verifyError } = await supabase.auth.signInWithPassword({ email: user.email, password });
+      if (verifyError) throw new Error("Incorrect password. No message changes were made.");
+      const action = secureAction; setSecureAction(null); setPassword(""); setSaving(false);
+      if (action.type === "SAVE") await saveVerified(); else await resetVerified(action.row);
+    } catch (e) { setError(e.message || "Unable to verify password."); setSaving(false); }
   }
 
   return <>
@@ -127,7 +144,7 @@ export default function AutomatedMessagesPage({ client }) {
               <td><div className="message-cell-text">{r.override?.message_text || <span className="muted-cell">No override</span>}</div></td>
               <td><div className="message-cell-text effective-message-cell">{r.effective_text}</div>{r.variables?.length > 0 && <div className="template-variable-row compact">{r.variables.map((v) => <code key={v}>{`{{${v}}}`}</code>)}</div>}</td>
               <td><span className={r.override ? "override-pill" : "default-pill"}>{r.override ? "Customized" : "System default"}</span></td>
-              <td><div className="message-table-actions">{r.override && <button className="table-action-button" type="button" onClick={() => reset(r)}>Reset</button>}<button className="table-action-button" type="button" onClick={() => beginEdit(r)}>Edit</button></div></td>
+              <td><div className="message-table-actions">{r.override && <button className="table-action-button" type="button" onClick={() => requestSecureAction("RESET", r)}>Reset</button>}<button className="table-action-button" type="button" onClick={() => beginEdit(r)}>Edit</button></div></td>
             </tr>)}</tbody>
           </table></div>
         </section>)}
@@ -135,12 +152,14 @@ export default function AutomatedMessagesPage({ client }) {
       </div>
     </section>
 
+    {secureAction && <div className="setup-modal-backdrop"><div className="setup-modal setup-password-modal" role="dialog" aria-modal="true"><div className="setup-modal-icon">🔒</div><div className="setup-modal-copy"><h3>Verify message change</h3><p>Enter your current EO2MATE password before {secureAction.type === "SAVE" ? "saving this client message override" : "resetting this message to the EO2MATE default"}.</p></div><label className="setup-password-field">Current password<input type="password" autoComplete="current-password" value={password} onChange={(e)=>setPassword(e.target.value)} /></label><div className="setup-modal-actions"><button className="secondary-button" type="button" onClick={()=>{setSecureAction(null);setPassword("")}} disabled={saving}>Cancel</button><button className="primary-button" type="button" onClick={verifyAndRun} disabled={saving}>{saving?"Verifying…":"Verify & Continue"}</button></div></div></div>}
+
     {editing && <div className="eo2-modal-backdrop" role="presentation" onMouseDown={() => !saving && setEditing(null)}><div className="eo2-modal-card" role="dialog" aria-modal="true" onMouseDown={(e) => e.stopPropagation()}>
       <div className="eo2-modal-header"><div><p className="eyebrow">{pretty(editing.mode_code)} · {pretty(editing.channel_code)}</p><h2>{pretty(editing.event_code)}</h2><span>{editing.description}</span></div><button className="icon-button" type="button" onClick={() => setEditing(null)} disabled={saving}>×</button></div>
       <label className="message-editor-label">Message<textarea rows="8" value={text} onChange={(e) => setText(e.target.value)} disabled={saving}/></label>
       <div className="message-editor-help"><strong>Allowed variables:</strong> {editing.variables?.length ? editing.variables.map((v) => `{{${v}}}`).join(", ") : "None"}. Unsupported variables are rejected by EO2MATE.</div>
       <div className="default-message-preview"><strong>EO2MATE default</strong><p>{editing.default_text}</p></div>
-      <div className="eo2-modal-actions">{editing.override && <button className="secondary-button danger-action" type="button" onClick={() => reset()} disabled={saving}>Reset to default</button>}<button className="secondary-button" type="button" onClick={() => setEditing(null)} disabled={saving}>Cancel</button><button className="primary-button" type="button" onClick={save} disabled={saving || !text.trim()}>{saving ? "Saving..." : "Save message"}</button></div>
+      <div className="eo2-modal-actions">{editing.override && <button className="secondary-button danger-action" type="button" onClick={() => requestSecureAction("RESET")} disabled={saving}>Reset to default</button>}<button className="secondary-button" type="button" onClick={() => setEditing(null)} disabled={saving}>Cancel</button><button className="primary-button" type="button" onClick={() => requestSecureAction("SAVE")} disabled={saving || !text.trim()}>{saving ? "Saving..." : "Save message"}</button></div>
     </div></div>}
   </>;
 }

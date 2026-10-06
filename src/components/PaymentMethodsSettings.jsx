@@ -20,7 +20,6 @@ export default function PaymentMethodsSettings({ clientId, onChanged }) {
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
-  const [manualInstructions, setManualInstructions] = useState("");
 
   async function call(body) {
     const accessToken = await token();
@@ -40,7 +39,6 @@ export default function PaymentMethodsSettings({ clientId, onChanged }) {
     try {
       const result = await call({ route: "get-settings" });
       setData(result);
-      setManualInstructions(result?.manual_instructions || "");
     } catch (e) { setMessage(e.message || "Unable to load payment methods."); }
     finally { setLoading(false); }
   }
@@ -54,27 +52,19 @@ export default function PaymentMethodsSettings({ clientId, onChanged }) {
     try {
       const result = await call({ route: "update-provider", provider, ...patch });
       setData(result);
-      setManualInstructions(result?.manual_instructions || manualInstructions);
       setMessage(`${provider} payment settings updated.`);
       await onChanged?.();
     } catch (e) { setMessage(e.message || `Unable to update ${provider}.`); }
     finally { setBusy(""); }
   }
 
-  async function saveManual() {
-    setBusy("MANUAL"); setMessage("");
-    try {
-      const result = await call({ route: "update-manual", instructions: manualInstructions });
-      setData(result); setMessage("Manual payment instructions saved."); await onChanged?.();
-    } catch (e) { setMessage(e.message || "Unable to save manual payment instructions."); }
-    finally { setBusy(""); }
-  }
+
 
   return (
-    <div className="payment-methods-settings">
+    <div className="payment-methods-settings payment-settings-enhanced">
       <header className="dashboard-header">
         <div><p className="eyebrow">SHARED · PAYMENTS</p><h1>Payment Settings</h1><p>Choose which payment methods buyers can use. EO2MATE resolves these settings per client—no provider is hardcoded.</p></div>
-        <button className="secondary-button" type="button" onClick={load} disabled={loading || !!busy}>{loading ? "Refreshing..." : "Refresh"}</button>
+        <button className="icon-button refresh-icon-button" type="button" onClick={load} disabled={loading || !!busy} title="Refresh payment settings" aria-label="Refresh payment settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v5h-5"/><path d="M4 18v-5h5"/><path d="M6.1 9a7 7 0 0 1 11.3-2.1L20 9"/><path d="M4 15l2.6 2.1A7 7 0 0 0 17.9 15"/></svg></button>
       </header>
 
       <section className="dashboard-panel">
@@ -97,11 +87,7 @@ export default function PaymentMethodsSettings({ clientId, onChanged }) {
         </div>
       </section>
 
-      <section className="dashboard-panel" style={{ marginTop: 16 }}>
-        <div className="panel-header"><div><h2>Manual payment instructions</h2><p>Sent only when Manual Payment is enabled/selected. Do not place API keys or other secrets here.</p></div></div>
-        <textarea className="payment-instructions-input" rows="6" value={manualInstructions} onChange={(e) => setManualInstructions(e.target.value)} placeholder="Example: Send payment to the Page's approved account, then reply with your payment reference." />
-        <div style={{ marginTop: 12 }}><button className="primary-button" type="button" onClick={saveManual} disabled={busy === "MANUAL"}>{busy === "MANUAL" ? "Saving..." : "Save Instructions"}</button></div>
-      </section>
+
 
       {message && <div className="form-message" style={{ marginTop: 12 }}>{message}</div>}
     </div>

@@ -756,6 +756,7 @@ export default function PortalPage({ session }) {
   const [automationControlMessage, setAutomationControlMessage] = useState("");
   const [automationModal, setAutomationModal] = useState(null);
   const [automationReason, setAutomationReason] = useState("");
+  const [automationPassword, setAutomationPassword] = useState("");
 
   const [staffSearch, setStaffSearch] = useState("");
   const [showStaffForm, setShowStaffForm] = useState(false);
@@ -1304,6 +1305,7 @@ export default function PortalPage({ session }) {
     enabled,
   }) {
     setAutomationReason("");
+    setAutomationPassword("");
     setAutomationModal({
       scopeType,
       scopeId,
@@ -1320,10 +1322,19 @@ export default function PortalPage({ session }) {
       return;
     }
 
+    if (!automationPassword) {
+      setAutomationControlMessage("Enter your current password to confirm this setup change.");
+      return;
+    }
+
     setAutomationControlLoading(true);
     setAutomationControlMessage("");
 
     try {
+      const { data: userResult, error: userError } = await supabase.auth.getUser();
+      if (userError || !userResult?.user?.email) throw new Error("Unable to verify the signed-in account.");
+      const { error: verifyError } = await supabase.auth.signInWithPassword({ email: userResult.user.email, password: automationPassword });
+      if (verifyError) throw new Error("Incorrect password. No setup changes were made.");
       const isPaymentAutomationChange = automationModal.kind === "PAYMENT_AUTOMATION";
       const { data, error } = await supabase.functions.invoke(
         "eo2mate",
@@ -1356,6 +1367,7 @@ export default function PortalPage({ session }) {
       );
       setAutomationModal(null);
       setAutomationReason("");
+      setAutomationPassword("");
       await loadAutomationControls();
     } catch (error) {
       setAutomationControlMessage(
@@ -2569,7 +2581,7 @@ export default function PortalPage({ session }) {
         {metaConnected && page === "pre-order" && (
           <>
             <section className="dashboard-panel" style={{ marginBottom: 18 }}>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              <div className="preorder-top-actions">
                 <button type="button" className="primary-button">Dashboard / Summary</button>
                 <button type="button" className="secondary-button" onClick={() => navigateTo("pre-order-create")}>Create Post</button>
               </div>
@@ -2634,9 +2646,7 @@ export default function PortalPage({ session }) {
                 <p>Authorize your Facebook account and connect the Page that will run auctions.</p>
               </div>
 
-              <button className="secondary-button" onClick={loadFacebookStatus} disabled={facebookLoading}>
-                {facebookLoading ? "Checking..." : "Refresh Status"}
-              </button>
+              <button className="icon-button refresh-icon-button" onClick={loadFacebookStatus} disabled={facebookLoading} title="Refresh Facebook status" aria-label="Refresh Facebook status"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v5h-5"/><path d="M4 18v-5h5"/><path d="M6.1 9a7 7 0 0 1 11.3-2.1L20 9"/><path d="M4 15l2.6 2.1A7 7 0 0 0 17.9 15"/></svg></button>
             </header>
 
             {facebookMessage && (
@@ -2672,17 +2682,7 @@ export default function PortalPage({ session }) {
               </div>
 
               <div className="facebook-connect-actions">
-                <button className="primary-button" onClick={connectFacebook}>
-                  {facebookStatus?.connected ? "Reconnect Facebook" : "Connect Facebook"}
-                </button>
-
-                <button
-                  className="secondary-button"
-                  type="button"
-                  onClick={() => setPage("dashboard")}
-                >
-                  {facebookStatus?.connected ? "Continue to Dashboard" : "Skip for Now"}
-                </button>
+                <button className={facebookStatus?.connected ? "icon-button facebook-reconnect-icon" : "primary-button"} onClick={connectFacebook} title={facebookStatus?.connected ? "Reconnect Facebook" : "Connect Facebook"} aria-label={facebookStatus?.connected ? "Reconnect Facebook" : "Connect Facebook"}>{facebookStatus?.connected ? <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v5h-5"/><path d="M4 18v-5h5"/><path d="M6.1 9a7 7 0 0 1 11.3-2.1L20 9"/><path d="M4 15l2.6 2.1A7 7 0 0 0 17.9 15"/></svg> : "Connect Facebook"}</button>
               </div>
             </section>
 
@@ -2869,10 +2869,10 @@ export default function PortalPage({ session }) {
                 </div>
                 {reportMessage && !generatedReport && <div className="info-banner report-filter-message">{reportMessage}</div>}
                 <div className="report-filter-actions">
-                  <button className="secondary-button" type="button" onClick={() => { setSelectedReport(""); setReportDateRange(""); setReportCustomFrom(""); setReportCustomTo(""); setReportPageFilter(""); setReportChannelFilter(""); setReportStatusFilter(""); setReportSortBy(""); setGeneratedReport(null); setReportMessage(""); }}>Clear</button>
-                  <button className="primary-button" type="submit">Generate Report</button>
-                  <button className="secondary-button" type="button" onClick={exportReportExcel} disabled={!generatedReport}>Export Excel</button>
-                  <button className="secondary-button" type="button" onClick={printReport} disabled={!generatedReport}>Export PDF</button>
+                  <button className="icon-button report-action-icon" type="button" title="Clear filters" aria-label="Clear filters" onClick={() => { setSelectedReport(""); setReportDateRange(""); setReportCustomFrom(""); setReportCustomTo(""); setReportPageFilter(""); setReportChannelFilter(""); setReportStatusFilter(""); setReportSortBy(""); setGeneratedReport(null); setReportMessage(""); }}>×</button>
+                  <button className="primary-button report-short-action" type="submit"><NavIcon type="reports" /> Run</button>
+                  <button className="secondary-button report-short-action" type="button" onClick={exportReportExcel} disabled={!generatedReport} title="Export Excel">▦ Excel</button>
+                  <button className="secondary-button report-short-action" type="button" onClick={printReport} disabled={!generatedReport} title="Export PDF">▤ PDF</button>
                 </div>
               </form>
             </section>
@@ -3001,6 +3001,11 @@ export default function PortalPage({ session }) {
                     />
                   </label>
 
+                  <label className="control-modal-reason">
+                    Current password
+                    <input type="password" autoComplete="current-password" value={automationPassword} onChange={(e) => setAutomationPassword(e.target.value)} placeholder="Verify your password" />
+                  </label>
+
                   <div className="control-modal-actions">
                     <button
                       type="button"
@@ -3008,6 +3013,7 @@ export default function PortalPage({ session }) {
                       onClick={() => {
                         setAutomationModal(null);
                         setAutomationReason("");
+                        setAutomationPassword("");
                       }}
                       disabled={automationControlLoading}
                     >
@@ -3164,21 +3170,10 @@ export default function PortalPage({ session }) {
                   <strong>Enable payment automation</strong>
                   <span>When OFF, Auction, Mining, Pre-Order and Regular Sale continue recording winners/orders, while payment links and !PAY link delivery are suppressed.</span>
                 </div>
-                <button
-                  type="button"
-                  className={paymentAutomation.payment_automation_enabled !== false ? "control-off-button" : "control-on-button"}
-                  disabled={automationControlLoading || !["ADMIN", "OWNER", "SUPER_ADMIN"].includes(String(client?.role || "").toUpperCase())}
-                  onClick={() => {
-                    setAutomationReason("");
-                    setAutomationModal({
-                      kind: "PAYMENT_AUTOMATION",
-                      label: "Payment automation",
-                      enabled: !(paymentAutomation.payment_automation_enabled !== false),
-                    });
-                  }}
-                >
-                  {paymentAutomation.payment_automation_enabled !== false ? "Disable" : "Enable"}
-                </button>
+                <label className="automation-toggle-control" title="Enable or disable payment automation">
+                  <input type="checkbox" checked={paymentAutomation.payment_automation_enabled !== false} disabled={automationControlLoading || !["ADMIN", "OWNER", "CLIENT_ADMIN", "SUPER_ADMIN"].includes(String(client?.role || "").toUpperCase())} onChange={(e) => { setAutomationReason(""); setAutomationPassword(""); setAutomationModal({ kind: "PAYMENT_AUTOMATION", label: "Payment automation", enabled: e.target.checked }); }} />
+                  <span className="automation-toggle-track"><span /></span>
+                </label>
               </div>
             </section>
 
@@ -3456,12 +3451,6 @@ export default function PortalPage({ session }) {
                 </p>
               </div>
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                <button className="secondary-button" type="button" onClick={() => setPage("reports")} style={{ background: "rgba(255,255,255,.1)", borderColor: "rgba(255,255,255,.18)", color: "#fff" }}>
-                  <NavIcon type="reports" /> Reports
-                </button>
-                <button className="primary-button" type="button" onClick={() => navigateTo("posts")}>
-                  <NavIcon type="create" /> Create Post
-                </button>
                 <button className="icon-button refresh-icon-button" onClick={loadPortal} title="Refresh dashboard" aria-label="Refresh dashboard" style={{ background: "rgba(255,255,255,.1)", borderColor: "rgba(255,255,255,.18)", color: "#fff" }}>
                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v5h-5"/><path d="M4 18v-5h5"/><path d="M6.1 9a7 7 0 0 1 11.3-2.1L20 9"/><path d="M4 15l2.6 2.1A7 7 0 0 0 17.9 15"/></svg>
                 </button>
@@ -3532,19 +3521,7 @@ export default function PortalPage({ session }) {
               </div>
             </section>
 
-            <section className="dashboard-panel" style={{ marginBottom: 20 }}>
-              <div className="panel-header"><div><h2>Quick actions</h2><p>Jump directly to your most-used EO2MATE workspaces.</p></div></div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
-                {[
-                  { icon: "create", label: "Create Post", action: () => navigateTo("posts"), meta: true },
-                  { icon: "inventory", label: "Inventory", action: () => setPage("inventory") },
-                  { icon: "sales", label: "Sales", action: () => setPage("sales") },
-                  { icon: "orders", label: "Orders", action: () => goToOrders("ALL") },
-                  { icon: "payments", label: "Payment Methods", action: () => setPage("payment-settings") },
-                  { icon: "reports", label: "Reports", action: () => setPage("reports") },
-                ].filter((item) => !item.meta || facebookStatus?.connected).map((item) => <button key={item.label} className="secondary-button" type="button" onClick={item.action} style={{ minHeight: 48, justifyContent: "flex-start", gap: 9 }}><NavIcon type={item.icon}/>{item.label}</button>)}
-              </div>
-            </section>
+
 
             <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 18, marginBottom: 20 }}>
               <div className={`payment-setup-card ${paymentAccountStatus?.payment_enabled ? "active" : ""}`} style={{ margin: 0 }}>

@@ -2826,3 +2826,83 @@ button.post-type-card:hover { transform: translateY(-2px); border-color: #bcdcc3
   .facebook-connect-actions > button, .report-filter-actions button { width:100%; flex-basis:100%; }
   .message-type-heading { align-items:flex-start; flex-direction:column; gap:6px; }
 }
+
+
+/* EO2MATE floating Meta Messenger */
+.meta-messenger-float-wrap {
+  position: fixed;
+  z-index: 10050;
+  width: 58px;
+  height: 58px;
+  pointer-events: none;
+}
+
+.meta-messenger-float {
+  width: 58px;
+  height: 58px;
+  border: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  background: #0866ff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .24);
+  cursor: grab;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.meta-messenger-float:active { cursor: grabbing; }
+.meta-messenger-float svg { width: 34px; height: 34px; fill: #fff; }
+.meta-messenger-float .meta-messenger-bolt { fill: #0866ff; }
+
+.meta-messenger-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 21px;
+  height: 21px;
+  padding: 0 5px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #fff;
+  background: #d93025;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.meta-messenger-page-picker {
+  position: absolute;
+  right: 0;
+  bottom: 68px;
+  width: min(300px, calc(100vw - 32px));
+  max-height: min(360px, calc(100vh - 110px));
+  overflow: auto;
+  padding: 10px;
+  border: 1px solid rgba(0,0,0,.12);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 12px 34px rgba(0,0,0,.2);
+  pointer-events: auto;
+}
+
+.meta-messenger-page-picker strong { display: block; padding: 6px 8px 9px; }
+.meta-messenger-page-picker button {
+  width: 100%;
+  display: flex;
+
+/* EO2MATE 2026-10-06 UI/security refinement batch */
+.report-filter-actions{display:flex;gap:9px;flex-wrap:wrap;align-items:center}.report-short-action{display:inline-flex;align-items:center;gap:7px;min-height:40px}.report-short-action svg{width:17px;height:17px}.report-action-icon{font-size:22px;font-weight:500}
+.automation-toggle-control{display:inline-flex;align-items:center;cursor:pointer}.automation-toggle-control input{position:absolute;opacity:0;pointer-events:none}.automation-toggle-track{width:52px;height:30px;border-radius:999px;background:#cbd5e1;padding:3px;transition:.2s;display:block}.automation-toggle-track>span{display:block;width:24px;height:24px;border-radius:50%;background:#fff;box-shadow:0 2px 7px rgba(15,23,42,.22);transition:.2s}.automation-toggle-control input:checked+.automation-toggle-track{background:#249447}.automation-toggle-control input:checked+.automation-toggle-track>span{transform:translateX(22px)}.automation-toggle-control input:disabled+.automation-toggle-track{opacity:.5;cursor:not-allowed}
+.control-modal-reason input[type=password],.setup-password-field input{width:100%;margin-top:7px;border:1px solid #d8e0e8;border-radius:10px;padding:11px 12px;font:inherit;box-sizing:border-box}.setup-password-field{display:block;margin:12px 0;color:#334155;font-size:13px;font-weight:700}.setup-password-modal{width:min(480px,calc(100vw - 32px))}
+.facebook-reconnect-icon svg{width:20px;height:20px}.preorder-top-actions{display:flex;flex-wrap:wrap;gap:14px;align-items:center}
+.payment-settings-enhanced .dashboard-panel{border-radius:18px}.payment-settings-enhanced .payment-provider-grid{grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}.payment-settings-enhanced .payment-provider-card{border-radius:16px;padding:18px;min-width:0}.payment-settings-enhanced .payment-provider-actions{display:flex;gap:16px;flex-wrap:wrap;margin-top:14px}.payment-settings-enhanced .payment-provider-card p{line-height:1.5;color:#64748b}
+.setup-value-only-form{grid-template-columns:minmax(220px,1.4fr) minmax(180px,1fr) auto;align-items:end}.setup-value-only-form input:disabled{background:#f8fafc;color:#64748b}
+/* Responsive operational workspaces: delivery, inventory, sales and purchases */
+.inventory-page .dashboard-panel,.inventory-page .settings-card,.sales-page .dashboard-panel,.purchases-page .dashboard-panel{border-radius:18px}.inventory-page .toolbar-card,.sales-page .toolbar-card,.purchases-page .toolbar-card{display:flex;flex-wrap:wrap;gap:10px}.inventory-page .table-wrapper,.payment-settings-enhanced .table-wrapper{max-width:100%}
+@media(max-width:760px){.report-filter-actions>*{flex:1 1 auto}.setup-value-only-form{grid-template-columns:1fr}.payment-settings-enhanced .payment-provider-grid{grid-template-columns:1fr}.preorder-top-actions{gap:10px}.dashboard-header{gap:12px}.facebook-connect-actions{gap:10px;flex-wrap:wrap}}
