@@ -2447,6 +2447,7 @@ export default function InventoryPage({
                 disabled={processing}
                 title="Upload up to 100 images, then assign them to products/SKUs"
               >
+                <span className="inventory-action-icon" aria-hidden="true">▧</span>
                 Assign Images
               </button>
 
@@ -2460,6 +2461,7 @@ export default function InventoryPage({
                   processing
                 }
               >
+                <span className="inventory-action-icon" aria-hidden="true">⇩</span>
                 Download Template
               </button>
 
@@ -2476,6 +2478,7 @@ export default function InventoryPage({
                   processing
                 }
               >
+                <span className="inventory-action-icon" aria-hidden="true">⇧</span>
                 Bulk Upload
               </button>
 
@@ -2489,7 +2492,8 @@ export default function InventoryPage({
                   processing
                 }
               >
-                + Add Item
+                <span className="inventory-action-icon" aria-hidden="true">＋</span>
+                Add Item
               </button>
             </div>
           </div>

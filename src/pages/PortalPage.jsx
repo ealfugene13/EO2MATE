@@ -2583,8 +2583,8 @@ export default function PortalPage({ session }) {
           <>
             <section className="dashboard-panel" style={{ marginBottom: 18 }}>
               <div className="preorder-primary-nav">
-                <button type="button" className="primary-button">Dashboard / Summary</button>
-                <button type="button" className="secondary-button" onClick={() => navigateTo("pre-order-create")}>Create Post</button>
+                <button type="button" className="primary-button"><span className="preorder-nav-icon" aria-hidden="true">▦</span>Dashboard / Summary</button>
+                <button type="button" className="secondary-button" onClick={() => navigateTo("pre-order-create")}><span className="preorder-nav-icon" aria-hidden="true">＋</span>Create Post</button>
               </div>
             </section>
             <PreorderAdminPage client={client} onCreatePost={() => navigateTo("pre-order-create")} />

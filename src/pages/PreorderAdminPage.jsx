@@ -57,10 +57,10 @@ export default function PreorderAdminPage({ client, onCreatePost }) {
     <header className="dashboard-header preorder-admin-header selling-hero"><div><p className="eyebrow">SELLING · PRE-ORDER</p><h1>Pre-Order</h1><p>Summary, Pre-Order posts and buyer reservations in one workspace.</p></div><button className="icon-button refresh-icon-button" type="button" onClick={load} disabled={loading} title="Refresh" aria-label="Refresh"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v5h-5"/><path d="M4 18v-5h5"/><path d="M6.1 9a7 7 0 0 1 11.3-2.1L20 9"/><path d="M4 15l2.6 2.1A7 7 0 0 0 17.9 15"/></svg></button></header>
     {notice&&<div className="success-message global-error">{notice}</div>}{error&&<div className="dashboard-error global-error">{error}</div>}
 
-    <section className="selling-tabs">
-      <div>
-        {tabs.map(tab=><button key={tab} type="button" className={workspaceTab===tab?"primary-button":"secondary-button"} onClick={()=>{setWorkspaceTab(tab);if(tab!=="POSTS"){setSelected(null);setEntries([])}}}>{tab==="POSTS"?"Posts":tab.charAt(0)+tab.slice(1).toLowerCase()}</button>)}
-        <button type="button" className="secondary-button" onClick={()=>onCreatePost?.()}>Create Post</button>
+    <section className="selling-tabs preorder-workspace-tabs">
+      <div className="preorder-workspace-actions">
+        {tabs.map(tab=><button key={tab} type="button" className={workspaceTab===tab?"primary-button":"secondary-button"} onClick={()=>{setWorkspaceTab(tab);if(tab!=="POSTS"){setSelected(null);setEntries([])}}}><span className="preorder-tab-icon" aria-hidden="true">{tab==="DASHBOARD"?"▦":"▤"}</span>{tab==="POSTS"?"Posts":tab.charAt(0)+tab.slice(1).toLowerCase()}</button>)}
+        <button type="button" className="secondary-button" onClick={()=>onCreatePost?.()}><span className="preorder-tab-icon" aria-hidden="true">＋</span>Create Post</button>
       </div>
     </section>
     </>}
