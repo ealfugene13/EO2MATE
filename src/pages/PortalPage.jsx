@@ -2957,7 +2957,7 @@ export default function PortalPage({ session }) {
                 }}
               >
                 <div
-                  className="control-modal"
+                  className="control-modal setup-password-modal"
                   role="dialog"
                   aria-modal="true"
                   style={{
@@ -3172,8 +3172,8 @@ export default function PortalPage({ session }) {
 
               <div className="automation-control-row client-scope">
                 <div className="automation-control-copy">
-                  <strong>Enable payment automation</strong>
-                  <span>When OFF, Auction, Mining, Pre-Order and Regular Sale continue recording winners/orders, while payment links and !PAY link delivery are suppressed.</span>
+                  <strong>Automated payment</strong>
+                  <span>Turn on to send supported checkout and payment links automatically. Turn off to keep selling active while handling payment manually.</span>
                 </div>
                 <button
                   type="button"
@@ -3190,7 +3190,6 @@ export default function PortalPage({ session }) {
                   }}
                 >
                   <span className={`automation-switch-orb ${paymentAutomation.payment_automation_enabled !== false ? "enabled" : "disabled"}`} aria-hidden="true"><span /></span>
-                  <span className="payment-automation-toggle-state">{paymentAutomation.payment_automation_enabled !== false ? "ON" : "OFF"}</span>
                 </button>
               </div>
             </section>
