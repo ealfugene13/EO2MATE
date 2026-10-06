@@ -1300,7 +1300,7 @@ export default function PortalPage({ session }) {
   }
 
   async function openAutomationControl() {
-    setPage("automation-control");
+    setPage("setup");
     await loadAutomationControls();
   }
 
@@ -2358,22 +2358,6 @@ export default function PortalPage({ session }) {
           </SidebarNavButton>
 
           <SidebarNavButton
-            icon="automation"
-            className={`nav-item ${page === "automation-control" ? "active" : ""}`}
-            onClick={openAutomationControl}
-          >
-            Automation Control
-          </SidebarNavButton>
-
-          <SidebarNavButton
-            icon="chat"
-            className={`nav-item ${page === "automated-messages" ? "active" : ""}`}
-            onClick={() => navigateTo("automated-messages")}
-          >
-            Automated Messages
-          </SidebarNavButton>
-
-          <SidebarNavButton
             icon="users"
             className={`nav-item ${page === "account-security" ? "active" : ""}`}
             onClick={() => navigateTo("account-security")}
@@ -2990,7 +2974,7 @@ export default function PortalPage({ session }) {
           </>
         )}
 
-        {page === "automation-control" && (
+        {page === "setup" && (
           <>
             {automationModal && (
               <div
@@ -3081,7 +3065,7 @@ export default function PortalPage({ session }) {
             <header className="dashboard-header">
               <div>
                 <p className="eyebrow">AUTOMATION GOVERNANCE</p>
-                <h1>Automation Control</h1>
+                <h2>Automation Control</h2>
                 <p>Pause or resume EO2MATE without deleting client, Page, auction, or transaction data.</p>
               </div>
 
@@ -3969,7 +3953,7 @@ export default function PortalPage({ session }) {
           <PaymentMethodsSettings clientId={client?.client_id} onChanged={loadPortal} />
         )}
 
-        {page === "automated-messages" && (
+        {page === "setup" && (
           <AutomatedMessagesPage client={client} />
         )}
 

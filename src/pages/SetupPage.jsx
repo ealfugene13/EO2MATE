@@ -375,7 +375,7 @@ export default function SetupPage({ client }) {
 
       setMessage(`${key} saved.`);
       showInfoPopup(
-        editingSetting ? "Setting updated" : "Setting created",
+        "Setting updated",
         `${key} was saved successfully and is now the effective client setup.`,
         "success"
       );
@@ -620,7 +620,7 @@ export default function SetupPage({ client }) {
         <div>
           <p className="eyebrow">EO2MATE CONFIGURATION</p>
           <h1>Setup</h1>
-          <p>Manage runtime rules and Messenger commands on one screen.</p>
+          <p>Manage supported EO2MATE settings and review system-defined Messenger commands.</p>
           <div className="setup-fyi-chip">
             <span>FYI</span>
             Changes here affect new EO2MATE actions immediately. Completed payments and historical auction records are not rewritten.
@@ -635,7 +635,7 @@ export default function SetupPage({ client }) {
         <div className="connection-warning-card">
           <div>
             <strong>Read-only setup access</strong>
-            <span>ADMIN, OWNER, or SUPER_ADMIN access is required for Create, Update, and Delete.</span>
+            <span>ADMIN, OWNER, or SUPER_ADMIN access is required to update configurable setting values.</span>
           </div>
         </div>
       )}
@@ -647,112 +647,42 @@ export default function SetupPage({ client }) {
         <div className="panel-header">
           <div>
             <h2>Runtime settings</h2>
-            <p>Editing a global default creates a client-specific override. Delete removes only the override.</p>
+            <p>EO2MATE defines the available settings. Clients may update supported values only; new settings cannot be created here.</p>
           </div>
         </div>
 
-        <div
-          className={`setup-edit-banner ${editingSetting ? "is-editing" : "is-creating"}`}
-          aria-live="polite"
-        >
-          <span className="setup-edit-icon">{editingSetting ? "✎" : "+"}</span>
+        <div className={`setup-edit-banner ${editingSetting ? "is-editing" : ""}`} aria-live="polite">
+          <span className="setup-edit-icon">✎</span>
           <div>
-            <strong>
-              {editingSetting
-                ? `Editing: ${editingSetting}`
-                : "Create a client setting override"}
-            </strong>
-            <span>
-              {editingSetting
-                ? "The selected row is highlighted. Make your changes here, then click Save Changes."
-                : "Enter a client-specific value without changing the global default."}
-            </span>
+            <strong>{editingSetting ? `Editing: ${editingSetting}` : "Select a supported setting to edit"}</strong>
+            <span>Only the existing setting and its value are exposed here. EO2MATE system metadata and behavior remain platform-owned.</span>
           </div>
         </div>
 
-        <form
-          ref={settingFormRef}
-          className={`setup-inline-form ${editingSetting ? "setup-form-editing" : ""}`}
-          onSubmit={saveSetting}
-        >
-          <label>
-            Setting key
-            <input
-              value={settingForm.setting_key}
-              onChange={(e) => setSettingForm((old) => ({ ...old, setting_key: e.target.value.toUpperCase() }))}
-              placeholder="PAYMENT_DEADLINE_HOURS"
-              disabled={!isAdmin || Boolean(editingSetting)}
-            />
-          </label>
-
-          <label>
-            Value
-            {settingForm.value_type === "BOOLEAN" ? (
-              <select
-                ref={settingValueRef}
-                value={settingForm.setting_value}
-                onChange={(e) => setSettingForm((old) => ({ ...old, setting_value: e.target.value }))}
-                disabled={!isAdmin}
-              >
-                <option value="">Select...</option>
-                <option value="true">true</option>
-                <option value="false">false</option>
-              </select>
-            ) : (
-              <input
-                ref={settingValueRef}
-                value={settingForm.setting_value}
-                onChange={(e) => setSettingForm((old) => ({ ...old, setting_value: e.target.value }))}
-                placeholder="24"
-                disabled={!isAdmin}
-              />
-            )}
-          </label>
-
-          <label>
-            Type
-            <select
-              value={settingForm.value_type}
-              onChange={(e) => setSettingForm((old) => ({ ...old, value_type: e.target.value, setting_value: "" }))}
-              disabled={!isAdmin}
-            >
-              <option value="NUMBER">Number</option>
-              <option value="BOOLEAN">Boolean</option>
-              <option value="TEXT">Text</option>
-            </select>
-          </label>
-
-          <label className="setup-description-field">
-            Description
-            <input
-              value={settingForm.description}
-              onChange={(e) => setSettingForm((old) => ({ ...old, description: e.target.value }))}
-              placeholder="What this setting controls"
-              disabled={!isAdmin}
-            />
-          </label>
-
-          <label className="setup-checkbox">
-            <input
-              type="checkbox"
-              checked={settingForm.is_active}
-              onChange={(e) => setSettingForm((old) => ({ ...old, is_active: e.target.checked }))}
-              disabled={!isAdmin}
-            />
-            Active
-          </label>
-
-          <div className="setup-form-actions">
-            {editingSetting && (
-              <button type="button" className="secondary-button" onClick={resetSettingForm} disabled={loading}>
-                Cancel
-              </button>
-            )}
-            <button type="submit" className="primary-button" disabled={!isAdmin || loading}>
-              {editingSetting ? "Save Changes" : "Create Setting"}
-            </button>
-          </div>
-        </form>
+        {editingSetting && (
+          <form ref={settingFormRef} className="setup-inline-form setup-form-editing" onSubmit={saveSetting}>
+            <label>
+              Setting
+              <input value={settingForm.setting_key} disabled />
+            </label>
+            <label>
+              Value
+              {settingForm.value_type === "BOOLEAN" ? (
+                <select ref={settingValueRef} value={settingForm.setting_value} onChange={(e) => setSettingForm((old) => ({ ...old, setting_value: e.target.value }))} disabled={!isAdmin}>
+                  <option value="">Select...</option>
+                  <option value="true">true</option>
+                  <option value="false">false</option>
+                </select>
+              ) : (
+                <input ref={settingValueRef} value={settingForm.setting_value} onChange={(e) => setSettingForm((old) => ({ ...old, setting_value: e.target.value }))} disabled={!isAdmin} />
+              )}
+            </label>
+            <div className="setup-form-actions">
+              <button type="button" className="secondary-button" onClick={resetSettingForm} disabled={loading}>Cancel</button>
+              <button type="submit" className="primary-button" disabled={!isAdmin || loading}>Save Value</button>
+            </div>
+          </form>
+        )}
 
         <div className="table-wrapper">
           <table>
@@ -764,7 +694,7 @@ export default function SetupPage({ client }) {
                 <th>Source</th>
                 <th>Status</th>
                 <th>Description</th>
-                <th>CRUD</th>
+                <th>Action</th>
               </tr>
             </thead>
             <tbody>
@@ -791,18 +721,7 @@ export default function SetupPage({ client }) {
                     <td><StatusPill active={row.is_active}>{row.is_active ? "Active" : "Disabled"}</StatusPill></td>
                     <td className="setup-description-cell">{row.description || "-"}</td>
                     <td>
-                      <div className="row-actions">
-                        <button className="table-action-button" type="button" onClick={() => editSetting(item)} disabled={!isAdmin || loading}>Edit</button>
-                        <button
-                          className="table-action-button danger-button"
-                          type="button"
-                          onClick={() => deleteSetting(item)}
-                          disabled={!isAdmin || loading || !item.override}
-                          title={item.override ? "Delete client override" : "Global default cannot be deleted"}
-                        >
-                          Delete
-                        </button>
-                      </div>
+<button className="table-action-button" type="button" onClick={() => editSetting(item)} disabled={!isAdmin || loading}>Edit Value</button>
                     </td>
                   </tr>
                 );
@@ -816,100 +735,17 @@ export default function SetupPage({ client }) {
         <div className="panel-header">
           <div>
             <h2>Messenger command aliases</h2>
-            <p>Only active commands are accepted during an EO2MATE payment conversation.</p>
+            <p>Commands shown here are implemented by EO2MATE and cannot be changed by clients.</p>
           </div>
         </div>
 
-        <div
-          className={`setup-edit-banner ${editingCommand ? "is-editing" : "is-creating"}`}
-          aria-live="polite"
-        >
-          <span className="setup-edit-icon">{editingCommand ? "✎" : "+"}</span>
+        <div className="setup-edit-banner" aria-live="polite">
+          <span className="setup-edit-icon">🔒</span>
           <div>
-            <strong>
-              {editingCommand
-                ? `Editing command: ${editingCommand}`
-                : "Create a Messenger command override"}
-            </strong>
-            <span>
-              {editingCommand
-                ? "The selected row is highlighted. Review the action/status, then click Save Changes."
-                : "Add an accepted command word or alias for the buyer."}
-            </span>
+            <strong>System-defined commands</strong>
+            <span>Commands are read-only. New commands, aliases, edits, and deletions must be introduced through EO2MATE code and deployment.</span>
           </div>
         </div>
-
-        <form
-          ref={commandFormRef}
-          className={`setup-inline-form command-form ${editingCommand ? "setup-form-editing" : ""}`}
-          onSubmit={saveCommand}
-        >
-          <label>
-            Command
-            <input
-              value={commandForm.command_text}
-              onChange={(e) => setCommandForm((old) => ({ ...old, command_text: e.target.value.toUpperCase() }))}
-              placeholder="PAY"
-              disabled={!isAdmin || Boolean(editingCommand)}
-            />
-          </label>
-
-          <label>
-            Action
-            <select
-              ref={commandActionRef}
-              value={commandForm.action_code}
-              onChange={(e) => setCommandForm((old) => ({ ...old, action_code: e.target.value }))}
-              disabled={!isAdmin}
-            >
-              {COMMAND_ACTIONS.map((action) => (
-                <option key={action.value} value={action.value}>{action.label}</option>
-              ))}
-            </select>
-          </label>
-
-          <label>
-            Sender scope
-            <select
-              value={commandForm.sender_scope}
-              onChange={(e) => setCommandForm((old) => ({ ...old, sender_scope: e.target.value }))}
-              disabled={!isAdmin}
-            >
-              {COMMAND_SCOPES.map((scope) => (
-                <option key={scope.value} value={scope.value}>{scope.label}</option>
-              ))}
-            </select>
-          </label>
-
-          <label className="setup-description-field">
-            Description
-            <input
-              value={commandForm.description}
-              onChange={(e) => setCommandForm((old) => ({ ...old, description: e.target.value }))}
-              placeholder="Shown in HELP / invalid-command response"
-              disabled={!isAdmin}
-            />
-          </label>
-
-          <label className="setup-checkbox">
-            <input
-              type="checkbox"
-              checked={commandForm.is_active}
-              onChange={(e) => setCommandForm((old) => ({ ...old, is_active: e.target.checked }))}
-              disabled={!isAdmin}
-            />
-            Active
-          </label>
-
-          <div className="setup-form-actions">
-            {editingCommand && (
-              <button type="button" className="secondary-button" onClick={resetCommandForm} disabled={loading}>Cancel</button>
-            )}
-            <button type="submit" className="primary-button" disabled={!isAdmin || loading}>
-              {editingCommand ? "Save Changes" : "Create Command"}
-            </button>
-          </div>
-        </form>
 
         <div className="table-wrapper">
           <table>
@@ -921,7 +757,7 @@ export default function SetupPage({ client }) {
                 <th>Source</th>
                 <th>Status</th>
                 <th>Description</th>
-                <th>CRUD</th>
+                <th>Access</th>
               </tr>
             </thead>
             <tbody>
@@ -954,18 +790,7 @@ export default function SetupPage({ client }) {
                     <td><StatusPill active={row.is_active}>{row.is_active ? "Active" : "Disabled"}</StatusPill></td>
                     <td className="setup-description-cell">{row.description || "-"}</td>
                     <td>
-                      <div className="row-actions">
-                        <button className="table-action-button" type="button" onClick={() => editCommand(item)} disabled={!isAdmin || loading}>Edit</button>
-                        <button
-                          className="table-action-button danger-button"
-                          type="button"
-                          onClick={() => deleteCommand(item)}
-                          disabled={!isAdmin || loading || !item.override}
-                          title={item.override ? "Delete client override" : "Global default cannot be deleted"}
-                        >
-                          Delete
-                        </button>
-                      </div>
+<span className="table-muted">Read only</span>
                     </td>
                   </tr>
                 );
