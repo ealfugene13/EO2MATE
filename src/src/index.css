@@ -3184,3 +3184,46 @@ button.post-type-card:hover { transform: translateY(-2px); border-color: #bcdcc3
   .inventory-page .inventory-card-actions{gap:6px!important}
   .inventory-page .inventory-card-actions .inventory-item-action{font-size:.82rem!important;padding:8px 6px!important}
 }
+
+/* Shared page navigation: modern workspace bars and legacy/detail tabs.
+   Keep explicit fallback selectors so page extraction cannot drop spacing. */
+.dashboard-content .selling-tabs > div,
+.dashboard-content .selling-workspace-nav,
+.dashboard-content .sales-tabs > .sales-actions,
+.dashboard-content .preorder-primary-nav,
+.dashboard-content .preorder-workspace-actions {
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  gap: 12px !important;
+}
+.dashboard-content .selling-tabs {
+  margin-bottom: 18px;
+}
+.dashboard-content .selling-tabs > div > button,
+.dashboard-content .selling-workspace-nav > button,
+.dashboard-content .sales-tabs > .sales-actions > button,
+.dashboard-content .preorder-primary-nav > button,
+.dashboard-content .preorder-workspace-actions > button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 7px !important;
+  margin: 0 !important;
+  min-height: 42px !important;
+  padding: 10px 16px !important;
+  border-radius: 10px !important;
+  line-height: 1.1 !important;
+}
+@media (max-width: 760px) {
+  .dashboard-content .selling-tabs > div,
+  .dashboard-content .selling-workspace-nav,
+  .dashboard-content .sales-tabs > .sales-actions,
+  .dashboard-content .preorder-primary-nav,
+  .dashboard-content .preorder-workspace-actions { gap: 10px !important; }
+  .dashboard-content .selling-tabs > div > button,
+  .dashboard-content .selling-workspace-nav > button,
+  .dashboard-content .sales-tabs > .sales-actions > button,
+  .dashboard-content .preorder-primary-nav > button,
+  .dashboard-content .preorder-workspace-actions > button { flex: 1 1 145px !important; }
+}
