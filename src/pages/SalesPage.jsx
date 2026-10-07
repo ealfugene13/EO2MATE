@@ -1,7 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../supabase';
-import { upper, number, settled, inactive, money, date, uniquePayments, orderPayments, groupPayments, paidAmount, csvCell, filterOrders } from './salesModel';
 import './SalesPage.css';
+const upper = value => String(value || '').toUpperCase();
+const number = value => Number.isFinite(Number(value)) ? Number(value) : 0;
+const settled = row => ['PAID','SUCCESS','SUCCEEDED','COMPLETED','PAYMENT_SUCCESS'].includes(upper(row.status || row.payment_status));
+const inactive = row => ['CANCELLED','CANCELED','FORFEITED','VOID'].includes(upper(row.order_status));
+const money = value => new Intl.NumberFormat('en-PH',{style:'currency',currency:'PHP'}).format(number(value));
+const date = value => value && !Number.isNaN(new Date(value).getTime()) ? new Date(value).toLocaleString('en-PH',{timeZone:'Asia/Manila'}) : '—';
+const day = value => value && !Number.isNaN(new Date(value).getTime()) ? new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Manila'}).format(new Date(value)) : '';
+const uniquePayments = rows => [...new Map(rows.filter(row => row.payment_id).map(row => [row.payment_id,row])).values()];
+const orderPayments = (order,payments) => payments.filter(row => row.order_id === order.order_id && !row.order_group_id);
+const groupPayments = (group,payments) => payments.filter(row => row.order_group_id === group.order_group_id);
+const paidAmount = rows => uniquePayments(rows).filter(settled).reduce((sum,row) => sum + number(row.amount),0);
+function csvCell(value) { let text=String(value??''); if (/^[\s]*[=+@-]/.test(text)) text="'"+text; return '"'+text.replaceAll('"','""')+'"'; }
+function filterOrders(rows,f) { return rows.filter(row => (!f.search || [row.order_number,row.buyer_name,row.item_label,row.sku,row.order_group_id].join(' ').toLowerCase().includes(f.search.toLowerCase())) && (f.channel==='ALL'||upper(row.source_type)===f.channel) && (f.status==='ALL'||upper(row.order_status)===f.status) && (!f.from||day(row.created_at)>=f.from) && (!f.to||day(row.created_at)<=f.to)); }
+
 const defaults={search:'',channel:'ALL',status:'ALL',from:'',to:''};
 function Icon({type}) { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{type==='refresh'?<><path d="M20 5v6h-6M4 19v-6h6"/><path d="M6 8a7 7 0 0 1 12-1l2 4M4 13l2 4a7 7 0 0 0 12-1"/></>:type==='export'?<path d="M12 3v12m-4-4 4 4 4-4M4 16v5h16v-5"/>:type==='close'?<path d="m6 6 12 12M18 6 6 18"/>:<><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></>}</svg>; }
 function Badge({value}) { return <span className={`sales-badge ${settled({status:value})?'sales-paid':''}`}>{String(value||'Not recorded').replaceAll('_',' ')}</span>; }
