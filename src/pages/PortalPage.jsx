@@ -15,7 +15,7 @@ import PurchasesPage from "./PurchasesPage";
 import DeliveriesPage from "./DeliveriesPage";
 import SalesPage from "./SalesPage";
 import InventoryPage from "./InventoryPage";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../supabase";
 import SetupPage from "./SetupPage";
 import OnboardingPage from "./OnboardingPage";
@@ -26,6 +26,121 @@ import AutomatedMessagesPage from "./AutomatedMessagesPage";
 import AccountSecurityPage from "./AccountSecurityPage";
 import PaymentMethodsSettings from "../components/PaymentMethodsSettings";
 
+
+function FloatingMetaMessenger({ clientId }) {
+  const [pages, setPages] = useState([]);
+  const [unread, setUnread] = useState(0);
+  const [messengerAvailable, setMessengerAvailable] = useState(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [position, setPosition] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("eo2mateMessengerFloatPosition")) || { right: 22, bottom: 24 }; }
+    catch { return { right: 22, bottom: 24 }; }
+  });
+  const [drag, setDrag] = useState(null);
+  const dragGestureRef = useRef({ active: false, moved: false, startX: 0, startY: 0 });
+
+  async function refreshNotifications() {
+    if (!clientId) return;
+    try {
+      const { data, error } = await supabase.functions.invoke("meta", {
+        method: "POST",
+        headers: { "x-eo2mate-meta-route": "messenger-notifications" },
+        body: { client_id: clientId },
+      });
+      if (error || !data?.success) return;
+      const connectedPages = data.pages || [];
+      setPages(connectedPages);
+      setUnread(Number(data.total_unread || 0));
+      setMessengerAvailable(connectedPages.length > 0);
+    } catch { /* notification failure must never block the portal */ }
+  }
+
+  useEffect(() => {
+    if (!clientId) return undefined;
+    refreshNotifications();
+    const timer = window.setInterval(refreshNotifications, 5000);
+    const onVisible = () => { if (document.visibilityState === "visible") refreshNotifications(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { window.clearInterval(timer); document.removeEventListener("visibilitychange", onVisible); };
+  }, [clientId]);
+
+  useEffect(() => {
+    if (!drag) return undefined;
+    const move = (event) => {
+      const point = event.touches?.[0] || event;
+      const gesture = dragGestureRef.current;
+      if (Math.hypot(point.clientX - gesture.startX, point.clientY - gesture.startY) > 5) gesture.moved = true;
+      const size = 58;
+      const x = Math.min(Math.max(point.clientX - drag.dx, 8), window.innerWidth - size - 8);
+      const y = Math.min(Math.max(point.clientY - drag.dy, 8), window.innerHeight - size - 8);
+      setPosition({ left: x, top: y });
+    };
+    const end = () => {
+      setDrag(null);
+      window.setTimeout(() => { dragGestureRef.current.active = false; }, 0);
+      setPosition((current) => {
+        const size = 58;
+        const left = current.left ?? (window.innerWidth - size - (current.right || 22));
+        const top = current.top ?? (window.innerHeight - size - (current.bottom || 24));
+        const snapped = left + size / 2 < window.innerWidth / 2
+          ? { left: 12, top }
+          : { right: 12, top };
+        localStorage.setItem("eo2mateMessengerFloatPosition", JSON.stringify(snapped));
+        return snapped;
+      });
+    };
+    window.addEventListener("mousemove", move); window.addEventListener("mouseup", end);
+    window.addEventListener("touchmove", move, { passive: false }); window.addEventListener("touchend", end);
+    return () => { window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", end); window.removeEventListener("touchmove", move); window.removeEventListener("touchend", end); };
+  }, [drag]);
+
+  async function openPage(page) {
+    const fbPageId = String(page?.fb_page_id || "");
+    if (!fbPageId) return;
+    // Clear EO2MATE's Page notification when the operator intentionally opens that Page inbox.
+    try {
+      await supabase.functions.invoke("meta", {
+        method: "POST",
+        headers: { "x-eo2mate-meta-route": "messenger-notifications" },
+        body: { client_id: clientId, action: "mark-read", fb_page_id: fbPageId },
+      });
+    } catch { /* Meta inbox should still open */ }
+    setPickerOpen(false);
+    setPages((current) => current.map((p) => String(p.fb_page_id) === fbPageId ? { ...p, unread_count: 0 } : p));
+    setUnread((current) => Math.max(0, current - Number(page?.unread_count || 0)));
+    window.open(`https://business.facebook.com/latest/inbox/all?asset_id=${encodeURIComponent(fbPageId)}`, "_blank", "noopener,noreferrer");
+  }
+
+  function activate() {
+    if (pages.length === 1) openPage(pages[0]);
+    else if (pages.length > 1) setPickerOpen((value) => !value);
+    else refreshNotifications();
+  }
+
+  if (!clientId || messengerAvailable === false) return null;
+  const style = position.left != null ? { left: position.left, top: position.top } : position.top != null ? { right: position.right ?? 12, top: position.top } : { right: position.right ?? 22, bottom: position.bottom ?? 24 };
+  return <div className="meta-messenger-float-wrap" style={style}>
+    {pickerOpen && pages.length > 1 && <div className="meta-messenger-page-picker">
+      <strong>Open Page Messenger</strong>
+      {pages.map((page) => <button key={page.fb_page_id} type="button" onClick={() => openPage(page)}>
+        <span>{page.page_name || "Facebook Page"}</span>
+        {Number(page.unread_count || 0) > 0 && <b>{Number(page.unread_count) > 99 ? "99+" : page.unread_count}</b>}
+      </button>)}
+    </div>}
+    <button
+      type="button"
+      className="meta-messenger-float"
+      aria-label={unread ? `Open Meta Messenger, ${unread} unread messages` : "Open Meta Messenger"}
+      title="Open Meta Messenger"
+      onMouseDown={(e) => { const r = e.currentTarget.getBoundingClientRect(); dragGestureRef.current = { active: true, moved: false, startX: e.clientX, startY: e.clientY }; setDrag({ dx: e.clientX-r.left, dy: e.clientY-r.top }); }}
+      onTouchStart={(e) => { const p=e.touches[0], r=e.currentTarget.getBoundingClientRect(); dragGestureRef.current = { active: true, moved: false, startX: p.clientX, startY: p.clientY }; setDrag({ dx:p.clientX-r.left, dy:p.clientY-r.top }); }}
+      onClick={(e) => { if (dragGestureRef.current.moved) { e.preventDefault(); e.stopPropagation(); dragGestureRef.current.moved = false; return; } activate(); }}
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.48 2 2 6.15 2 11.27c0 2.91 1.45 5.5 3.72 7.2V22l3.4-1.87c.91.25 1.88.39 2.88.39 5.52 0 10-4.15 10-9.25S17.52 2 12 2Z"/><path className="meta-messenger-bolt" d="m6.8 14.2 3.4-3.6 2.1 2 4.9-2.8-3.4 3.6-2.1-2-4.9 2.8Z"/></svg>
+      {unread > 0 && <span className="meta-messenger-badge">{unread > 99 ? "99+" : unread}</span>}
+    </button>
+  </div>;
+}
 
 function NavIcon({ type }) {
   const common = {
@@ -1000,6 +1115,7 @@ export default function PortalPage({ session }) {
         {(page === "deliveries" || page === "delivery-detail") && <DeliveriesPage navigationFilter={navigationFilter} client={client} detailRequest={detailRequest} goToDeliveries={goToDeliveries} page={page} setErrorMessage={setErrorMessage} setPage={setPage} />}
 
       </main>
+      <FloatingMetaMessenger clientId={client?.client_id} />
     </div>
   );
 }
