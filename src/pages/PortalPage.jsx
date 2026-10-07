@@ -1,5 +1,6 @@
+import SalesPage from "./SalesPage";
 import InventoryPage from "./InventoryPage";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../supabase";
 import SetupPage from "./SetupPage";
 import OnboardingPage from "./OnboardingPage";
@@ -10,122 +11,6 @@ import AutomatedMessagesPage from "./AutomatedMessagesPage";
 import AccountSecurityPage from "./AccountSecurityPage";
 import PaymentMethodsSettings from "../components/PaymentMethodsSettings";
 
-
-
-function FloatingMetaMessenger({ clientId }) {
-  const [pages, setPages] = useState([]);
-  const [unread, setUnread] = useState(0);
-  const [messengerAvailable, setMessengerAvailable] = useState(null);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [position, setPosition] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("eo2mateMessengerFloatPosition")) || { right: 22, bottom: 24 }; }
-    catch { return { right: 22, bottom: 24 }; }
-  });
-  const [drag, setDrag] = useState(null);
-  const dragGestureRef = useRef({ active: false, moved: false, startX: 0, startY: 0 });
-
-  async function refreshNotifications() {
-    if (!clientId) return;
-    try {
-      const { data, error } = await supabase.functions.invoke("meta", {
-        method: "POST",
-        headers: { "x-eo2mate-meta-route": "messenger-notifications" },
-        body: { client_id: clientId },
-      });
-      if (error || !data?.success) return;
-      const connectedPages = data.pages || [];
-      setPages(connectedPages);
-      setUnread(Number(data.total_unread || 0));
-      setMessengerAvailable(connectedPages.length > 0);
-    } catch { /* notification failure must never block the portal */ }
-  }
-
-  useEffect(() => {
-    if (!clientId) return undefined;
-    refreshNotifications();
-    const timer = window.setInterval(refreshNotifications, 5000);
-    const onVisible = () => { if (document.visibilityState === "visible") refreshNotifications(); };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => { window.clearInterval(timer); document.removeEventListener("visibilitychange", onVisible); };
-  }, [clientId]);
-
-  useEffect(() => {
-    if (!drag) return undefined;
-    const move = (event) => {
-      const point = event.touches?.[0] || event;
-      const gesture = dragGestureRef.current;
-      if (Math.hypot(point.clientX - gesture.startX, point.clientY - gesture.startY) > 5) gesture.moved = true;
-      const size = 58;
-      const x = Math.min(Math.max(point.clientX - drag.dx, 8), window.innerWidth - size - 8);
-      const y = Math.min(Math.max(point.clientY - drag.dy, 8), window.innerHeight - size - 8);
-      setPosition({ left: x, top: y });
-    };
-    const end = () => {
-      setDrag(null);
-      window.setTimeout(() => { dragGestureRef.current.active = false; }, 0);
-      setPosition((current) => {
-        const size = 58;
-        const left = current.left ?? (window.innerWidth - size - (current.right || 22));
-        const top = current.top ?? (window.innerHeight - size - (current.bottom || 24));
-        const snapped = left + size / 2 < window.innerWidth / 2
-          ? { left: 12, top }
-          : { right: 12, top };
-        localStorage.setItem("eo2mateMessengerFloatPosition", JSON.stringify(snapped));
-        return snapped;
-      });
-    };
-    window.addEventListener("mousemove", move); window.addEventListener("mouseup", end);
-    window.addEventListener("touchmove", move, { passive: false }); window.addEventListener("touchend", end);
-    return () => { window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", end); window.removeEventListener("touchmove", move); window.removeEventListener("touchend", end); };
-  }, [drag]);
-
-  async function openPage(page) {
-    const fbPageId = String(page?.fb_page_id || "");
-    if (!fbPageId) return;
-    // Clear EO2MATE's Page notification when the operator intentionally opens that Page inbox.
-    try {
-      await supabase.functions.invoke("meta", {
-        method: "POST",
-        headers: { "x-eo2mate-meta-route": "messenger-notifications" },
-        body: { client_id: clientId, action: "mark-read", fb_page_id: fbPageId },
-      });
-    } catch { /* Meta inbox should still open */ }
-    setPickerOpen(false);
-    setPages((current) => current.map((p) => String(p.fb_page_id) === fbPageId ? { ...p, unread_count: 0 } : p));
-    setUnread((current) => Math.max(0, current - Number(page?.unread_count || 0)));
-    window.open(`https://business.facebook.com/latest/inbox/all?asset_id=${encodeURIComponent(fbPageId)}`, "_blank", "noopener,noreferrer");
-  }
-
-  function activate() {
-    if (pages.length === 1) openPage(pages[0]);
-    else if (pages.length > 1) setPickerOpen((value) => !value);
-    else refreshNotifications();
-  }
-
-  if (!clientId || messengerAvailable === false) return null;
-  const style = position.left != null ? { left: position.left, top: position.top } : position.top != null ? { right: position.right ?? 12, top: position.top } : { right: position.right ?? 22, bottom: position.bottom ?? 24 };
-  return <div className="meta-messenger-float-wrap" style={style}>
-    {pickerOpen && pages.length > 1 && <div className="meta-messenger-page-picker">
-      <strong>Open Page Messenger</strong>
-      {pages.map((page) => <button key={page.fb_page_id} type="button" onClick={() => openPage(page)}>
-        <span>{page.page_name || "Facebook Page"}</span>
-        {Number(page.unread_count || 0) > 0 && <b>{Number(page.unread_count) > 99 ? "99+" : page.unread_count}</b>}
-      </button>)}
-    </div>}
-    <button
-      type="button"
-      className="meta-messenger-float"
-      aria-label={unread ? `Open Meta Messenger, ${unread} unread messages` : "Open Meta Messenger"}
-      title="Open Meta Messenger"
-      onMouseDown={(e) => { const r = e.currentTarget.getBoundingClientRect(); dragGestureRef.current = { active: true, moved: false, startX: e.clientX, startY: e.clientY }; setDrag({ dx: e.clientX-r.left, dy: e.clientY-r.top }); }}
-      onTouchStart={(e) => { const p=e.touches[0], r=e.currentTarget.getBoundingClientRect(); dragGestureRef.current = { active: true, moved: false, startX: p.clientX, startY: p.clientY }; setDrag({ dx:p.clientX-r.left, dy:p.clientY-r.top }); }}
-      onClick={(e) => { if (dragGestureRef.current.moved) { e.preventDefault(); e.stopPropagation(); dragGestureRef.current.moved = false; return; } activate(); }}
-    >
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.48 2 2 6.15 2 11.27c0 2.91 1.45 5.5 3.72 7.2V22l3.4-1.87c.91.25 1.88.39 2.88.39 5.52 0 10-4.15 10-9.25S17.52 2 12 2Z"/><path className="meta-messenger-bolt" d="m6.8 14.2 3.4-3.6 2.1 2 4.9-2.8-3.4 3.6-2.1-2-4.9 2.8Z"/></svg>
-      {unread > 0 && <span className="meta-messenger-badge">{unread > 99 ? "99+" : unread}</span>}
-    </button>
-  </div>;
-}
 
 function NavIcon({ type }) {
   const common = {
@@ -252,6 +137,12 @@ function NavIcon({ type }) {
         <circle cx="17" cy="19" r="1.5" />
         <path d="M12 6v5" />
         <path d="m10 9 2 2 2-2" />
+      </svg>
+    ),
+    automation: (
+      <svg {...common}>
+        <circle cx="12" cy="12" r="3" />
+        <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21h-4v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3v-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1L7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.6V3h4v.1a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.1v4H21a1.7 1.7 0 0 0-1.6 1Z" />
       </svg>
     ),
     setup: (
@@ -583,6 +474,7 @@ const META_OPERATIONAL_PAGES = new Set([
   "pre-order",
   "pre-order-create",
   "regular-sale",
+  "facebook-chats",
 ]);
 
 function isMetaOperationalPage(page) {
@@ -751,14 +643,24 @@ export default function PortalPage({ session }) {
 
   const [automationControls, setAutomationControls] = useState([]);
   const [automationPages, setAutomationPages] = useState([]);
-  const [paymentAutomation, setPaymentAutomation] = useState({ payment_automation_enabled: true, payment_automation_reason: null });
   const [automationControlLoading, setAutomationControlLoading] = useState(false);
   const [automationControlMessage, setAutomationControlMessage] = useState("");
   const [automationModal, setAutomationModal] = useState(null);
-  const [automationModalError, setAutomationModalError] = useState("");
   const [automationReason, setAutomationReason] = useState("");
-  const [automationPassword, setAutomationPassword] = useState("");
 
+  // Facebook Chats uses Meta as the live source of truth. EO2MATE does not persist conversation content.
+  const [chatSearch, setChatSearch] = useState("");
+  const [chatPageFilter, setChatPageFilter] = useState("");
+  const [chatPages, setChatPages] = useState([]);
+  const [chatConversations, setChatConversations] = useState([]);
+  const [chatSelectedConversation, setChatSelectedConversation] = useState(null);
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatDraft, setChatDraft] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
+  const [chatMessagesLoading, setChatMessagesLoading] = useState(false);
+  const [chatSending, setChatSending] = useState(false);
+  const [chatMessage, setChatMessage] = useState("");
+  const [chatMetaWindowBlocked, setChatMetaWindowBlocked] = useState(false);
   const [staffSearch, setStaffSearch] = useState("");
   const [showStaffForm, setShowStaffForm] = useState(false);
   const [staffDraft, setStaffDraft] = useState({ name: "", email: "", role: "STAFF" });
@@ -787,7 +689,6 @@ export default function PortalPage({ session }) {
   const [sellingPostDetailLoading, setSellingPostDetailLoading] = useState(false);
   const [sellingPostDetailError, setSellingPostDetailError] = useState("");
   const [inventoryTab, setInventoryTab] = useState("SUMMARY");
-  const [salesTab, setSalesTab] = useState("SUMMARY");
   const [purchasesTab, setPurchasesTab] = useState("SUMMARY");
 
   const reportData = useMemo(() => {
@@ -1088,6 +989,55 @@ export default function PortalPage({ session }) {
     };
   }, [sellingPostRows.MINING]);
 
+  const filteredChatConversations = useMemo(() => {
+    const query = chatSearch.trim().toLowerCase();
+
+    if (!query) return chatConversations;
+
+    return chatConversations.filter((conversation) =>
+      String(conversation?.participant?.name || "")
+        .toLowerCase()
+        .includes(query)
+    );
+  }, [chatConversations, chatSearch]);
+
+  const chatReplyWindow = useMemo(() => {
+    if (!chatSelectedConversation) {
+      return { status: "NONE", label: "Select a conversation", lastInboundAt: null };
+    }
+
+    const inboundMessages = chatMessages
+      .filter((message) => message?.direction === "INBOUND" && message?.created_time)
+      .map((message) => ({ ...message, timestamp: Date.parse(message.created_time) }))
+      .filter((message) => Number.isFinite(message.timestamp))
+      .sort((a, b) => b.timestamp - a.timestamp);
+
+    const lastInboundAt = inboundMessages[0]?.created_time || null;
+    const lastInboundMs = inboundMessages[0]?.timestamp || 0;
+    const withinStandardWindow = lastInboundMs > 0 && Date.now() - lastInboundMs <= 24 * 60 * 60 * 1000;
+
+    if (withinStandardWindow) {
+      return {
+        status: "AVAILABLE",
+        label: "Reply available",
+        lastInboundAt,
+      };
+    }
+
+    if (chatMetaWindowBlocked || lastInboundMs > 0) {
+      return {
+        status: "EXPIRED",
+        label: "Reply window expired",
+        lastInboundAt,
+      };
+    }
+
+    return {
+      status: "UNKNOWN",
+      label: "Reply availability will be confirmed by Meta",
+      lastInboundAt: null,
+    };
+  }, [chatSelectedConversation, chatMessages, chatMetaWindowBlocked]);
 
 
   useEffect(() => {
@@ -1265,7 +1215,6 @@ export default function PortalPage({ session }) {
     if (!client?.client_id) return;
 
     setAutomationControlLoading(true);
-    setAutomationModalError("");
     setAutomationControlMessage("");
 
     try {
@@ -1288,7 +1237,6 @@ export default function PortalPage({ session }) {
 
       setAutomationControls(data.controls || []);
       setAutomationPages(data.pages || []);
-      setPaymentAutomation(data.payment_automation || { payment_automation_enabled: true, payment_automation_reason: null });
       return data;
     } catch (error) {
       setAutomationControlMessage(
@@ -1300,6 +1248,236 @@ export default function PortalPage({ session }) {
     }
   }
 
+  async function openAutomationControl() {
+    setPage("automation-control");
+    await loadAutomationControls();
+  }
+
+  async function loadFacebookChats(fbPageId = "") {
+    if (!client?.client_id) return;
+
+    setChatLoading(true);
+    setChatMessage("");
+
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        "meta",
+        {
+          method: "POST",
+          headers: {
+              "x-eo2mate-meta-route": "chat-conversations",
+            },
+          body: {
+            client_id: client.client_id,
+            fb_page_id: fbPageId || undefined,
+            limit: 12,
+          },
+        },
+      );
+
+      if (error) throw error;
+      if (!data?.success) {
+        throw new Error(data?.message || "Unable to load Facebook conversations.");
+      }
+
+      const pages = data.pages || [];
+      const selectedPageId = data.selected_page?.fb_page_id || fbPageId || pages[0]?.fb_page_id || "";
+
+      setChatPages(pages);
+      setChatPageFilter(selectedPageId);
+      setChatConversations(
+        [...(data.conversations || [])].sort((a, b) => {
+          const aTime = Number(a?.last_activity_ms) || 0;
+          const bTime = Number(b?.last_activity_ms) || 0;
+          return bTime - aTime;
+        })
+      );
+      setChatSelectedConversation(null);
+      setChatMessages([]);
+      setChatDraft("");
+      setChatMetaWindowBlocked(false);
+    } catch (error) {
+      setChatConversations([]);
+      setChatSelectedConversation(null);
+      setChatMessages([]);
+      setChatMessage(
+        await getEdgeFunctionErrorMessage(
+          error,
+          "Unable to load Facebook conversations."
+        )
+      );
+    } finally {
+      setChatLoading(false);
+    }
+  }
+
+  async function openFacebookChats() {
+    setPage("facebook-chats");
+    await loadFacebookChats(chatPageFilter);
+  }
+
+  async function selectFacebookConversation(conversation) {
+    if (!client?.client_id || !chatPageFilter || !conversation?.conversation_id) return;
+
+    setChatSelectedConversation(conversation);
+    setChatMessagesLoading(true);
+    setChatMessage("");
+    setChatMetaWindowBlocked(false);
+
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        "meta",
+        {
+          method: "POST",
+          headers: {
+            "x-eo2mate-meta-route": "chat-messages",
+          },
+          body: {
+            client_id: client.client_id,
+            fb_page_id: chatPageFilter,
+            conversation_id: conversation.conversation_id,
+            limit: 50,
+          },
+        },
+      );
+
+      if (error) throw error;
+      if (!data?.success) {
+        throw new Error(data?.message || "Unable to load Messenger messages.");
+      }
+
+      setChatMessages((data.messages || []).slice().reverse());
+    } catch (error) {
+      setChatMessages([]);
+      setChatMessage(
+        await getEdgeFunctionErrorMessage(
+          error,
+          "Unable to load Messenger messages."
+        )
+      );
+    } finally {
+      setChatMessagesLoading(false);
+    }
+  }
+
+  async function sendFacebookChatMessage() {
+    const recipientPsid = chatSelectedConversation?.participant?.id;
+    const messageText = chatDraft.trim();
+
+    if (!client?.client_id || !chatPageFilter || !recipientPsid || !messageText || chatSending) {
+      return;
+    }
+
+    if (chatReplyWindow.status === "EXPIRED") {
+      setChatMessage(
+        "Reply unavailable. Meta's standard messaging window for this conversation has expired. Ask the customer to message the Page again or continue in Meta Inbox."
+      );
+      return;
+    }
+
+    setChatSending(true);
+    setChatMessage("");
+
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        "meta",
+        {
+          method: "POST",
+          headers: {
+            "x-eo2mate-meta-route": "chat-send",
+          },
+          body: {
+            client_id: client.client_id,
+            fb_page_id: chatPageFilter,
+            recipient_psid: recipientPsid,
+            message: messageText,
+          },
+        },
+      );
+
+      if (error) {
+        throw error;
+      }
+      if (!data?.success) {
+        throw new Error(data?.message || "Unable to send Messenger message.");
+      }
+
+      const now = data?.sent_at || new Date().toISOString();
+      const optimisticMessage = {
+        id: data?.message_id || `local-${Date.now()}`,
+        text: messageText,
+        created_time: now,
+        direction: "OUTBOUND",
+        attachments: [],
+        local_echo: true,
+      };
+
+      setChatDraft("");
+      setChatMessages((current) => [...current, optimisticMessage]);
+      setChatSelectedConversation((current) =>
+        current
+          ? {
+              ...current,
+              updated_time: now,
+              last_activity_at: now,
+              last_activity_ms: Date.parse(now) || Date.now(),
+              latest_message: {
+                id: data?.message_id || null,
+                text: messageText,
+                created_time: now,
+              },
+            }
+          : current
+      );
+      setChatConversations((current) => {
+        const selectedId = chatSelectedConversation?.conversation_id;
+        if (!selectedId) return current;
+
+        const updated = current.map((conversation) =>
+          conversation.conversation_id === selectedId
+            ? {
+                ...conversation,
+                updated_time: now,
+                last_activity_at: now,
+                last_activity_ms: Date.parse(now) || Date.now(),
+                latest_message: {
+                  id: data?.message_id || null,
+                  text: messageText,
+                  created_time: now,
+                },
+              }
+            : conversation
+        );
+
+        const selected = updated.find((row) => row.conversation_id === selectedId);
+        return selected
+          ? [selected, ...updated.filter((row) => row.conversation_id !== selectedId)]
+          : updated;
+      });
+    } catch (error) {
+      const message = await getEdgeFunctionErrorMessage(
+        error,
+        "Unable to send Messenger message."
+      );
+
+      const outsideWindow =
+        /outside of allowed window/i.test(message) ||
+        /subcode\s*2018278/i.test(message) ||
+        /2018278/.test(message);
+
+      if (outsideWindow) {
+        setChatMetaWindowBlocked(true);
+        setChatMessage(
+          "Reply unavailable. Meta has closed the standard messaging window for this conversation. Ask the customer to message the Page again or use Meta Inbox for any Meta-supported options."
+        );
+      } else {
+        setChatMessage(message);
+      }
+    } finally {
+      setChatSending(false);
+    }
+  }
+
   function requestAutomationChange({
     scopeType,
     scopeId,
@@ -1307,8 +1485,6 @@ export default function PortalPage({ session }) {
     enabled,
   }) {
     setAutomationReason("");
-    setAutomationPassword("");
-    setAutomationModalError("");
     setAutomationModal({
       scopeType,
       scopeId,
@@ -1321,12 +1497,7 @@ export default function PortalPage({ session }) {
     if (!automationModal || !client?.client_id) return;
 
     if (!automationModal.enabled && !automationReason.trim()) {
-      setAutomationModalError("Please enter a reason before disabling automation.");
-      return;
-    }
-
-    if (!automationPassword) {
-      setAutomationModalError("Enter your current password to confirm this setup change.");
+      setAutomationControlMessage("Please enter a reason before disabling automation.");
       return;
     }
 
@@ -1334,22 +1505,12 @@ export default function PortalPage({ session }) {
     setAutomationControlMessage("");
 
     try {
-      const { data: userResult, error: userError } = await supabase.auth.getUser();
-      if (userError || !userResult?.user?.email) throw new Error("Unable to verify the signed-in account.");
-      const { error: verifyError } = await supabase.auth.signInWithPassword({ email: userResult.user.email, password: automationPassword });
-      if (verifyError) throw new Error("Incorrect password. No setup changes were made.");
-      const isPaymentAutomationChange = automationModal.kind === "PAYMENT_AUTOMATION";
       const { data, error } = await supabase.functions.invoke(
         "eo2mate",
         {
           method: "POST",
           headers: { "x-eo2mate-route": "automation-admin" },
-          body: isPaymentAutomationChange ? {
-            action: "SET_PAYMENT_AUTOMATION",
-            client_id: client.client_id,
-            is_enabled: automationModal.enabled,
-            reason: automationReason.trim() || null,
-          } : {
+          body: {
             action: "SET",
             client_id: client.client_id,
             scope_type: automationModal.scopeType,
@@ -1366,14 +1527,15 @@ export default function PortalPage({ session }) {
       }
 
       setAutomationControlMessage(
-        `${automationModal.label} ${automationModal.enabled ? "enabled" : "disabled"}.`
+        `${automationModal.label} automation ${automationModal.enabled ? "enabled" : "disabled"}.`
       );
       setAutomationModal(null);
       setAutomationReason("");
-      setAutomationPassword("");
       await loadAutomationControls();
     } catch (error) {
-      setAutomationModalError(error.message || "Unable to update automation control.");
+      setAutomationControlMessage(
+        error.message || "Unable to update automation control."
+      );
     } finally {
       setAutomationControlLoading(false);
     }
@@ -2323,6 +2485,14 @@ export default function PortalPage({ session }) {
               <SidebarSectionLabel>Facebook</SidebarSectionLabel>
 
               <SidebarNavButton
+                icon="chat"
+                className={`nav-item ${page === "facebook-chats" ? "active" : ""}`}
+                onClick={openFacebookChats}
+              >
+                Facebook Chats
+              </SidebarNavButton>
+
+              <SidebarNavButton
                 icon="facebook"
                 className={`nav-item ${page === "facebook" ? "active" : ""}`}
                 onClick={openFacebookSetup}
@@ -2361,6 +2531,22 @@ export default function PortalPage({ session }) {
             onClick={() => setPage("users-staff")}
           >
             Users &amp; Staff
+          </SidebarNavButton>
+
+          <SidebarNavButton
+            icon="automation"
+            className={`nav-item ${page === "automation-control" ? "active" : ""}`}
+            onClick={openAutomationControl}
+          >
+            Automation Control
+          </SidebarNavButton>
+
+          <SidebarNavButton
+            icon="chat"
+            className={`nav-item ${page === "automated-messages" ? "active" : ""}`}
+            onClick={() => navigateTo("automated-messages")}
+          >
+            Automated Messages
           </SidebarNavButton>
 
           <SidebarNavButton
@@ -2493,21 +2679,16 @@ export default function PortalPage({ session }) {
               <MetricCard title="Sales value" value={formatCurrency(regularSaleStats.value)} subtitle="Gross Regular Sale value" />
             </section>
 
-            <section className="dashboard-panel selling-workspace-nav-panel" style={{ marginBottom: 18 }}>
-              <div className="selling-workspace-nav">
-                {[
-                  { key: "SUMMARY", label: "Summary", icon: "dashboard" },
-                  { key: "POSTS", label: "Posts", icon: "sales" },
-                  { key: "POSTING", label: "Create Post", icon: "create" },
-                ].map((tab) => (
+            <section className="selling-tabs">
+              <div>
+                {["SUMMARY", "POSTS", "POSTING"].map((tab) => (
                   <button
-                    key={tab.key}
+                    key={tab}
                     type="button"
-                    className={regularSaleWorkspaceTab === tab.key ? "primary-button" : "secondary-button"}
-                    onClick={() => setRegularSaleWorkspaceTab(tab.key)}
+                    className={regularSaleWorkspaceTab === tab ? "primary-button" : "secondary-button"}
+                    onClick={() => setRegularSaleWorkspaceTab(tab)}
                   >
-                    <span className="selling-nav-icon"><NavIcon type={tab.icon} /></span>
-                    <span>{tab.label}</span>
+                    {tab === "POSTING" ? "Create Post" : tab.charAt(0) + tab.slice(1).toLowerCase()}
                   </button>
                 ))}
               </div>
@@ -2586,10 +2767,10 @@ export default function PortalPage({ session }) {
 
         {metaConnected && page === "pre-order" && (
           <>
-            <section className="dashboard-panel" style={{ marginBottom: 18 }}>
-              <div className="preorder-primary-nav">
-                <button type="button" className="primary-button"><span className="preorder-nav-icon" aria-hidden="true">▦</span>Dashboard / Summary</button>
-                <button type="button" className="secondary-button" onClick={() => navigateTo("pre-order-create")}><span className="preorder-nav-icon" aria-hidden="true">＋</span>Create Post</button>
+            <section className="selling-tabs">
+              <div>
+                <button type="button" className="primary-button">Dashboard / Summary</button>
+                <button type="button" className="secondary-button" onClick={() => navigateTo("pre-order-create")}>Create Post</button>
               </div>
             </section>
             <PreorderAdminPage client={client} onCreatePost={() => navigateTo("pre-order-create")} />
@@ -2626,22 +2807,14 @@ export default function PortalPage({ session }) {
               <MetricCard title="Items sold" value="0" subtitle="Allocated quantity" />
               <MetricCard title="Sales value" value={formatCurrency(0)} subtitle="Gross live-selling value" />
             </section>
-            <section className="dashboard-panel selling-workspace-nav-panel" style={{ marginBottom: 18 }}>
-              <div className="selling-workspace-nav">
-                {[
-                  { key: "DASHBOARD", label: "Dashboard", icon: "dashboard" },
-                  { key: "SUMMARY", label: "Summary", icon: "reports" },
-                  { key: "POSTS", label: "Posts", icon: "sales" },
-                ].map((tab) => (
-                  <button key={tab.key} type="button" className={liveSellingWorkspaceTab === tab.key ? "primary-button" : "secondary-button"} onClick={() => setLiveSellingWorkspaceTab(tab.key)}>
-                    <span className="selling-nav-icon"><NavIcon type={tab.icon} /></span>
-                    <span>{tab.label}</span>
+            <section className="selling-tabs">
+              <div>
+                {["DASHBOARD", "SUMMARY", "POSTS"].map((tab) => (
+                  <button key={tab} type="button" className={liveSellingWorkspaceTab === tab ? "primary-button" : "secondary-button"} onClick={() => setLiveSellingWorkspaceTab(tab)}>
+                    {tab.charAt(0) + tab.slice(1).toLowerCase()}
                   </button>
                 ))}
-                <button type="button" className="secondary-button" disabled title="Coming soon">
-                  <span className="selling-nav-icon"><NavIcon type="create" /></span>
-                  <span>Create Post · Soon</span>
-                </button>
+                <button type="button" className="secondary-button" disabled title="Coming soon">Create Post · Soon</button>
               </div>
             </section>
             <section className="dashboard-panel">
@@ -2660,7 +2833,9 @@ export default function PortalPage({ session }) {
                 <p>Authorize your Facebook account and connect the Page that will run auctions.</p>
               </div>
 
-              <button className="icon-button refresh-icon-button" onClick={loadFacebookStatus} disabled={facebookLoading} title="Refresh Facebook status" aria-label="Refresh Facebook status"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v5h-5"/><path d="M4 18v-5h5"/><path d="M6.1 9a7 7 0 0 1 11.3-2.1L20 9"/><path d="M4 15l2.6 2.1A7 7 0 0 0 17.9 15"/></svg></button>
+              <button className="secondary-button" onClick={loadFacebookStatus} disabled={facebookLoading}>
+                {facebookLoading ? "Checking..." : "Refresh Status"}
+              </button>
             </header>
 
             {facebookMessage && (
@@ -2696,7 +2871,17 @@ export default function PortalPage({ session }) {
               </div>
 
               <div className="facebook-connect-actions">
-                <button className={facebookStatus?.connected ? "icon-button facebook-reconnect-icon" : "primary-button"} onClick={connectFacebook} title={facebookStatus?.connected ? "Reconnect Facebook" : "Connect Facebook"} aria-label={facebookStatus?.connected ? "Reconnect Facebook" : "Connect Facebook"}>{facebookStatus?.connected ? <svg viewBox="0 0 24 24" aria-hidden="true" className="facebook-mark-icon"><path d="M13.6 21v-8h2.7l.4-3.1h-3.1V7.9c0-.9.3-1.5 1.6-1.5h1.7V3.6c-.3 0-1.3-.1-2.5-.1-2.5 0-4.2 1.5-4.2 4.3v2.1H7.4V13h2.8v8h3.4Z" fill="currentColor" stroke="none"/></svg> : "Connect Facebook"}</button>
+                <button className="primary-button" onClick={connectFacebook}>
+                  {facebookStatus?.connected ? "Reconnect Facebook" : "Connect Facebook"}
+                </button>
+
+                <button
+                  className="secondary-button"
+                  type="button"
+                  onClick={() => setPage("dashboard")}
+                >
+                  {facebookStatus?.connected ? "Continue to Dashboard" : "Skip for Now"}
+                </button>
               </div>
             </section>
 
@@ -2714,6 +2899,7 @@ export default function PortalPage({ session }) {
                   <thead>
                     <tr>
                       <th>Page</th>
+                      <th>Facebook Page ID</th>
                       <th>Status</th>
                       <th>Authorization</th>
                       <th>Connected</th>
@@ -2723,6 +2909,7 @@ export default function PortalPage({ session }) {
                     {(facebookStatus?.pages || []).map((fbPage) => (
                       <tr key={fbPage.fb_page_id}>
                         <td>{fbPage.page_name || "Facebook Page"}</td>
+                        <td>{fbPage.fb_page_id || "-"}</td>
                         <td><StatusBadge status={fbPage.status || "ACTIVE"} /></td>
                         <td><StatusBadge status={fbPage.token_present ? "AUTHORIZED" : "RECONNECT"} /></td>
                         <td>{formatDateTime(fbPage.connected_at)}</td>
@@ -2731,7 +2918,7 @@ export default function PortalPage({ session }) {
 
                     {!facebookLoading && !(facebookStatus?.pages || []).length && (
                       <tr>
-                        <td colSpan="4" className="empty-table-cell">No Facebook Page connected yet.</td>
+                        <td colSpan="5" className="empty-table-cell">No Facebook Page connected yet.</td>
                       </tr>
                     )}
                   </tbody>
@@ -2745,6 +2932,258 @@ export default function PortalPage({ session }) {
                 <div><strong>Facebook account</strong><span>Use the account that manages the business Page.</span></div>
                 <div><strong>Page access</strong><span>The account must have enough Page permissions to authorize your automation.</span></div>
                 <div><strong>No developer setup</strong><span>Your platform's Meta app handles OAuth, webhook and API integration.</span></div>
+              </div>
+            </section>
+          </>
+        )}
+
+        {metaConnected && page === "facebook-chats" && (
+          <>
+            <header className="dashboard-header">
+              <div>
+                <p className="eyebrow">FACEBOOK · LIVE INBOX</p>
+                <h1>Facebook Chats</h1>
+                <p>View and reply to Messenger conversations live from Meta. Conversation content is not stored in EO2MATE.</p>
+              </div>
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => loadFacebookChats(chatPageFilter)}
+                disabled={chatLoading || !client?.client_id}
+              >
+                {chatLoading ? "Refreshing..." : "Refresh Inbox"}
+              </button>
+            </header>
+
+            <section className="dashboard-panel">
+              <div className="panel-header">
+                <div>
+                  <h2>Page Inbox</h2>
+                  <p>Facebook remains the source of truth. Messages are fetched only while this screen is in use.</p>
+                </div>
+                <StatusBadge status={chatPages.length ? "CONNECTED" : "NOT_CONNECTED"} />
+              </div>
+
+              {chatMessage && (
+                <div className="form-error" style={{ marginTop: 14 }}>
+                  {chatMessage}
+                </div>
+              )}
+
+              <div style={{ display: "grid", gridTemplateColumns: "minmax(260px, 360px) minmax(0, 1fr)", gap: 18, marginTop: 18 }}>
+                <div style={{ border: "1px solid #e5eaf0", borderRadius: 14, overflow: "hidden", background: "#fff", height: 620, display: "flex", flexDirection: "column" }}>
+                  <div style={{ padding: 14, borderBottom: "1px solid #e5eaf0", display: "grid", gap: 10 }}>
+                    <select
+                      value={chatPageFilter}
+                      onChange={async (event) => {
+                        const nextPage = event.target.value;
+                        setChatPageFilter(nextPage);
+                        await loadFacebookChats(nextPage);
+                      }}
+                      disabled={chatLoading || !chatPages.length}
+                    >
+                      {!chatPages.length && <option value="">No connected Page</option>}
+                      {chatPages.map((fbPage) => (
+                        <option key={fbPage.fb_page_id} value={fbPage.fb_page_id}>
+                          {fbPage.page_name || fbPage.fb_page_id}
+                        </option>
+                      ))}
+                    </select>
+
+                    <input
+                      type="search"
+                      value={chatSearch}
+                      onChange={(event) => setChatSearch(event.target.value)}
+                      placeholder="Search buyer"
+                    />
+                  </div>
+
+                  <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+                    {chatLoading ? (
+                      <div style={{ padding: 28, textAlign: "center", color: "#718096" }}>Loading live Messenger inbox...</div>
+                    ) : filteredChatConversations.length === 0 ? (
+                      <div style={{ padding: 28, textAlign: "center", color: "#718096" }}>
+                        <strong style={{ display: "block", color: "#263548", marginBottom: 6 }}>No conversations found</strong>
+                        <span style={{ fontSize: 13 }}>If this Page has Messenger conversations, check the Page token and Meta permissions.</span>
+                      </div>
+                    ) : (
+                      filteredChatConversations.map((conversation) => {
+                          const selected = chatSelectedConversation?.conversation_id === conversation.conversation_id;
+                          return (
+                            <button
+                              key={conversation.conversation_id}
+                              type="button"
+                              onClick={() => selectFacebookConversation(conversation)}
+                              style={{
+                                width: "100%",
+                                textAlign: "left",
+                                padding: "14px 16px",
+                                border: 0,
+                                borderBottom: "1px solid #edf1f5",
+                                background: selected ? "#f1f8f3" : "#fff",
+                                cursor: "pointer",
+                              }}
+                            >
+                              <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+                                <strong style={{ color: "#263548" }}>{conversation?.participant?.name || "Facebook User"}</strong>
+                                <span style={{ fontSize: 11, color: "#718096", whiteSpace: "nowrap" }}>
+                                  {conversation?.last_activity_at ? new Date(conversation.last_activity_at).toLocaleString() : ""}
+                                </span>
+                              </div>
+                              <div style={{ marginTop: 5, color: "#718096", fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                {conversation?.latest_message?.text || "Messenger conversation"}
+                              </div>
+                            </button>
+                          );
+                        })
+                    )}
+                  </div>
+                </div>
+
+                <div style={{ height: 620, minHeight: 620, maxHeight: 620, border: "1px solid #e5eaf0", borderRadius: 14, background: "#fff", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+                  <div style={{ padding: "16px 18px", borderBottom: "1px solid #e5eaf0", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
+                    <div style={{ minWidth: 0 }}>
+                      <strong>{chatSelectedConversation?.participant?.name || "Select a conversation"}</strong>
+                      <div style={{ fontSize: 12, color: "#718096", marginTop: 3 }}>
+                        {chatSelectedConversation
+                          ? `Messenger · ${chatPages.find((row) => row.fb_page_id === chatPageFilter)?.page_name || chatPageFilter}`
+                          : "Choose a Messenger conversation from the live Page inbox."}
+                      </div>
+                      {chatSelectedConversation && (
+                        <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                          <span
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              padding: "3px 8px",
+                              borderRadius: 999,
+                              fontSize: 11,
+                              fontWeight: 800,
+                              background:
+                                chatReplyWindow.status === "AVAILABLE"
+                                  ? "#e9f7ee"
+                                  : chatReplyWindow.status === "EXPIRED"
+                                    ? "#fff1f1"
+                                    : "#f2f4f7",
+                              color:
+                                chatReplyWindow.status === "AVAILABLE"
+                                  ? "#247a3c"
+                                  : chatReplyWindow.status === "EXPIRED"
+                                    ? "#b43d3d"
+                                    : "#667085",
+                            }}
+                          >
+                            {chatReplyWindow.label}
+                          </span>
+                          {chatReplyWindow.lastInboundAt && (
+                            <span style={{ fontSize: 11, color: "#8a98a8" }}>
+                              Last buyer message: {new Date(chatReplyWindow.lastInboundAt).toLocaleString()}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {chatPageFilter && (
+                      <button
+                        className="secondary-button"
+                        type="button"
+                        onClick={() =>
+                          window.open(
+                            `https://business.facebook.com/latest/inbox/all?asset_id=${encodeURIComponent(chatPageFilter)}`,
+                            "_blank",
+                            "noopener,noreferrer"
+                          )
+                        }
+                      >
+                        Open Meta Inbox
+                      </button>
+                    )}
+                  </div>
+
+                  <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 18, background: "#f8fafc" }}>
+                    {!chatSelectedConversation ? (
+                      <div style={{ height: "100%", display: "grid", placeItems: "center", color: "#718096", textAlign: "center" }}>
+                        Choose a Messenger conversation from the inbox to view its current message history.
+                      </div>
+                    ) : chatMessagesLoading ? (
+                      <div style={{ textAlign: "center", color: "#718096", padding: 30 }}>Loading messages from Meta...</div>
+                    ) : chatMessages.length === 0 ? (
+                      <div style={{ textAlign: "center", color: "#718096", padding: 30 }}>No messages returned for this conversation.</div>
+                    ) : (
+                      <div style={{ display: "grid", gap: 10 }}>
+                        {chatMessages.map((message) => {
+                          const outbound = message.direction === "OUTBOUND";
+                          return (
+                            <div key={message.id || `${message.created_time}-${message.text}`} style={{ display: "flex", justifyContent: outbound ? "flex-end" : "flex-start" }}>
+                              <div style={{
+                                maxWidth: "78%",
+                                padding: "10px 12px",
+                                borderRadius: 14,
+                                background: outbound ? "#dff3e4" : "#fff",
+                                border: "1px solid #e2e8f0",
+                                color: "#263548",
+                              }}>
+                                {message.text && <div style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{message.text}</div>}
+                                {message.attachments?.length > 0 && (
+                                  <div style={{ marginTop: message.text ? 8 : 0, fontSize: 12, color: "#718096" }}>
+                                    {message.attachments.length} attachment{message.attachments.length === 1 ? "" : "s"}
+                                  </div>
+                                )}
+                                <div style={{ marginTop: 5, fontSize: 10, color: "#8a98a8", textAlign: outbound ? "right" : "left" }}>
+                                  {message.created_time ? new Date(message.created_time).toLocaleString() : ""}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ padding: 14, borderTop: "1px solid #e5eaf0", flex: "0 0 auto", background: "#fff" }}>
+                    {chatSelectedConversation && chatReplyWindow.status === "EXPIRED" && (
+                      <div style={{ marginBottom: 10, padding: "9px 11px", borderRadius: 9, background: "#fff7ed", color: "#9a5412", fontSize: 12, lineHeight: 1.45 }}>
+                        Meta's standard reply window has expired. The conversation can still be viewed here, but normal API replies are disabled until the customer messages the Page again.
+                      </div>
+                    )}
+
+                    <div style={{ display: "flex", gap: 10 }}>
+                      <input
+                        type="text"
+                        value={chatDraft}
+                        onChange={(event) => setChatDraft(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" && !event.shiftKey) {
+                            event.preventDefault();
+                            sendFacebookChatMessage();
+                          }
+                        }}
+                        placeholder={
+                          chatReplyWindow.status === "EXPIRED"
+                            ? "Reply window expired — open Meta Inbox or wait for a new buyer message"
+                            : "Write a Messenger reply..."
+                        }
+                        disabled={!chatSelectedConversation || chatSending || chatReplyWindow.status === "EXPIRED"}
+                        maxLength={2000}
+                        style={{ flex: 1 }}
+                      />
+                      <button
+                        className="primary-button"
+                        type="button"
+                        onClick={sendFacebookChatMessage}
+                        disabled={
+                          !chatSelectedConversation ||
+                          !chatDraft.trim() ||
+                          chatSending ||
+                          chatReplyWindow.status === "EXPIRED"
+                        }
+                      >
+                        {chatSending ? "Sending..." : "Send"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </section>
           </>
@@ -2860,7 +3299,10 @@ export default function PortalPage({ session }) {
                 <h1>Reports &amp; Insights</h1>
                 <p>Operational reports plus EO2MATE insights designed to help clients decide what to sell, collect and improve next.</p>
               </div>
-
+              <div style={{ display: "flex", gap: 8 }}>
+                <button className="secondary-button" type="button" onClick={exportReportExcel} disabled={!generatedReport}>Generate Excel</button>
+                <button className="secondary-button" type="button" onClick={printReport} disabled={!generatedReport}>Generate PDF</button>
+              </div>
             </header>
 
             <section className="dashboard-panel report-filter-panel">
@@ -2883,12 +3325,35 @@ export default function PortalPage({ session }) {
                 </div>
                 {reportMessage && !generatedReport && <div className="info-banner report-filter-message">{reportMessage}</div>}
                 <div className="report-filter-actions">
-                  <button className="icon-button report-action-icon" type="button" title="Clear filters" aria-label="Clear filters" onClick={() => { setSelectedReport(""); setReportDateRange(""); setReportCustomFrom(""); setReportCustomTo(""); setReportPageFilter(""); setReportChannelFilter(""); setReportStatusFilter(""); setReportSortBy(""); setGeneratedReport(null); setReportMessage(""); }}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18"/><path d="M6 5l1 15h10l1-15"/><path d="M9 9v7"/><path d="M15 9v7"/></svg></button>
-                  <button className="primary-button report-short-action" type="submit"><span className="report-run-icon"><NavIcon type="reports" /></span><span>Run</span></button>
-                  <button className="secondary-button report-short-action" type="button" onClick={exportReportExcel} disabled={!generatedReport} title="Export Excel">▦ Excel</button>
-                  <button className="secondary-button report-short-action" type="button" onClick={printReport} disabled={!generatedReport} title="Export PDF">▤ PDF</button>
+                  <button className="secondary-button" type="button" onClick={() => { setSelectedReport(""); setReportDateRange(""); setReportCustomFrom(""); setReportCustomTo(""); setReportPageFilter(""); setReportChannelFilter(""); setReportStatusFilter(""); setReportSortBy(""); setGeneratedReport(null); setReportMessage(""); }}>Clear Filters</button>
+                  <button className="primary-button" type="submit">Generate Report</button>
                 </div>
               </form>
+            </section>
+
+            <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 14, marginBottom: 18 }}>
+              {REPORT_CATALOG.map((report) => (
+                <button
+                  key={report.key}
+                  type="button"
+                  onClick={() => setSelectedReport(report.key)}
+                  style={{
+                    border: report.key === selectedReport ? "2px solid #2ea84a" : "1px solid #e3e9ef",
+                    background: report.featured ? "linear-gradient(135deg, #f1fff4 0%, #ffffff 65%)" : "#ffffff",
+                    borderRadius: 14,
+                    padding: 18,
+                    textAlign: "left",
+                    cursor: "pointer",
+                    boxShadow: report.key === selectedReport ? "0 8px 24px rgba(46,168,74,.10)" : "none",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", marginBottom: 8 }}>
+                    <strong style={{ color: "#1e2d3d" }}>{report.title}</strong>
+                    <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: ".08em", color: report.featured ? "#20833a" : "#718096" }}>{report.featured ? "EO2MATE" : report.group.toUpperCase()}</span>
+                  </div>
+                  <div style={{ fontSize: 13, lineHeight: 1.5, color: "#607083" }}>{report.description}</div>
+                </button>
+              ))}
             </section>
 
             {(() => {
@@ -2953,7 +3418,7 @@ export default function PortalPage({ session }) {
           </>
         )}
 
-        {page === "setup" && (
+        {page === "automation-control" && (
           <>
             {automationModal && (
               <div
@@ -2970,7 +3435,7 @@ export default function PortalPage({ session }) {
                 }}
               >
                 <div
-                  className="control-modal setup-password-modal"
+                  className="control-modal"
                   role="dialog"
                   aria-modal="true"
                   style={{
@@ -3015,15 +3480,6 @@ export default function PortalPage({ session }) {
                     />
                   </label>
 
-                  <label className="control-modal-reason">
-                    Current password
-                    <input type="password" autoComplete="current-password" value={automationPassword} onChange={(e) => setAutomationPassword(e.target.value)} placeholder="Verify your password" />
-                  </label>
-
-                  {automationModalError && (
-                    <div className="setup-modal-inline-error" role="alert">{automationModalError}</div>
-                  )}
-
                   <div className="control-modal-actions">
                     <button
                       type="button"
@@ -3031,8 +3487,6 @@ export default function PortalPage({ session }) {
                       onClick={() => {
                         setAutomationModal(null);
                         setAutomationReason("");
-                        setAutomationPassword("");
-                        setAutomationModalError("");
                       }}
                       disabled={automationControlLoading}
                     >
@@ -3055,7 +3509,7 @@ export default function PortalPage({ session }) {
             <header className="dashboard-header">
               <div>
                 <p className="eyebrow">AUTOMATION GOVERNANCE</p>
-                <h2>Automation Control</h2>
+                <h1>Automation Control</h1>
                 <p>Pause or resume EO2MATE without deleting client, Page, auction, or transaction data.</p>
               </div>
 
@@ -3157,54 +3611,6 @@ export default function PortalPage({ session }) {
                   Client-level ON/OFF is locked to SUPER_ADMIN so a subscription-suspended client cannot reactivate itself.
                 </div>
               )}
-            </section>
-
-            <section className="dashboard-panel automation-control-panel payment-automation-panel">
-              <div className="panel-header">
-                <div>
-                  <p className="eyebrow">PAYMENT MODE</p>
-                  <h2>Payment automation</h2>
-                  <p>Control whether EO2MATE may automatically provide payment or checkout links to buyers.</p>
-                </div>
-              </div>
-
-              <div className={`payment-automation-notice ${paymentAutomation.payment_automation_enabled !== false ? "enabled" : "manual"}`}>
-                <div>
-                  <strong>{paymentAutomation.payment_automation_enabled !== false ? "Automated payment mode" : "Manual payment mode"}</strong>
-                  <span>
-                    {paymentAutomation.payment_automation_enabled !== false
-                      ? "EO2MATE may send payment instructions and secure checkout links through supported buyer flows."
-                      : "Selling remains active, but EO2MATE will not issue payment links in winner/order replies or through payment Messenger commands."}
-                  </span>
-                  {paymentAutomation.payment_automation_enabled === false && paymentAutomation.payment_automation_reason && (
-                    <small>Reason: {paymentAutomation.payment_automation_reason}</small>
-                  )}
-                </div>
-                <StatusBadge status={paymentAutomation.payment_automation_enabled !== false ? "ACTIVE" : "MANUAL"} />
-              </div>
-
-              <div className="payment-automation-setting-row">
-                <div className="payment-automation-setting-copy">
-                  <strong>Automated payment</strong>
-                  <span>Automatically send supported checkout and payment links. Turn off to handle buyer payments manually.</span>
-                </div>
-                <button
-                  type="button"
-                  className="payment-automation-toggle"
-                  aria-pressed={paymentAutomation.payment_automation_enabled !== false}
-                  aria-label={paymentAutomation.payment_automation_enabled !== false ? "Disable payment automation" : "Enable payment automation"}
-                  title={paymentAutomation.payment_automation_enabled !== false ? "Turn payment automation off" : "Turn payment automation on"}
-                  disabled={automationControlLoading || !["ADMIN", "OWNER", "CLIENT_ADMIN", "SUPER_ADMIN"].includes(String(client?.role || "").toUpperCase())}
-                  onClick={() => {
-                    setAutomationReason("");
-                    setAutomationPassword("");
-                    setAutomationModalError("");
-                    setAutomationModal({ kind: "PAYMENT_AUTOMATION", label: "Payment automation", enabled: !(paymentAutomation.payment_automation_enabled !== false) });
-                  }}
-                >
-                  <span className={`automation-switch-orb ${paymentAutomation.payment_automation_enabled !== false ? "enabled" : "disabled"}`} aria-hidden="true"><span /></span>
-                </button>
-              </div>
             </section>
 
             <section className="dashboard-panel automation-control-panel">
@@ -3324,29 +3730,19 @@ export default function PortalPage({ session }) {
               <MetricCard title="Claimed value" value={formatCurrency(miningStats.value)} subtitle="Gross claimed sales" />
             </section>
 
-            <section className="dashboard-panel selling-workspace-nav-panel" style={{ marginBottom: 18 }}>
-              <div className="selling-workspace-nav">
-                {[
-                  { key: "SUMMARY", label: "Summary", icon: "dashboard" },
-                  { key: "POSTS", label: "Posts", icon: "mining" },
-                  { key: "LIVE MINING", label: "Live Mining", icon: "reports" },
-                  { key: "CLAIMS", label: "Claims", icon: "orders" },
-                  { key: "BUYERS", label: "Buyers", icon: "users" },
-                ].map((tab) => (
+            <section className="selling-tabs">
+              <div>
+                {["SUMMARY", "POSTS", "LIVE MINING", "CLAIMS", "BUYERS"].map((tab) => (
                   <button
-                    key={tab.key}
+                    key={tab}
                     type="button"
-                    className={miningWorkspaceTab === tab.key ? "primary-button" : "secondary-button"}
-                    onClick={() => setMiningWorkspaceTab(tab.key)}
+                    className={miningWorkspaceTab === tab ? "primary-button" : "secondary-button"}
+                    onClick={() => setMiningWorkspaceTab(tab)}
                   >
-                    <span className="selling-nav-icon"><NavIcon type={tab.icon} /></span>
-                    <span>{tab.label}</span>
+                    {tab === "LIVE MINING" ? "Live Mining" : tab.charAt(0) + tab.slice(1).toLowerCase()}
                   </button>
                 ))}
-                <button type="button" className="secondary-button" onClick={() => navigateTo("mining-create")}>
-                  <span className="selling-nav-icon"><NavIcon type="create" /></span>
-                  <span>Create Post</span>
-                </button>
+                <button type="button" className="secondary-button" onClick={() => navigateTo("mining-create")}>Create Post</button>
               </div>
             </section>
 
@@ -3482,15 +3878,21 @@ export default function PortalPage({ session }) {
               flexWrap: "wrap",
             }}>
               <div style={{ minWidth: 260, flex: "1 1 520px" }}>
-                <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: ".14em", opacity: .72, marginBottom: 8 }}>EO2MATE BUSINESS OVERVIEW</div>
+                <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: ".14em", opacity: .72, marginBottom: 8 }}>EO2MATE CONTROL CENTER</div>
                 <h1 style={{ margin: 0, fontSize: "clamp(26px, 4vw, 38px)", lineHeight: 1.08 }}>
-                  {client?.name ? `${client.name} Dashboard` : "Business Dashboard"}
+                  {client?.name ? `Welcome, ${client.name}` : "Business dashboard"}
                 </h1>
                 <p style={{ margin: "10px 0 0", maxWidth: 720, color: "rgba(255,255,255,.78)", lineHeight: 1.55 }}>
-                  Monitor today’s selling activity, orders, payments, inventory and fulfillment from one clear operational dashboard.
+                  Sales, orders, payments, inventory and fulfillment — one operational view of your EO2MATE workspace.
                 </p>
               </div>
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <button className="secondary-button" type="button" onClick={() => setPage("reports")} style={{ background: "rgba(255,255,255,.1)", borderColor: "rgba(255,255,255,.18)", color: "#fff" }}>
+                  <NavIcon type="reports" /> Reports
+                </button>
+                <button className="primary-button" type="button" onClick={() => navigateTo("posts")}>
+                  <NavIcon type="create" /> Create Post
+                </button>
                 <button className="icon-button refresh-icon-button" onClick={loadPortal} title="Refresh dashboard" aria-label="Refresh dashboard" style={{ background: "rgba(255,255,255,.1)", borderColor: "rgba(255,255,255,.18)", color: "#fff" }}>
                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v5h-5"/><path d="M4 18v-5h5"/><path d="M6.1 9a7 7 0 0 1 11.3-2.1L20 9"/><path d="M4 15l2.6 2.1A7 7 0 0 0 17.9 15"/></svg>
                 </button>
@@ -3561,7 +3963,19 @@ export default function PortalPage({ session }) {
               </div>
             </section>
 
-
+            <section className="dashboard-panel" style={{ marginBottom: 20 }}>
+              <div className="panel-header"><div><h2>Quick actions</h2><p>Jump directly to your most-used EO2MATE workspaces.</p></div></div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
+                {[
+                  { icon: "create", label: "Create Post", action: () => navigateTo("posts"), meta: true },
+                  { icon: "inventory", label: "Inventory", action: () => setPage("inventory") },
+                  { icon: "sales", label: "Sales", action: () => setPage("sales") },
+                  { icon: "orders", label: "Orders", action: () => goToOrders("ALL") },
+                  { icon: "payments", label: "Payment Methods", action: () => setPage("payment-settings") },
+                  { icon: "reports", label: "Reports", action: () => setPage("reports") },
+                ].filter((item) => !item.meta || facebookStatus?.connected).map((item) => <button key={item.label} className="secondary-button" type="button" onClick={item.action} style={{ minHeight: 48, justifyContent: "flex-start", gap: 9 }}><NavIcon type={item.icon}/>{item.label}</button>)}
+              </div>
+            </section>
 
             <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 18, marginBottom: 20 }}>
               <div className={`payment-setup-card ${paymentAccountStatus?.payment_enabled ? "active" : ""}`} style={{ margin: 0 }}>
@@ -3604,23 +4018,14 @@ export default function PortalPage({ session }) {
               <MetricCard title="Winning value" value={formatCurrency(auctions.reduce((sum, a) => sum + Number(a.highest_bid || 0), 0))} subtitle="Current / final highest bids" />
             </section>
 
-            <section className="dashboard-panel selling-workspace-nav-panel" style={{ marginBottom: 18 }}>
-              <div className="selling-workspace-nav">
-                {[
-                  { key: "SUMMARY", label: "Summary", icon: "dashboard" },
-                  { key: "AUCTIONS", label: "Auctions", icon: "auction" },
-                  { key: "BIDS", label: "Bids", icon: "sales" },
-                  { key: "WINNERS", label: "Winners", icon: "users" },
-                ].map((tab) => (
-                  <button key={tab.key} type="button" className={auctionWorkspaceTab === tab.key ? "primary-button" : "secondary-button"} onClick={() => setAuctionWorkspaceTab(tab.key)}>
-                    <span className="selling-nav-icon"><NavIcon type={tab.icon} /></span>
-                    <span>{tab.label}</span>
+            <section className="selling-tabs">
+              <div>
+                {["SUMMARY", "AUCTIONS", "BIDS", "WINNERS"].map((tab) => (
+                  <button key={tab} type="button" className={auctionWorkspaceTab === tab ? "primary-button" : "secondary-button"} onClick={() => setAuctionWorkspaceTab(tab)}>
+                    {tab.charAt(0) + tab.slice(1).toLowerCase()}
                   </button>
                 ))}
-                <button type="button" className="secondary-button" onClick={() => navigateTo("facebook-post")}>
-                  <span className="selling-nav-icon"><NavIcon type="create" /></span>
-                  <span>Create Post</span>
-                </button>
+                <button type="button" className="secondary-button" onClick={() => navigateTo("facebook-post")}>Create Post</button>
               </div>
             </section>
 
@@ -3676,12 +4081,7 @@ export default function PortalPage({ session }) {
         )}
 
         {page === "sales" && (
-          <>
-            <header className="dashboard-header"><div><p className="eyebrow">SALES</p><h1>Sales</h1><p>Consolidated sales from Auctions, Post Mining, Live Mining and manual transactions.</p></div></header>
-            <section className="metrics-grid"><MetricCard title="Gross sales" value={formatCurrency(0)} subtitle="Before deductions" /><MetricCard title="Net sales" value={formatCurrency(0)} subtitle="After discounts / adjustments" /><MetricCard title="Paid" value={formatCurrency(0)} subtitle="Collected sales" /><MetricCard title="Pending" value={formatCurrency(0)} subtitle="Awaiting payment" /><MetricCard title="Transactions" value="0" subtitle="Sales records" /><MetricCard title="Average sale" value={formatCurrency(0)} subtitle="Per transaction" /></section>
-            <section className="dashboard-panel" style={{ marginBottom: 18 }}><div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>{["SUMMARY", "TRANSACTIONS", "RETURNS"].map((tab) => <button key={tab} type="button" className={salesTab === tab ? "primary-button" : "secondary-button"} onClick={() => setSalesTab(tab)}>{tab.charAt(0)+tab.slice(1).toLowerCase()}</button>)}</div></section>
-            <section className="dashboard-panel"><div className="panel-header"><div><h2>{salesTab === "SUMMARY" ? "Sales summary" : salesTab.charAt(0)+salesTab.slice(1).toLowerCase()}</h2><p>Sales data will consolidate all enabled EO2MATE selling channels.</p></div></div><div className="table-wrapper"><table><thead><tr><th>Date</th><th>Reference</th><th>Channel</th><th>Buyer</th><th>Items</th><th>Gross</th><th>Paid</th><th>Status</th></tr></thead><tbody><tr><td colSpan="8">No consolidated sales records yet.</td></tr></tbody></table></div></section>
-          </>
+          <SalesPage client={client} orderLabels={orders} />
         )}
 
         {page === "purchases" && (
@@ -3944,7 +4344,7 @@ export default function PortalPage({ session }) {
           <PaymentMethodsSettings clientId={client?.client_id} onChanged={loadPortal} />
         )}
 
-        {page === "setup" && (
+        {page === "automated-messages" && (
           <AutomatedMessagesPage client={client} />
         )}
 
@@ -4342,7 +4742,6 @@ export default function PortalPage({ session }) {
           </>
         )}
       </main>
-      <FloatingMetaMessenger clientId={client?.client_id} />
     </div>
   );
 }
