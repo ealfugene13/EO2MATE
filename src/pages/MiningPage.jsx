@@ -508,19 +508,29 @@ export default function MiningPage({ client, metaConnected, miningWorkspaceTab, 
               <MetricCard title="Claimed value" value={formatCurrency(miningStats.value)} subtitle="Gross claimed sales" />
             </section>
 
-            <section className="selling-tabs">
-              <div>
-                {["SUMMARY", "POSTS", "LIVE MINING", "CLAIMS", "BUYERS"].map((tab) => (
+            <section className="dashboard-panel selling-workspace-nav-panel" style={{ marginBottom: 18 }}>
+              <div className="selling-workspace-nav" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 16 }}>
+                {[
+                  { key: "SUMMARY", label: "Summary", icon: "dashboard" },
+                  { key: "POSTS", label: "Posts", icon: "mining" },
+                  { key: "LIVE MINING", label: "Live Mining", icon: "reports" },
+                  { key: "CLAIMS", label: "Claims", icon: "orders" },
+                  { key: "BUYERS", label: "Buyers", icon: "users" },
+                ].map((tab) => (
                   <button
-                    key={tab}
+                    key={tab.key}
                     type="button"
-                    className={miningWorkspaceTab === tab ? "primary-button" : "secondary-button"}
-                    onClick={() => setMiningWorkspaceTab(tab)}
+                    className={miningWorkspaceTab === tab.key ? "primary-button" : "secondary-button"}
+                    onClick={() => setMiningWorkspaceTab(tab.key)}
                   >
-                    {tab === "LIVE MINING" ? "Live Mining" : tab.charAt(0) + tab.slice(1).toLowerCase()}
+                    <span className="selling-nav-icon"><NavIcon type={tab.icon} /></span>
+                    <span>{tab.label}</span>
                   </button>
                 ))}
-                <button type="button" className="secondary-button" onClick={() => navigateTo("mining-create")}>Create Post</button>
+                <button type="button" className="secondary-button" onClick={() => navigateTo("mining-create")}>
+                  <span className="selling-nav-icon"><NavIcon type="create" /></span>
+                  <span>Create Post</span>
+                </button>
               </div>
             </section>
 

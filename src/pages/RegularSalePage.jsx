@@ -503,16 +503,21 @@ export default function RegularSalePage({ client, metaConnected, page, regularSa
               <MetricCard title="Sales value" value={formatCurrency(regularSaleStats.value)} subtitle="Gross Regular Sale value" />
             </section>
 
-            <section className="selling-tabs">
-              <div>
-                {["SUMMARY", "POSTS", "POSTING"].map((tab) => (
+            <section className="dashboard-panel selling-workspace-nav-panel" style={{ marginBottom: 18 }}>
+              <div className="selling-workspace-nav" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 16 }}>
+                {[
+                  { key: "SUMMARY", label: "Summary", icon: "dashboard" },
+                  { key: "POSTS", label: "Posts", icon: "sales" },
+                  { key: "POSTING", label: "Create Post", icon: "create" },
+                ].map((tab) => (
                   <button
-                    key={tab}
+                    key={tab.key}
                     type="button"
-                    className={regularSaleWorkspaceTab === tab ? "primary-button" : "secondary-button"}
-                    onClick={() => setRegularSaleWorkspaceTab(tab)}
+                    className={regularSaleWorkspaceTab === tab.key ? "primary-button" : "secondary-button"}
+                    onClick={() => setRegularSaleWorkspaceTab(tab.key)}
                   >
-                    {tab === "POSTING" ? "Create Post" : tab.charAt(0) + tab.slice(1).toLowerCase()}
+                    <span className="selling-nav-icon"><NavIcon type={tab.icon} /></span>
+                    <span>{tab.label}</span>
                   </button>
                 ))}
               </div>

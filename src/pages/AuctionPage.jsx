@@ -370,14 +370,23 @@ export default function AuctionPage({ auctionWorkspaceTab, client, detailRequest
               <MetricCard title="Winning value" value={formatCurrency(auctions.reduce((sum, a) => sum + Number(a.highest_bid || 0), 0))} subtitle="Current / final highest bids" />
             </section>
 
-            <section className="selling-tabs">
-              <div>
-                {["SUMMARY", "AUCTIONS", "BIDS", "WINNERS"].map((tab) => (
-                  <button key={tab} type="button" className={auctionWorkspaceTab === tab ? "primary-button" : "secondary-button"} onClick={() => setAuctionWorkspaceTab(tab)}>
-                    {tab.charAt(0) + tab.slice(1).toLowerCase()}
+            <section className="dashboard-panel selling-workspace-nav-panel" style={{ marginBottom: 18 }}>
+              <div className="selling-workspace-nav" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 16 }}>
+                {[
+                  { key: "SUMMARY", label: "Summary", icon: "dashboard" },
+                  { key: "AUCTIONS", label: "Auctions", icon: "auction" },
+                  { key: "BIDS", label: "Bids", icon: "sales" },
+                  { key: "WINNERS", label: "Winners", icon: "users" },
+                ].map((tab) => (
+                  <button key={tab.key} type="button" className={auctionWorkspaceTab === tab.key ? "primary-button" : "secondary-button"} onClick={() => setAuctionWorkspaceTab(tab.key)}>
+                    <span className="selling-nav-icon"><NavIcon type={tab.icon} /></span>
+                    <span>{tab.label}</span>
                   </button>
                 ))}
-                <button type="button" className="secondary-button" onClick={() => navigateTo("facebook-post")}>Create Post</button>
+                <button type="button" className="secondary-button" onClick={() => navigateTo("facebook-post")}>
+                  <span className="selling-nav-icon"><NavIcon type="create" /></span>
+                  <span>Create Post</span>
+                </button>
               </div>
             </section>
 
