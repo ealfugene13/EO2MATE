@@ -1,0 +1,198 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { supabase } from '../supabase';
+import './SalesPage.css';
+const upper = value => String(value || '').toUpperCase();
+const number = value => Number.isFinite(Number(value)) ? Number(value) : 0;
+const settled = row => ['PAID','SUCCESS','SUCCEEDED','COMPLETED','PAYMENT_SUCCESS'].includes(upper(row.status || row.payment_status));
+const inactive = row => ['CANCELLED','CANCELED','FORFEITED','VOID'].includes(upper(row.order_status));
+const money = value => new Intl.NumberFormat('en-PH',{style:'currency',currency:'PHP'}).format(number(value));
+const date = value => value && !Number.isNaN(new Date(value).getTime()) ? new Date(value).toLocaleString('en-PH',{timeZone:'Asia/Manila'}) : '—';
+const day = value => value && !Number.isNaN(new Date(value).getTime()) ? new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Manila'}).format(new Date(value)) : '';
+const uniquePayments = rows => [...new Map(rows.filter(row => row.payment_id).map(row => [row.payment_id,row])).values()];
+const orderPayments = (order,payments) => payments.filter(row => row.order_id === order.order_id && !row.order_group_id);
+const groupPayments = (group,payments) => payments.filter(row => row.order_group_id === group.order_group_id);
+const paidAmount = rows => uniquePayments(rows).filter(settled).reduce((sum,row) => sum + number(row.amount),0);
+function csvCell(value) { let text=String(value??''); if (/^[\s]*[=+@-]/.test(text)) text="'"+text; return '"'+text.replaceAll('"','""')+'"'; }
+function filterOrders(rows,f) { return rows.filter(row => (!f.search || [row.order_number,row.buyer_name,row.item_label,row.sku,row.order_group_id].join(' ').toLowerCase().includes(f.search.toLowerCase())) && (f.channel==='ALL'||upper(row.source_type)===f.channel) && (f.status==='ALL'||upper(row.order_status)===f.status) && (!f.from||day(row.created_at)>=f.from) && (!f.to||day(row.created_at)<=f.to)); }
+
+const defaults={search:'',channel:'ALL',status:'ALL',from:'',to:''};
+function Icon({type}) { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{type==='refresh'?<><path d="M20 5v6h-6M4 19v-6h6"/><path d="M6 8a7 7 0 0 1 12-1l2 4M4 13l2 4a7 7 0 0 0 12-1"/></>:type==='export'?<path d="M12 3v12m-4-4 4 4 4-4M4 16v5h16v-5"/>:type==='close'?<path d="m6 6 12 12M18 6 6 18"/>:<><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></>}</svg>; }
+function Badge({value}) { return <span className={`sales-badge ${settled({status:value})?'sales-paid':''}`}>{String(value||'Not recorded').replaceAll('_',' ')}</span>; }
+function WorkspaceIcon({ type }) {
+  const paths = {
+    summary: <><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></>,
+    transactions: <><path d="M4 20V10m6 10V4m6 16v-8M2 20h20"/></>,
+    groups: <><rect x="3" y="3" width="13" height="13" rx="2"/><path d="M8 21h11a2 2 0 0 0 2-2V8M7 7h5M7 11h5"/></>,
+    purchases: <><path d="M3 3h2l3 12h10l3-9H6"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></>,
+    suppliers: <><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0M16 5a3 3 0 0 1 0 6M17 14a5 5 0 0 1 4 6"/></>,
+    receiving: <><path d="m3 7 9-4 9 4-9 4-9-4ZM3 7v10l9 4 9-4V7M12 11v10m-5-5 3 3 6-6"/></>,
+    create: <><path d="M12 5v14M5 12h14"/></>,
+  };
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[type] || paths.summary}</svg>;
+}
+
+function Metric({title,value,note}) {
+ return <div className="metric-card metric-button"><div className="metric-title">{title}</div><div className="metric-value">{value}</div><div className="metric-subtitle">{note}</div></div>;
+}
+function Field({label,children}) { return <label className="sales-field"><span>{label}</span>{children}</label>; }
+function Detail({label,value}) { return <div className="sales-detail-row"><span>{label}</span><strong>{value??'—'}</strong></div>; }
+async function clientRows(table,clientId) { const rows=[]; for(let offset=0;;offset+=500) { const {data,error}=await supabase.from(table).select(table==='orders'?'*, auction_items(item_label)':'*').eq('client_id',clientId).order('created_at',{ascending:false}).order(table==='orders'?'order_id':'order_group_id').range(offset,offset+499); if(error) throw error; rows.push(...(data||[])); if((data||[]).length<500) return rows; } }
+async function linkedPayments(column,ids) { const rows=[]; for(let i=0;i<ids.length;i+=100) { for(let offset=0;;offset+=500) { const {data,error}=await supabase.from('payments').select('*').in(column,ids.slice(i,i+100)).order('payment_id').range(offset,offset+499); if(error) throw error; rows.push(...(data||[])); if((data||[]).length<500) break; } } return rows; }
+export default function SalesPage({client,orderLabels=[],navigationFilter}) {
+ const [data,setData]=useState({orders:[],groups:[],payments:[]}); const [busy,setBusy]=useState(true); const [error,setError]=useState(''); const [tab,setTab]=useState('SUMMARY'); const [filters,setFilters]=useState(defaults); const [groupFilters,setGroupFilters]=useState({search:'',status:'ALL',from:'',to:''}); const [period,setPeriod]=useState('MONTH'); const [summaryChannel,setSummaryChannel]=useState('ALL'); const [summaryFrom,setSummaryFrom]=useState(''); const [summaryTo,setSummaryTo]=useState(''); const [advanced,setAdvanced]=useState(false); const [selected,setSelected]=useState(null); const [page,setPage]=useState(1); const generation=useRef(0),dialog=useRef(null),returnFocus=useRef(null);
+ const labels=useMemo(()=>new Map(orderLabels.map(row=>[row.order_id,row.item_label])),[orderLabels]);
+ async function load() { const request=++generation.current; setBusy(true);setError('');setSelected(null);setData({orders:[],groups:[],payments:[]}); try { if(!client?.client_id) throw new Error('A client workspace is required to load Sales.'); const [orders,groups]=await Promise.all([clientRows('orders',client.client_id),clientRows('order_groups',client.client_id)]); const [byOrder,byGroup]=await Promise.all([linkedPayments('order_id',orders.map(row=>row.order_id)),linkedPayments('order_group_id',groups.map(row=>row.order_group_id))]); if(request===generation.current) setData({orders,groups,payments:uniquePayments([...byOrder,...byGroup])}); } catch(err) { if(request===generation.current) setError(err.message||'Unable to load Sales.'); } finally { if(request===generation.current) setBusy(false); } }
+ useEffect(()=>{load();return()=>{generation.current++;};},[client?.client_id]); useEffect(()=>setPage(1),[filters,groupFilters,tab]);
+ useEffect(()=>{if(navigationFilter?.page==='sales'){setTab(navigationFilter.tab||'TRANSACTIONS');setFilters({...defaults,status:navigationFilter.value||'ALL'});}},[navigationFilter]);
+ useEffect(()=>{if(!selected)return; returnFocus.current=document.activeElement; const element=dialog.current;element?.showModal();return()=>{element?.close();returnFocus.current?.focus?.();};},[selected]);
+ const rows=useMemo(()=>data.orders.map(row=>({...row,item_label:row.item_label||row.item_name_snapshot||row.auction_items?.item_label||labels.get(row.order_id)})),[data.orders,labels]); const invalidRange=filters.from&&filters.to&&filters.from>filters.to;
+ const filtered=useMemo(()=>invalidRange?[]:filterOrders(rows,filters),[rows,filters,invalidRange]);const active=filtered.filter(row=>!inactive(row));const groups=data.groups.filter(group=>filtered.some(row=>row.order_group_id===group.order_group_id));const groupMap=new Map(data.groups.map(group=>[group.order_group_id,group]));
+ const today = day(new Date());
+ const periodStart = (()=>{const d=new Date(); if(period==='TODAY') return day(d); if(period==='WEEK'){const offset=(d.getDay()+6)%7; d.setDate(d.getDate()-offset);return day(d);}if(period==='MONTH')return `${today.slice(0,7)}-01`;return summaryFrom;})();
+ const summaryRows=rows.filter(row=>!inactive(row)&&(summaryChannel==='ALL'||upper(row.source_type)===summaryChannel)&&(!periodStart||day(row.created_at)>=periodStart)&&((period==='CUSTOM'&&summaryTo)?day(row.created_at)<=summaryTo:true)&&(!today||day(row.created_at)<=today||period==='CUSTOM'));
+ const paidSummaryRows=(period==='CUSTOM'&&summaryFrom&&summaryTo&&summaryFrom>summaryTo?[]:summaryRows).filter(row=>['PAID','SUCCESS','SUCCEEDED','COMPLETED','PAYMENT_SUCCESS'].includes(upper(row.payment_status)));
+ const summary=[...new Set(paidSummaryRows.map(row=>row.source_type||'UNSPECIFIED'))].map(channel=>{const list=paidSummaryRows.filter(row=>(row.source_type||'UNSPECIFIED')===channel);return {channel,count:list.length,subtotal:list.reduce((n,row)=>n+number(row.subtotal),0),total:list.reduce((n,row)=>n+number(row.total_amount),0)};});
+ const summaryGroups=data.groups.filter(group=>summaryRows.some(row=>row.order_group_id===group.order_group_id));
+ const summaryPayments=uniquePayments([...summaryRows.flatMap(row=>orderPayments(row,data.payments)),...summaryGroups.flatMap(group=>groupPayments(group,data.payments))]);
+ const orderSummaryRows = rows.filter(row =>
+   (summaryChannel==='ALL'||upper(row.source_type)===summaryChannel) &&
+   (!periodStart||day(row.created_at)>=periodStart) &&
+   (!(period==='CUSTOM'&&summaryTo)||day(row.created_at)<=summaryTo) &&
+   (period==='CUSTOM'||!today||day(row.created_at)<=today) &&
+   !(period==='CUSTOM'&&summaryFrom&&summaryTo&&summaryFrom>summaryTo)
+ );
+ const paymentState = (due,collected,cancelled=false,recordedStatus='') => {
+   if(cancelled) return 'CANCELLED';
+   if(upper(recordedStatus)==='REFUNDED') return 'REFUNDED';
+   if(due<=0) return 'OTHER';
+   if(collected>=due-0.009) return 'PAID';
+   if(collected>0.009) return 'PARTIAL';
+   return 'UNPAID';
+ };
+ // Financial classification works at payment ownership level. A group payment is
+ // never allocated to each linked order, preventing inflated paid/partial counts.
+ const summaryGroupIds = new Set(orderSummaryRows.map(row=>row.order_group_id).filter(Boolean));
+ const groupedSummary = data.groups.filter(group=>summaryGroupIds.has(group.order_group_id));
+ const standaloneSummary = orderSummaryRows.filter(row=>!row.order_group_id);
+ const summaryBuckets = [
+   {key:'UNPAID',label:'Unpaid',description:'No verified payment'},
+   {key:'PARTIAL',label:'Partially paid',description:'Payment received; balance remains'},
+   {key:'PAID',label:'Fully paid',description:'Verified amount covers total'},
+   {key:'CANCELLED',label:'Cancelled / forfeited',description:'Excluded from outstanding'},
+   {key:'REFUNDED',label:'Refunded',description:'Review refund history'},
+   {key:'OTHER',label:'Other / no amount',description:'Requires review'},
+ ];
+ const classifyStandalone = row => paymentState(
+   number(row.total_amount),
+   paidAmount(orderPayments(row,data.payments)),
+   inactive(row),
+   row.payment_status
+ );
+ const classifyGroup = group => paymentState(
+   number(group.total_amount),
+   paidAmount(groupPayments(group,data.payments)),
+   ['CANCELLED','CANCELED','FORFEITED','VOID'].includes(upper(group.group_status)),
+   group.payment_status
+ );
+ const orderSummary = summaryBuckets.map(bucket=>{
+   const standalone=standaloneSummary.filter(row=>classifyStandalone(row)===bucket.key);
+   const grouped=groupedSummary.filter(group=>classifyGroup(group)===bucket.key);
+   const value=standalone.reduce((n,row)=>n+number(row.total_amount),0)+grouped.reduce((n,group)=>n+number(group.total_amount),0);
+   const received=standalone.reduce((n,row)=>n+paidAmount(orderPayments(row,data.payments)),0)+grouped.reduce((n,group)=>n+paidAmount(groupPayments(group,data.payments)),0);
+   return {...bucket,orders:standalone.length,groups:grouped.length,value,received,balance:['CANCELLED','REFUNDED'].includes(bucket.key)?0:Math.max(0,value-received)};
+ });
+ const summaryTotals={orders:orderSummaryRows.length,groups:groupedSummary.length,
+   outstanding:orderSummary.filter(row=>['UNPAID','PARTIAL'].includes(row.key)).reduce((n,row)=>n+row.balance,0)};
+ const groupList=data.groups.filter(group=>{const groupOrders=rows.filter(row=>row.order_group_id===group.order_group_id);const q=groupFilters.search.trim().toLowerCase();return (!q||[group.group_number,group.order_group_id,group.buyer_name,...groupOrders.map(row=>row.order_number)].join(' ').toLowerCase().includes(q))&&(groupFilters.status==='ALL'||upper(group.group_status||group.payment_status||group.status)===groupFilters.status)&&(!groupFilters.from||day(group.created_at)>=groupFilters.from)&&(!groupFilters.to||day(group.created_at)<=groupFilters.to);});
+ const groupInvalidRange=!!(groupFilters.from&&groupFilters.to&&groupFilters.from>groupFilters.to);
+ const selectedPayments=selected?.kind==='group'?groupPayments(selected.row,data.payments):selected?orderPayments(selected.row,data.payments):[];
+ const selectedGroupId=selected?.kind==='group'?selected.row.order_group_id:selected?.row.order_group_id;
+ const selectedItems=selectedGroupId?rows.filter(row=>row.order_group_id===selectedGroupId):selected?[selected.row]:[];
+ function openGroup(id) {
+   const group=data.groups.find(row=>row.order_group_id===id);
+   if(group) setSelected({kind:'group',row:group});
+   else setSelected({kind:'group',row:{order_group_id:id,buyer_name:rows.find(row=>row.order_group_id===id)?.buyer_name}});
+ }
+ const list=tab==='GROUPS'?(groupInvalidRange?[]:groupList):filtered;const totalPages=Math.max(1,Math.ceil(list.length/25));const currentPage=Math.min(page,totalPages);const display=list.slice((currentPage-1)*25,currentPage*25);
+ function change(key,value) { setFilters(f=>({...f,[key]:value})); }
+ function exportCSV() { if(tab==='GROUPS'){const header=['Created (Manila)','Group','Buyer','Total','Group status'];const lines=list.map(g=>[date(g.created_at),g.group_number||g.order_group_id,g.buyer_name,g.total_amount,g.group_status||g.payment_status]);downloadCSV([header,...lines],'EO2MATE-Order-Groups.csv');return;} if(tab==='SUMMARY'){const header=['Channel','Paid orders','Subtotal','Paid order value'];downloadCSV([header,...summary.map(row=>[row.channel,row.count,row.subtotal,row.total])],'EO2MATE-Paid-Sales-Summary.csv');return;} const header=['Date (Manila)','Order','Channel','Buyer','Item','Subtotal','Total','Order status','Payment status','Order group'];const lines=filtered.map(row=>[date(row.created_at),row.order_number||row.order_id,row.source_type,row.buyer_name,row.item_label,row.subtotal,row.total_amount,row.order_status,row.payment_status,groupMap.get(row.order_group_id)?.group_number||row.order_group_id]); downloadCSV([header,...lines],'EO2MATE-Orders.csv'); }
+ function downloadCSV(lines,filename){const url=URL.createObjectURL(new Blob(['\uFEFF'+lines.map(line=>line.map(csvCell).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8;'}));const anchor=document.createElement('a');anchor.href=url;anchor.download=filename;anchor.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+ return <div className="sales-workspace">
+ <header className="dashboard-header"><div><p className="eyebrow">SALES &amp; ORDER MANAGEMENT</p><h1>Sales &amp; Orders</h1><p>One workspace for sales performance, customer orders and order groups.</p></div><div className="sales-actions"><button className="icon-button refresh-icon-button" title="Refresh Sales & Orders" aria-label="Refresh Sales & Orders" disabled={busy} onClick={load}><Icon type="refresh"/></button></div></header>
+ {error&&<div className="error-message" role="alert">{error} <button className="secondary-button" onClick={load}>Retry</button></div>}
+ {busy?<div className="loading-card" role="status">Loading Sales…</div>:!error&&<>
+ <section className="dashboard-panel selling-workspace-nav-panel" style={{ marginBottom: 18 }}>
+   <div role="tablist" aria-label="Sales and order sections" className="selling-workspace-nav" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 16 }}>
+     {[
+       { key: 'SUMMARY', label: 'Sales summary', icon: 'summary' },
+       { key: 'TRANSACTIONS', label: 'Orders', icon: 'transactions' },
+       { key: 'GROUPS', label: 'Order groups', icon: 'groups' },
+     ].map(({key,label,icon}) => <button key={key} type="button" role="tab" aria-selected={tab===key} aria-controls="sales-panel" className={tab===key?'primary-button':'secondary-button'} onClick={()=>setTab(key)}><span className="selling-nav-icon"><WorkspaceIcon type={icon}/></span><span>{label}</span></button>)}
+   </div>
+ </section>
+ <section className="toolbar-card sales-tab-filters" aria-label={`${tab==='SUMMARY'?'Sales summary':tab==='GROUPS'?'Order group':'Order'} filters`}>
+   {tab==='SUMMARY'?<>
+      <Field label="Period"><select value={period} onChange={e=>setPeriod(e.target.value)}><option value="TODAY">Today</option><option value="WEEK">This week</option><option value="MONTH">This month</option><option value="CUSTOM">Custom dates</option></select></Field>
+      <Field label="Channel"><select value={summaryChannel} onChange={e=>setSummaryChannel(e.target.value)}><option value="ALL">All channels</option>{[...new Set(rows.map(row=>upper(row.source_type)).filter(Boolean))].sort().map(value=><option key={value} value={value}>{value.replaceAll('_',' ')}</option>)}</select></Field>
+      {period==='CUSTOM'&&<><Field label="From (Manila)"><input type="date" value={summaryFrom} onChange={e=>setSummaryFrom(e.target.value)}/></Field><Field label="To (Manila)"><input type="date" value={summaryTo} onChange={e=>setSummaryTo(e.target.value)}/></Field></>}
+   </>:tab==='TRANSACTIONS'?<>
+      <Field label="Find order"><input className="search-input" value={filters.search} onChange={e=>change('search',e.target.value)} placeholder="Order, buyer or item…"/></Field>
+      <Field label="Order status"><select value={filters.status} onChange={e=>change('status',e.target.value)}><option value="ALL">All statuses</option>{[...new Set(rows.map(row=>upper(row.order_status)).filter(Boolean))].sort().map(value=><option key={value} value={value}>{value.replaceAll('_',' ')}</option>)}</select></Field>
+      <Field label="Channel"><select value={filters.channel} onChange={e=>change('channel',e.target.value)}><option value="ALL">All channels</option>{[...new Set(rows.map(row=>upper(row.source_type)).filter(Boolean))].sort().map(value=><option key={value} value={value}>{value.replaceAll('_',' ')}</option>)}</select></Field>
+      <button type="button" className="secondary-button" onClick={()=>setAdvanced(v=>!v)} aria-expanded={advanced}>{advanced?'Hide dates':'Date filters'}</button>
+      {advanced&&<><Field label="From (Manila)"><input type="date" value={filters.from} onChange={e=>change('from',e.target.value)}/></Field><Field label="To (Manila)"><input type="date" value={filters.to} onChange={e=>change('to',e.target.value)}/></Field></>}
+      <button type="button" className="secondary-button" onClick={()=>setFilters({...defaults})}>Reset</button>
+   </>:<>
+      <Field label="Find order group"><input value={groupFilters.search} onChange={e=>setGroupFilters(f=>({...f,search:e.target.value}))} placeholder="Group number or buyer…"/></Field>
+      <Field label="Group status"><select value={groupFilters.status} onChange={e=>setGroupFilters(f=>({...f,status:e.target.value}))}><option value="ALL">All statuses</option>{[...new Set(data.groups.map(row=>upper(row.group_status||row.payment_status||row.status)).filter(Boolean))].sort().map(value=><option key={value} value={value}>{value.replaceAll('_',' ')}</option>)}</select></Field>
+      <button type="button" className="secondary-button" onClick={()=>setAdvanced(v=>!v)} aria-expanded={advanced}>{advanced?'Hide dates':'Date filters'}</button>
+      {advanced&&<><Field label="From (Manila)"><input type="date" value={groupFilters.from} onChange={e=>setGroupFilters(f=>({...f,from:e.target.value}))}/></Field><Field label="To (Manila)"><input type="date" value={groupFilters.to} onChange={e=>setGroupFilters(f=>({...f,to:e.target.value}))}/></Field></>}
+      <button type="button" className="secondary-button" onClick={()=>setGroupFilters({search:'',status:'ALL',from:'',to:''})}>Reset</button>
+   </>}
+   <button type="button" className="secondary-button sales-export" onClick={exportCSV} disabled={tab==='SUMMARY'?!summary.length:!list.length}><Icon type="export"/>Export {tab==='GROUPS'?'groups':tab==='SUMMARY'?'summary':'orders'}</button>
+ </section>
+ {tab==='TRANSACTIONS'&&invalidRange&&<p role="alert" className="error-message">The end date must be on or after the start date.</p>}
+ {tab==='GROUPS'&&groupInvalidRange&&<p role="alert" className="error-message">The end date must be on or after the start date.</p>}
+ {tab==='SUMMARY'&&period==='CUSTOM'&&summaryFrom&&summaryTo&&summaryFrom>summaryTo&&<p role="alert" className="error-message">The end date must be on or after the start date.</p>}
+ {tab==='SUMMARY'&&<section className="dashboard-panel sales-order-summary">
+   <div className="panel-header"><div><h2>Order summary</h2><p>{summaryTotals.orders} orders · {summaryTotals.groups} groups linked to matching orders · amounts based on payment ownership</p></div></div>
+   <div className="sales-order-summary-highlights">
+     <Metric title="Recorded orders" value={summaryTotals.orders} note="Includes unpaid and cancelled orders"/>
+     <Metric title="Order groups" value={summaryTotals.groups} note="Group payment tracked separately"/>
+     <Metric title="Outstanding balance" value={money(summaryTotals.outstanding)} note="Unpaid and partial only; excludes cancelled"/>
+   </div>
+   <div className="table-wrapper"><table className="sales-order-summary-table"><thead><tr><th>Payment state</th><th>Standalone orders</th><th>Order groups</th><th>Order / group value</th><th>Collected</th><th>Balance</th></tr></thead><tbody>
+     {orderSummary.map(bucket=><tr key={bucket.key}><td><strong>{bucket.label}</strong><small className="sales-muted">{bucket.description}</small></td><td>{bucket.orders}</td><td>{bucket.groups}</td><td>{money(bucket.value)}</td><td>{money(bucket.received)}</td><td>{money(bucket.balance)}</td></tr>)}
+   </tbody></table></div>
+   <p className="sales-order-summary-note">Grouped payments are evaluated once against the full group amount, not assigned to individual orders. When filtering by channel, a matching group can include orders from other channels; its full amount is shown. Collections shown here are verified payments recorded in EO2MATE, not a refund-adjusted accounting ledger.</p>
+ </section>}
+ {tab==='SUMMARY'&&<section className="metrics-grid sales-summary-metrics"><Metric title="Paid order value" value={money(paidSummaryRows.reduce((n,row)=>n+number(row.total_amount),0))} note="Paid orders only; excludes pending"/><Metric title="Confirmed collections" value={money(paidAmount(summaryPayments))} note="Linked payments on orders in period; counted once"/><Metric title="Orders awaiting payment" value={summaryRows.filter(row=>!['PAID','SUCCESS','SUCCEEDED','COMPLETED','PAYMENT_SUCCESS'].includes(upper(row.payment_status))).length} note="Not included in paid order value"/><Metric title="Paid orders" value={paidSummaryRows.length} note="Based on recorded order payment status"/></section>}
+ <section className="dashboard-panel" id="sales-panel" role="tabpanel"><div className="panel-header"><div><h2>{tab==='SUMMARY'?'Sales by channel':tab==='GROUPS'?'Order groups':'Order list'}</h2><p>{tab==='GROUPS'?`${list.length} order groups`:tab==='SUMMARY'?`${paidSummaryRows.length} paid orders`:`${filtered.length} matching orders`}</p></div></div>
+ {tab==='SUMMARY'?<><div className="table-wrapper"><table><thead><tr><th>Channel</th><th>Paid orders</th><th>Subtotal</th><th>Paid value</th></tr></thead><tbody>{summary.map(row=><tr key={row.channel}><td>{row.channel.replaceAll('_',' ')}</td><td>{row.count}</td><td>{money(row.subtotal)}</td><td>{money(row.total)}</td></tr>)}{!summary.length&&<tr><td colSpan="4" className="empty-table-cell">No paid sales match this period and channel.</td></tr>}</tbody></table></div><div className="sales-payment-note"><strong>Recorded collections</strong><p>Standalone order payments: {money(paidAmount(summaryRows.flatMap(row=>orderPayments(row,data.payments))))} · Linked group payments: {money(paidAmount(summaryGroups.flatMap(group=>groupPayments(group,data.payments))))}</p><p>Collections are recorded payments, not booked order values. Group payments are counted once and cannot reliably be allocated by sales channel.</p></div></>:<>
+ <div className="table-wrapper sales-list-wrapper">
+   <table className="sales-list-table">
+     {tab==='GROUPS'?<colgroup><col style={{width:'24%'}}/><col style={{width:'24%'}}/><col style={{width:'16%'}}/><col style={{width:'16%'}}/><col style={{width:'20%'}}/></colgroup>:<colgroup><col style={{width:'14%'}}/><col style={{width:'22%'}}/><col style={{width:'26%'}}/><col style={{width:'12%'}}/><col style={{width:'11%'}}/><col style={{width:'15%'}}/></colgroup>}
+     <thead>{tab==='GROUPS'?<tr><th>Group</th><th>Buyer / items</th><th>Total</th><th>Collected</th><th>Status</th></tr>:<tr><th>Created</th><th>Order / group</th><th>Buyer / item</th><th>Channel</th><th>Total</th><th>Status</th></tr>}</thead>
+     <tbody>{display.map(row=>tab==='GROUPS'?<tr key={row.order_group_id}>
+       <td data-label="Group"><button type="button" className="sales-reference" onClick={()=>openGroup(row.order_group_id)}>{row.group_number||row.order_group_id}</button></td>
+       <td data-label="Buyer / items">{row.buyer_name||'—'}<small className="sales-muted">{rows.filter(order=>order.order_group_id===row.order_group_id).length} linked orders</small></td>
+       <td data-label="Total">{money(row.total_amount)}</td><td data-label="Collected">{money(paidAmount(groupPayments(row,data.payments)))}</td>
+       <td data-label="Status"><Badge value={row.payment_status||row.group_status||row.status}/></td>
+     </tr>:<tr key={row.order_id}>
+       <td data-label="Created">{day(row.created_at)||'—'}<small className="sales-muted">{row.created_at?new Date(row.created_at).toLocaleTimeString('en-PH',{timeZone:'Asia/Manila',hour:'numeric',minute:'2-digit'}):''}</small></td>
+       <td data-label="Order / group"><button type="button" className="sales-reference" onClick={()=>setSelected({kind:'order',row})}>{row.order_number||row.order_id}</button>{row.order_group_id?<button type="button" className="sales-reference sales-group-reference" onClick={()=>openGroup(row.order_group_id)}>{groupMap.get(row.order_group_id)?.group_number||row.order_group_id}</button>:<small className="sales-muted">Standalone order</small>}</td>
+       <td data-label="Buyer / item">{row.buyer_name||'—'}<small className="sales-muted">{row.item_label||'Item details not supplied'}</small></td>
+       <td data-label="Channel">{String(row.source_type||'Unspecified').replaceAll('_',' ')}</td><td data-label="Total">{money(row.total_amount)}</td>
+       <td data-label="Status"><div className="sales-status-pair"><span>Order</span><Badge value={row.order_status}/><span>Payment</span><Badge value={row.payment_status}/></div></td>
+     </tr>)}{!display.length&&<tr><td colSpan={tab==='GROUPS'?5:6} className="empty-table-cell">No records match these filters.</td></tr>}</tbody>
+   </table>
+ </div>
+ <div className="sales-pagination"><span>Page {currentPage} of {totalPages}</span><div className="sales-actions"><button className="secondary-button" disabled={currentPage<=1} onClick={()=>setPage(currentPage-1)}>Previous</button><button className="secondary-button" disabled={currentPage>=totalPages} onClick={()=>setPage(currentPage+1)}>Next</button></div></div></>}
+ </section></>}
+ {selected&&<dialog ref={dialog} className="sales-dialog" aria-labelledby="sale-detail-title" onCancel={()=>setSelected(null)}><header className="panel-header"><div><p className="eyebrow">{selected.kind==='group'?'ORDER GROUP':'SALES TRANSACTION'}</p><h2 id="sale-detail-title">{selected.row.order_number||selected.row.group_number||selected.row.order_id||selected.row.order_group_id}</h2></div><button className="icon-button" aria-label="Close details" onClick={()=>setSelected(null)}><Icon type="close"/></button></header>
+ <div className="detail-grid"><section className="detail-card"><h3>{selected.kind==='group'?'Order group':'Order'}</h3><Detail label="Created" value={date(selected.row.created_at)}/><Detail label="Buyer" value={selected.row.buyer_name||'—'}/>{selected.row.buyer_phone&&<Detail label="Phone" value={selected.row.buyer_phone}/>} {selected.row.buyer_email&&<Detail label="Email" value={selected.row.buyer_email}/>}{selected.kind==='group'?<Detail label="Linked orders" value={selectedItems.length}/>:<><Detail label="Item" value={selected.row.item_label||'—'}/><Detail label="SKU / variant" value={selected.row.sku||selected.row.item_code_snapshot||'—'}/><Detail label="Quantity" value={selected.row.quantity??selected.row.accepted_quantity??'—'}/></>}<Detail label="Status" value={selected.row.order_status||selected.row.group_status||selected.row.status||'—'}/>{selected.kind==='order'&&<Detail label="Fulfillment" value={selected.row.fulfillment_status||'Not recorded'}/>}</section><section className="detail-card"><h3>Amounts</h3><Detail label="Subtotal" value={selected.row.subtotal!=null?money(selected.row.subtotal):'—'}/><Detail label="Shipping" value={selected.row.shipping_fee!=null?money(selected.row.shipping_fee):'—'}/><Detail label="Total" value={selected.row.total_amount!=null?money(selected.row.total_amount):'—'}/><Detail label="Payment status" value={selected.row.payment_status||'Not recorded'}/><Detail label="Linked collections" value={money(paidAmount(selectedPayments))}/>{selected.kind==='order'&&selected.row.order_group_id&&<button type="button" className="secondary-button sales-view-group" onClick={()=>openGroup(selected.row.order_group_id)}><span className="selling-nav-icon"><WorkspaceIcon type="groups"/></span>View order group</button>}</section></div>
+ <section className="sales-dialog-section"><div className="sales-section-heading"><h3>{selectedGroupId?'Group items':'Order items'}</h3><p>{selectedItems.length} linked orders{selectedGroupId?' · All items in this group':''}</p></div>
+ <div className="table-wrapper"><table className="sales-list-table"><thead><tr><th>Order / item</th><th>Channel</th><th>Qty</th><th>Total</th><th>Status</th></tr></thead><tbody>{selectedItems.map(row=><tr key={row.order_id} className={selected.kind==='order'&&row.order_id===selected.row.order_id?'sales-selected-item':''}><td data-label="Order / item"><button type="button" className="sales-reference" onClick={()=>setSelected({kind:'order',row})}>{row.order_number||row.order_id}</button><small className="sales-muted">{row.item_label||'—'}</small></td><td data-label="Channel">{String(row.source_type||'—').replaceAll('_',' ')}</td><td data-label="Qty">{row.quantity??row.accepted_quantity??'—'}</td><td data-label="Total">{money(row.total_amount)}</td><td data-label="Status"><Badge value={row.order_status}/></td></tr>)}{!selectedItems.length&&<tr><td colSpan="5" className="empty-table-cell">No linked items found.</td></tr>}</tbody></table></div></section>
+ <section className="sales-dialog-section"><div className="sales-section-heading"><h3>Payment history</h3></div><div className="table-wrapper"><table><thead><tr><th>Date</th><th>Provider / reference</th><th>Amount</th><th>Status</th></tr></thead><tbody>{selectedPayments.map(row=><tr key={row.payment_id}><td>{date(row.paid_at||row.created_at)}</td><td>{row.provider||'—'}<small className="sales-muted">{row.payment_reference||row.request_reference_number||'—'}</small></td><td>{money(row.amount)}</td><td><Badge value={row.status||row.payment_status}/></td></tr>)}{!selectedPayments.length&&<tr><td colSpan="4" className="empty-table-cell">No directly linked payment records.</td></tr>}</tbody></table></div></section><footer className="sales-actions"><button className="secondary-button" onClick={()=>setSelected(null)}>Close</button></footer></dialog>}
+ </div>;
+}
