@@ -11,3 +11,11 @@
 @media(max-width:1200px){.orders-workspace .orders-top-filters{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:800px){.orders-workspace .orders-top-filters,.orders-workspace .orders-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:520px){.orders-workspace .orders-top-filters,.orders-workspace .orders-summary{grid-template-columns:minmax(0,1fr)}.orders-workspace .orders-top-filters{padding:15px;gap:12px}}
+.orders-workspace .orders-workspace-nav-panel{padding:10px 12px}
+.orders-workspace .orders-link-button{display:block;max-width:100%;border:0;background:none;padding:2px 0;color:#28558b;font-size:12px;font-weight:650;text-align:left;white-space:normal;overflow-wrap:anywhere;line-height:1.5;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.orders-workspace .orders-link-button:hover{color:#187644}
+.orders-workspace .orders-table-subtext{display:block;margin-top:4px;font-size:11px;color:#64748b;line-height:1.45}
+.orders-workspace .orders-group-reference{font-weight:500}
+.orders-workspace .orders-status-pair{display:grid;gap:4px;justify-items:start}
+.orders-workspace .orders-status-pair>span:not(.status-badge){font-size:9px;color:#64748b;font-weight:650}
+.orders-workspace .table-wrapper td .orders-table-subtext:first-of-type{margin-top:2px}
