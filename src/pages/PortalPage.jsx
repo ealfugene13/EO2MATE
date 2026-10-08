@@ -686,8 +686,8 @@ export default function PortalPage({ session }) {
   }
 
   function goToOrders(filter = "ALL") {
-    setNavigationFilter({ page: "orders", value: filter });
-    setPage("orders");
+    setNavigationFilter({ page: "sales", value: filter, tab: "TRANSACTIONS", requestId: Date.now() });
+    setPage("sales");
   }
 
   function goToPayments(filter = "ALL") {
@@ -859,14 +859,6 @@ export default function PortalPage({ session }) {
           <SidebarSectionLabel>Operations</SidebarSectionLabel>
 
           <SidebarNavButton
-            icon="orders"
-            className={`nav-item ${page.includes("order") ? "active" : ""}`}
-            onClick={() => goToOrders("ALL")}
-          >
-            Orders
-          </SidebarNavButton>
-
-          <SidebarNavButton
             icon="payments"
             className={`nav-item ${page.includes("payment") ? "active" : ""}`}
             onClick={() => paymentAccountStatus?.payment_enabled && goToPayments("ALL")}
@@ -894,10 +886,10 @@ export default function PortalPage({ session }) {
 
           <SidebarNavButton
             icon="sales"
-            className={`nav-item ${page === "sales" ? "active" : ""}`}
+            className={`nav-item ${["sales", "orders", "order-detail"].includes(page) ? "active" : ""}`}
             onClick={() => setPage("sales")}
           >
-            Sales
+            Sales &amp; Orders
           </SidebarNavButton>
 
           <SidebarNavButton
@@ -1087,12 +1079,12 @@ export default function PortalPage({ session }) {
         )}
 
         {page === "sales" && (
-          <SalesPage client={client} />
+          <SalesPage client={client} navigationFilter={navigationFilter} />
         )}
 
         {(page === "purchases") && <PurchasesPage client={client} />}
 
-        {(page === "orders" || page === "order-detail") && <OrdersPage navigationFilter={navigationFilter} client={client} detailRequest={detailRequest} page={page} setErrorMessage={setErrorMessage} setPage={setPage} />}
+        {(page === "order-detail") && <OrdersPage navigationFilter={navigationFilter} client={client} detailRequest={detailRequest} page={page} setErrorMessage={setErrorMessage} setPage={(next) => setPage(next === "orders" ? "sales" : next)} />}
 
         {(page === "payments" || page === "payment-detail") && <PaymentsPage navigationFilter={navigationFilter} client={client} detailRequest={detailRequest} page={page} paymentAccountStatus={paymentAccountStatus} setErrorMessage={setErrorMessage} setPage={setPage} />}
 
