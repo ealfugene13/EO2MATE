@@ -1090,7 +1090,7 @@ export default function PortalPage({ session }) {
           <SalesPage client={client} />
         )}
 
-        {(page === "purchases") && <PurchasesPage page={page} />}
+        {(page === "purchases") && <PurchasesPage client={client} />}
 
         {(page === "orders" || page === "order-detail") && <OrdersPage navigationFilter={navigationFilter} client={client} detailRequest={detailRequest} page={page} setErrorMessage={setErrorMessage} setPage={setPage} />}
 
