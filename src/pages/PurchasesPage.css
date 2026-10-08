@@ -396,3 +396,10 @@
   color: #637188;
   font-size: 12px;
 }
+
+.purchase-item-fields {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}

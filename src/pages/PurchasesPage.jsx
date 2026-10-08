@@ -72,6 +72,13 @@ export const purchaseTotal = (p) =>
   centsText(p.lines.reduce((sum, line) => sum + lineCents(line), 0n));
 const total = purchaseTotal;
 
+const newInventoryItem = () => ({
+  item_code: "",
+  item_name: "",
+  description: "",
+  default_selling_price: "0",
+});
+
 function Icon({ type }) {
   const paths = {
     summary: (
@@ -406,6 +413,8 @@ export default function PurchasesPage({ client }) {
     [receiptNotes, setReceiptNotes] = useState(""),
     [payment, setPayment] = useState(""),
     [reason, setReason] = useState("");
+  const [itemForm, setItemForm] = useState(newInventoryItem);
+  const itemReturn = useRef({ type: null, lineKey: null });
   const dialog = useRef(null),
     focus = useRef(null),
     version = useRef(0),
@@ -537,8 +546,97 @@ export default function PurchasesPage({ client }) {
   function closeModal() {
     if (!saving) {
       fileVersion.current++;
-      setModal(null);
+      setModal(modal === "ITEM" ? itemReturn.current.type : null);
       setModalError("");
+    }
+  }
+  function startNewInventoryItem(lineKey = null) {
+    itemReturn.current = { type: modal, lineKey };
+    setItemForm(newInventoryItem());
+    openModal("ITEM");
+  }
+  async function saveInventoryItem() {
+    if (saving || !canWrite) return;
+    const code = itemForm.item_code.trim().toUpperCase(),
+      name = itemForm.item_name.trim(),
+      price = scaledValue(itemForm.default_selling_price, 2);
+    if (!code || !name) {
+      setModalError("Item code and name are required.");
+      return;
+    }
+    if (items.some((item) => key(item.item_code) === key(code))) {
+      setModalError(
+        "This item code already exists. Select the existing item, or use a different code.",
+      );
+      return;
+    }
+    if (price === null || price > 999999999999999999n) {
+      setModalError(
+        "Enter a non-negative selling price with at most 2 decimals.",
+      );
+      return;
+    }
+    const workspace = clientId,
+      destination = { ...itemReturn.current };
+    setSaving(true);
+    setModalError("");
+    try {
+      const { data, error: invokeError } = await supabase.functions.invoke(
+        "inventory-admin",
+        {
+          body: {
+            action: "SAVE_ITEM",
+            client_id: workspace,
+            item_code: code,
+            item_name: name,
+            description: itemForm.description.trim(),
+            default_selling_price: itemForm.default_selling_price,
+            opening_quantity: 0,
+            status: "ACTIVE",
+            source_type: "MANUAL",
+            created_from_post: false,
+          },
+        },
+      );
+      if (activeClient.current !== workspace) return;
+      if (invokeError) {
+        let message = invokeError.message;
+        try {
+          const body = await invokeError.context?.json();
+          message = body?.error || body?.message || message;
+        } catch {}
+        throw new Error(message || "Unable to create the inventory item.");
+      }
+      if (!data?.success || !data.item?.inventory_item_id)
+        throw new Error(data?.error || "The inventory item was not saved.");
+      const item = data.item;
+      if (item.client_id !== workspace)
+        throw new Error("Inventory item does not belong to this workspace.");
+      setItems((previous) =>
+        [
+          ...previous.filter(
+            (row) => row.inventory_item_id !== item.inventory_item_id,
+          ),
+          item,
+        ].sort((a, b) => a.item_code.localeCompare(b.item_code)),
+      );
+      if (destination.lineKey)
+        setForm((previous) => ({
+          ...previous,
+          lines: previous.lines.map((line) =>
+            line.key === destination.lineKey
+              ? { ...line, item_code: item.item_code }
+              : line,
+          ),
+        }));
+      setModal(destination.type);
+      setMessage(
+        `${item.item_code} created in Inventory with zero stock. Receive the purchase to add stock.`,
+      );
+    } catch (e) {
+      if (activeClient.current === workspace) setModalError(e.message);
+    } finally {
+      setSaving(false);
     }
   }
   function requestId(payload) {
@@ -802,6 +900,13 @@ export default function PurchasesPage({ client }) {
             }}
           >
             New purchase
+          </Action>
+          <Action
+            icon="add"
+            disabled={!canWrite || busy}
+            onClick={() => startNewInventoryItem()}
+          >
+            New inventory item
           </Action>
           <Action
             icon="upload"
@@ -1079,29 +1184,31 @@ export default function PurchasesPage({ client }) {
           className="purchase-dialog"
           aria-labelledby="purchase-dialog-title"
           onCancel={(e) => {
-            if (saving) e.preventDefault();
-            else closeModal();
+            e.preventDefault();
+            if (!saving) closeModal();
           }}
         >
           <header className="panel-header">
             <div>
               <p className="eyebrow">PURCHASING</p>
               <h2 id="purchase-dialog-title">
-                {modal === "CREATE"
-                  ? "New purchase"
-                  : modal === "UPLOAD"
-                    ? "Bulk purchase upload"
-                    : modal === "SUPPLIER"
-                      ? supplierForm.supplier_id
-                        ? "Edit supplier"
-                        : "New supplier"
-                      : modal === "RECEIVE"
-                        ? "Receive stock"
-                        : modal === "PAYMENT"
-                          ? "Record supplier payment"
-                          : modal === "CANCEL"
-                            ? "Cancel purchase"
-                            : detail?.purchase.purchase_ref}
+                {modal === "ITEM"
+                  ? "New inventory item"
+                  : modal === "CREATE"
+                    ? "New purchase"
+                    : modal === "UPLOAD"
+                      ? "Bulk purchase upload"
+                      : modal === "SUPPLIER"
+                        ? supplierForm.supplier_id
+                          ? "Edit supplier"
+                          : "New supplier"
+                        : modal === "RECEIVE"
+                          ? "Receive stock"
+                          : modal === "PAYMENT"
+                            ? "Record supplier payment"
+                            : modal === "CANCEL"
+                              ? "Cancel purchase"
+                              : detail?.purchase.purchase_ref}
               </h2>
             </div>
             <Action
@@ -1116,6 +1223,94 @@ export default function PurchasesPage({ client }) {
             <div className="error-message purchase-errors" role="alert">
               {modalError}
             </div>
+          )}
+          {modal === "ITEM" && (
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                saveInventoryItem();
+              }}
+            >
+              <p className="purchase-note">
+                Create the item in Inventory without leaving Purchases. It
+                starts with zero stock and uses your default inventory owner.
+                Confirm a purchase receipt to add stock.
+              </p>
+              <fieldset className="purchase-item-fields" disabled={saving}>
+                <div className="purchase-form-grid">
+                  <Field label="New item code *">
+                    <input
+                      required
+                      maxLength="100"
+                      value={itemForm.item_code}
+                      onChange={(event) =>
+                        setItemForm({
+                          ...itemForm,
+                          item_code: event.target.value,
+                        })
+                      }
+                    />
+                  </Field>
+                  <Field label="New item name *">
+                    <input
+                      required
+                      maxLength="200"
+                      value={itemForm.item_name}
+                      onChange={(event) =>
+                        setItemForm({
+                          ...itemForm,
+                          item_name: event.target.value,
+                        })
+                      }
+                    />
+                  </Field>
+                  <Field label="Default selling price (PHP)">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={itemForm.default_selling_price}
+                      onChange={(event) =>
+                        setItemForm({
+                          ...itemForm,
+                          default_selling_price: event.target.value,
+                        })
+                      }
+                    />
+                  </Field>
+                  <Field label="Description" wide>
+                    <textarea
+                      maxLength="4000"
+                      value={itemForm.description}
+                      onChange={(event) =>
+                        setItemForm({
+                          ...itemForm,
+                          description: event.target.value,
+                        })
+                      }
+                    />
+                  </Field>
+                </div>
+              </fieldset>
+              <footer>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  disabled={saving}
+                  onClick={closeModal}
+                >
+                  Back
+                </button>
+                <Action
+                  type="submit"
+                  icon="add"
+                  className="primary-button"
+                  disabled={saving}
+                >
+                  {saving ? "Saving…" : "Create inventory item"}
+                </Action>
+              </footer>
+            </form>
           )}
           {modal === "CREATE" && (
             <form
@@ -1183,15 +1378,27 @@ export default function PurchasesPage({ client }) {
               </div>
               <div className="purchase-section-title">
                 <h3>Items</h3>
-                <Action
-                  icon="add"
-                  disabled={form.lines.length >= 1000}
-                  onClick={() =>
-                    setForm({ ...form, lines: [...form.lines, newLine()] })
-                  }
-                >
-                  Add item
-                </Action>
+                <div className="purchase-actions">
+                  <Action
+                    icon="add"
+                    onClick={() =>
+                      startNewInventoryItem(
+                        form.lines.find((line) => !line.item_code)?.key,
+                      )
+                    }
+                  >
+                    New inventory item
+                  </Action>
+                  <Action
+                    icon="add"
+                    disabled={form.lines.length >= 1000}
+                    onClick={() =>
+                      setForm({ ...form, lines: [...form.lines, newLine()] })
+                    }
+                  >
+                    Add item
+                  </Action>
+                </div>
               </div>
               {form.lines.map((l, i) => (
                 <div className="purchase-line-form" key={l.key}>
@@ -1200,10 +1407,15 @@ export default function PurchasesPage({ client }) {
                       required
                       value={l.item_code}
                       onChange={(e) =>
-                        editLine(l.key, "item_code", e.target.value)
+                        e.target.value === "__CREATE_NEW_ITEM__"
+                          ? startNewInventoryItem(l.key)
+                          : editLine(l.key, "item_code", e.target.value)
                       }
                     >
                       <option value="">Select inventory item</option>
+                      <option value="__CREATE_NEW_ITEM__">
+                        + Create new inventory item
+                      </option>
                       {items.map((item) => (
                         <option
                           key={item.inventory_item_id}
@@ -1354,7 +1566,8 @@ export default function PurchasesPage({ client }) {
                 <p>
                   One row per item. Repeat the purchase reference to group items
                   into one order. Supplier and inventory item codes must already
-                  exist.
+                  exist. You can create missing inventory items here before
+                  submitting the upload.
                 </p>
                 <p>
                   Maximum 1,000 rows / 100 purchases / 2 MB. Use YYYY-MM-DD
@@ -1362,6 +1575,9 @@ export default function PurchasesPage({ client }) {
                   every row of the same purchase.
                 </p>
                 <div className="purchase-actions">
+                  <Action icon="add" onClick={() => startNewInventoryItem()}>
+                    New inventory item
+                  </Action>
                   <Action
                     icon="download"
                     onClick={() => downloadTemplate(suppliers[0], items[0])}
