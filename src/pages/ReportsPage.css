@@ -1,0 +1,15 @@
+.reports-workspace{min-width:0}
+.reports-workspace .report-export-actions{display:flex;align-items:center;flex-wrap:wrap;gap:12px}
+.reports-workspace .report-icon-action{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:40px;padding:10px 15px;line-height:1.2;white-space:nowrap}
+.reports-workspace .report-icon-action svg{width:18px;height:18px;flex:0 0 18px}
+.reports-workspace .report-filter-actions{gap:12px}
+.reports-workspace .report-card-title{display:flex;align-items:center;gap:10px;min-width:0}
+.reports-workspace .report-card-icon{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;flex:0 0 34px;border:1px solid #dfebe3;border-radius:10px;background:#f1f8f3;color:#308c42}
+.reports-workspace .report-card-icon svg{width:18px;height:18px}
+.reports-workspace .report-catalog-button{transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease}
+.reports-workspace .report-catalog-button:hover{transform:translateY(-2px);box-shadow:0 6px 18px #233b5510!important}
+.reports-workspace .report-catalog-button:focus-visible,.reports-workspace .report-icon-action:focus-visible{outline:2px solid #399947;outline-offset:3px}
+.reports-workspace .report-metric-title{display:flex;align-items:center;gap:8px}
+.reports-workspace .report-metric-title svg{width:16px;height:16px;flex:0 0 16px;color:#398d47}
+@media(max-width:600px){.reports-workspace .report-export-actions{width:100%;gap:12px}.reports-workspace .report-export-actions button{flex:1;min-width:110px}.reports-workspace .report-filter-actions{gap:12px}.reports-workspace .report-card-title{gap:9px}}
+@media(prefers-reduced-motion:reduce){.reports-workspace .report-catalog-button{transition:none}.reports-workspace .report-catalog-button:hover{transform:none}}

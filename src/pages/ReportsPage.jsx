@@ -1,6 +1,26 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../supabase";
+import "./ReportsPage.css";
 
+
+function ReportIcon({type="sales-summary"}) {
+  const shapes={
+    excel:<><path d="M14 3H5v18h14V8l-5-5ZM14 3v5h5M8 11l5 6m0-6-5 6"/></>,
+    pdf:<><path d="M6 8V3h12v5M6 17H3V8h18v9h-3M6 14h12v7H6zM17 11h1"/></>,
+    clear:<><path d="M20 7v5h-5M20 12a8 8 0 1 0-2 6"/></>,
+    generate:<><path d="M5 3h10l4 4v14H5zM14 3v5h5M8 17v-3m4 3v-6m4 6v-4"/></>,
+    "sales-summary":<><path d="M4 20V10m5 10V4m5 16v-7m5 7V8M2 20h20"/></>,
+    "auction-performance":<><path d="m14 3 7 7-4 4-7-7 4-4ZM5 12l7 7-4 4-7-7 4-4ZM8 15l5-5M13 21h9"/></>,
+    "post-mining-performance":<><path d="M4 3h16v15H9l-5 4V3ZM8 8h8M8 12h5"/></>,
+    "payment-collection":<><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h4"/></>,
+    "order-fulfillment":<><path d="M3 5h11v12H3zM14 10h4l3 4v3h-7M6 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM18 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/></>,
+    "inventory-movement":<><path d="m3 7 9-4 9 4-9 4-9-4ZM3 7v10l9 4 9-4V7M12 11v10"/></>,
+    "buyer-analysis":<><circle cx="9" cy="8" r="3"/><path d="M3 21v-2a6 6 0 0 1 12 0v2M16 5a3 3 0 0 1 0 6M18 15a5 5 0 0 1 3 6"/></>,
+    "facebook-page-performance":<><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M14 7h-2a2 2 0 0 0-2 2v12M8 12h7"/></>,
+    opportunity:<><path d="M9 18h6M10 21h4M8 14a6 6 0 1 1 8 0l-1 4H9l-1-4Z"/></>,
+  };
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">{shapes[type] || shapes["sales-summary"]}</svg>;
+}
 
 const REPORT_CATALOG = [
   {
@@ -123,7 +143,7 @@ function StatusBadge({ status }) {
 function MetricCard({ title, value, subtitle, onClick }) {
   return (
     <button type="button" className="metric-card metric-button" onClick={onClick}>
-      <div className="metric-title">{title}</div>
+      <div className="metric-title report-metric-title"><ReportIcon/>{title}</div>
       <div className="metric-value">{value}</div>
       <div className="metric-subtitle">{subtitle}</div>
     </button>
@@ -444,7 +464,7 @@ export default function ReportsPage({ client, page, setErrorMessage }) {
   }
   useEffect(() => { loadPortal(); return () => { pageLoadVersion.current++; }; }, [client?.client_id]);
   if (pageDataLoading) return <div className="loading-card"><h2>Loading page</h2></div>;
-  return (<>
+  return (<div className="reports-workspace">
     {page === "reports" && (
           <>
             <header className="dashboard-header">
@@ -453,9 +473,9 @@ export default function ReportsPage({ client, page, setErrorMessage }) {
                 <h1>Reports &amp; Insights</h1>
                 <p>Operational reports plus EO2MATE insights designed to help clients decide what to sell, collect and improve next.</p>
               </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button className="secondary-button" type="button" onClick={exportReportExcel} disabled={!generatedReport}>Generate Excel</button>
-                <button className="secondary-button" type="button" onClick={printReport} disabled={!generatedReport}>Generate PDF</button>
+              <div className="report-export-actions">
+                <button className="secondary-button report-icon-action" type="button" aria-label="Generate Excel" title="Export report to Excel" onClick={exportReportExcel} disabled={!generatedReport}><ReportIcon type="excel"/><span>Excel</span></button>
+                <button className="secondary-button report-icon-action" type="button" aria-label="Generate PDF" title="Print report or save as PDF" onClick={printReport} disabled={!generatedReport}><ReportIcon type="pdf"/><span>PDF</span></button>
               </div>
             </header>
 
@@ -479,8 +499,8 @@ export default function ReportsPage({ client, page, setErrorMessage }) {
                 </div>
                 {reportMessage && !generatedReport && <div className="info-banner report-filter-message">{reportMessage}</div>}
                 <div className="report-filter-actions">
-                  <button className="secondary-button" type="button" onClick={() => { setSelectedReport(""); setReportDateRange(""); setReportCustomFrom(""); setReportCustomTo(""); setReportPageFilter(""); setReportChannelFilter(""); setReportStatusFilter(""); setReportSortBy(""); setGeneratedReport(null); setReportMessage(""); }}>Clear Filters</button>
-                  <button className="primary-button" type="submit">Generate Report</button>
+                  <button className="secondary-button report-icon-action" type="button" aria-label="Clear Filters" onClick={() => { setSelectedReport(""); setReportDateRange(""); setReportCustomFrom(""); setReportCustomTo(""); setReportPageFilter(""); setReportChannelFilter(""); setReportStatusFilter(""); setReportSortBy(""); setGeneratedReport(null); setReportMessage(""); }}><ReportIcon type="clear"/><span>Clear Filters</span></button>
+                  <button className="primary-button report-icon-action" type="submit"><ReportIcon type="generate"/><span>Generate Report</span></button>
                 </div>
               </form>
             </section>
@@ -489,6 +509,8 @@ export default function ReportsPage({ client, page, setErrorMessage }) {
               {REPORT_CATALOG.map((report) => (
                 <button
                   key={report.key}
+                  className="report-catalog-button"
+                  aria-pressed={report.key === selectedReport}
                   type="button"
                   onClick={() => setSelectedReport(report.key)}
                   style={{
@@ -502,7 +524,7 @@ export default function ReportsPage({ client, page, setErrorMessage }) {
                   }}
                 >
                   <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", marginBottom: 8 }}>
-                    <strong style={{ color: "#1e2d3d" }}>{report.title}</strong>
+                    <span className="report-card-title"><span className="report-card-icon"><ReportIcon type={report.key}/></span><strong style={{ color: "#1e2d3d" }}>{report.title}</strong></span>
                     <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: ".08em", color: report.featured ? "#20833a" : "#718096" }}>{report.featured ? "EO2MATE" : report.group.toUpperCase()}</span>
                   </div>
                   <div style={{ fontSize: 13, lineHeight: 1.5, color: "#607083" }}>{report.description}</div>
@@ -571,5 +593,5 @@ export default function ReportsPage({ client, page, setErrorMessage }) {
             })()}
           </>
         )}
-  </>);
+  </div>);
 }
