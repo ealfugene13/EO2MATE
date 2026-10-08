@@ -1,13 +1,26 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../supabase";
+import "./OrdersPage.css";
 
+
+const normalized = value => String(value || "").toUpperCase();
+const amount = value => Number.isFinite(Number(value)) ? Number(value) : 0;
+const orderDay = value => value && !Number.isNaN(new Date(value).getTime()) ? new Intl.DateTimeFormat("sv-SE",{timeZone:"Asia/Manila"}).format(new Date(value)) : "";
+function OrdersIcon({type}) {
+  const paths={export:<path d="M12 3v12m-4-4 4 4 4-4M4 16v5h16v-5"/>,reset:<path d="M20 7v5h-5M20 12a8 8 0 1 0-2 6"/>,refresh:<><path d="M20 5v6h-6M4 19v-6h6"/><path d="M6 8a7 7 0 0 1 12-1l2 4M4 13l2 4a7 7 0 0 0 12-1"/></>};
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[type]}</svg>;
+}
+function OrderField({label,children}) {return <label className="orders-filter-field"><span>{label}</span>{children}</label>;}
+function OrderMetric({title,value,note}) {return <div className="metric-card metric-button"><div className="metric-title">{title}</div><div className="metric-value">{value}</div><div className="metric-subtitle">{note}</div></div>;}
+function csvCell(value){let text=String(value??"");if(/^[\s]*[=+@-]/.test(text))text="'"+text;return '"'+text.replaceAll('"','""')+'"';}
 
 function formatCurrency(value) {
   if (value === null || value === undefined || value === "") return "-";
   return new Intl.NumberFormat("en-PH", {
     style: "currency",
     currency: "PHP",
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(Number(value || 0));
 }
 
@@ -65,7 +78,9 @@ function DetailRow({ label, value }) {
 export default function OrdersPage({ client, detailRequest, page, setErrorMessage, setPage, navigationFilter }) {
   const [orderSearch, setOrderSearch] = useState("");
   const [orderStatusFilter, setOrderStatusFilter] = useState("ALL");
-  useEffect(() => { if (navigationFilter?.page === "orders") { setOrderStatusFilter(navigationFilter.value); setOrderSearch(""); } }, [navigationFilter]);
+  const [channel,setChannel]=useState("ALL"),[from,setFrom]=useState(""),[to,setTo]=useState("");
+  const invalidRange=!!(from && to && from>to);
+  useEffect(() => { if (navigationFilter?.page === "orders") { setOrderStatusFilter(navigationFilter.value); setOrderSearch(""); setChannel("ALL"); setFrom(""); setTo(""); } }, [navigationFilter]);
   const [orders, setOrders] = useState([]);
 
   const [detailLoading, setDetailLoading] = useState(false);
@@ -99,7 +114,7 @@ export default function OrdersPage({ client, detailRequest, page, setErrorMessag
     return orders.filter((order) => {
       const matchesStatus =
         orderStatusFilter === "ALL" ||
-        order.order_status === orderStatusFilter;
+        normalized(order.order_status) === normalized(orderStatusFilter);
 
       const haystack = [
         order.order_number,
@@ -115,9 +130,20 @@ export default function OrdersPage({ client, detailRequest, page, setErrorMessag
         !orderSearch.trim() ||
         haystack.includes(orderSearch.trim().toLowerCase());
 
-      return matchesStatus && matchesSearch;
+      const day=orderDay(order.created_at);
+      return !invalidRange && matchesStatus && matchesSearch && (channel==="ALL" || normalized(order.source_type)===channel) && (!from || day>=from) && (!to || (!!day && day<=to));
     });
-  }, [orders, orderStatusFilter, orderSearch]);
+  }, [orders, orderStatusFilter, orderSearch,channel,from,to,invalidRange]);
+
+
+  const activeOrders=filteredOrders.filter(order=>!["CANCELLED","CANCELED","FORFEITED","PAYMENT_EXPIRED","FAILED","VOID"].includes(normalized(order.order_status)));
+  const channels=[...new Set(orders.map(order=>normalized(order.source_type)).filter(Boolean))].sort();
+  const statuses=[...new Set(["PAYMENT_PENDING","PAID","READY_FOR_DELIVERY","SHIPPED","DELIVERED","COMPLETED","CANCELLED",...orders.map(order=>normalized(order.order_status)).filter(Boolean),orderStatusFilter!=="ALL"?normalized(orderStatusFilter):""])].filter(Boolean);
+  function resetFilters(){setOrderSearch("");setOrderStatusFilter("ALL");setChannel("ALL");setFrom("");setTo("");}
+  function exportOrders(){
+    const rows=[["Order","Item","Buyer","Channel","Subtotal","Shipping","Total","Order status","Payment status","Created (Manila)"],...filteredOrders.map(order=>[order.order_number,order.item_label,order.buyer_name,order.source_type,order.subtotal,order.shipping_fee,order.total_amount,order.order_status,order.latest_payment_status||order.payment_status,formatDateTime(order.created_at)])];
+    const url=URL.createObjectURL(new Blob(["\uFEFF"+rows.map(row=>row.map(csvCell).join(",")).join("\r\n")],{type:"text/csv;charset=utf-8"}));const link=document.createElement("a");link.href=url;link.download="EO2MATE-Orders.csv";link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }
 
 
   const [pageDataLoading, setPageDataLoading] = useState(true);
@@ -144,7 +170,7 @@ export default function OrdersPage({ client, detailRequest, page, setErrorMessag
 
   useEffect(() => { if (detailRequest?.kind === "order" && page === "order-detail") openOrder(detailRequest.id); }, [detailRequest]);
   if (pageDataLoading) return <div className="loading-card"><h2>Loading page</h2></div>;
-  return (<>
+  return (<div className="orders-workspace">
     {page === "orders" && (
           <>
             <header className="dashboard-header">
@@ -153,28 +179,25 @@ export default function OrdersPage({ client, detailRequest, page, setErrorMessag
                 <h1>Orders</h1>
                 <p>Track winner orders from payment pending to completion.</p>
               </div>
-              <button className="icon-button refresh-icon-button" onClick={loadPortal} title="Refresh" aria-label="Refresh">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M20 6v5h-5" />
-            <path d="M4 18v-5h5" />
-            <path d="M6.1 9a7 7 0 0 1 11.3-2.1L20 9" />
-            <path d="M4 15l2.6 2.1A7 7 0 0 0 17.9 15" />
-          </svg>
-        </button>
+              <div className="orders-header-actions">
+                <button type="button" className="secondary-button orders-icon-action" onClick={exportOrders} disabled={!filteredOrders.length || invalidRange}><OrdersIcon type="export"/><span>Export</span></button>
+                <button type="button" className="icon-button refresh-icon-button orders-icon-action" onClick={loadPortal} title="Refresh Orders" aria-label="Refresh Orders"><OrdersIcon type="refresh"/></button>
+              </div>
             </header>
-
-            <section className="toolbar-card">
-              <input className="search-input" value={orderSearch} onChange={(e) => setOrderSearch(e.target.value)} placeholder="Search order, item or buyer..." />
-              <select className="filter-select" value={orderStatusFilter} onChange={(e) => setOrderStatusFilter(e.target.value)}>
-                <option value="ALL">All statuses</option>
-                <option value="PAYMENT_PENDING">Payment pending</option>
-                <option value="PAID">Paid</option>
-                <option value="READY_FOR_DELIVERY">Ready for delivery</option>
-                <option value="SHIPPED">Shipped</option>
-                <option value="DELIVERED">Delivered</option>
-                <option value="COMPLETED">Completed</option>
-                <option value="CANCELLED">Cancelled</option>
-              </select>
+            <section className="toolbar-card orders-top-filters" aria-label="Order filters">
+              <OrderField label="Search"><input className="search-input" value={orderSearch} onChange={event=>setOrderSearch(event.target.value)} placeholder="Order, buyer or item…"/></OrderField>
+              <OrderField label="Channel"><select className="filter-select" value={channel} onChange={event=>setChannel(event.target.value)}><option value="ALL">All channels</option>{channels.map(value=><option key={value} value={value}>{statusLabel(value)}</option>)}</select></OrderField>
+              <OrderField label="Order status"><select className="filter-select" value={orderStatusFilter} onChange={event=>setOrderStatusFilter(event.target.value)}><option value="ALL">All statuses</option>{statuses.map(value=><option key={value} value={value}>{statusLabel(value)}</option>)}</select></OrderField>
+              <OrderField label="From (Manila)"><input type="date" value={from} onChange={event=>setFrom(event.target.value)}/></OrderField>
+              <OrderField label="To (Manila)"><input type="date" value={to} onChange={event=>setTo(event.target.value)}/></OrderField>
+              <button type="button" className="secondary-button orders-icon-action" onClick={resetFilters}><OrdersIcon type="reset"/><span>Reset</span></button>
+            </section>
+            {invalidRange && <div className="error-message" role="alert">The end date must be on or after the start date.</div>}
+            <section className="metrics-grid orders-summary" aria-label="Order summary">
+              <OrderMetric title="Order subtotal" value={formatCurrency(activeOrders.reduce((sum,order)=>sum+amount(order.subtotal),0))} note="Matching active orders"/>
+              <OrderMetric title="Order total" value={formatCurrency(activeOrders.reduce((sum,order)=>sum+amount(order.total_amount),0))} note="Including recorded shipping charges"/>
+              <OrderMetric title="Transactions" value={filteredOrders.length} note={`${activeOrders.length} active; ${filteredOrders.length-activeOrders.length} cancelled / expired / forfeited`}/>
+              <OrderMetric title="Awaiting payment" value={activeOrders.filter(order=>["PENDING","PAYMENT_PENDING","PARTIAL","PARTIALLY_PAID","UNPAID","PAYMENT_REOPENED"].includes(normalized(order.payment_status||order.latest_payment_status))).length} note="Orders by recorded payment status"/>
             </section>
 
             <section className="dashboard-panel">
@@ -196,6 +219,7 @@ export default function OrdersPage({ client, detailRequest, page, setErrorMessag
                         <td>{formatDateTime(order.created_at)}</td>
                       </tr>
                     ))}
+                    {!filteredOrders.length && <tr><td colSpan="7" className="empty-table-cell">No orders match these filters.</td></tr>}
                   </tbody>
                 </table>
               </div>
@@ -245,5 +269,5 @@ export default function OrdersPage({ client, detailRequest, page, setErrorMessag
             ) : null}
           </>
         )}
-  </>);
+  </div>);
 }
