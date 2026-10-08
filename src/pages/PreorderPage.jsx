@@ -174,12 +174,7 @@ function NavIcon({ type }) {
 import PreorderAdminPage from "./PreorderAdminPage";
 export default function PreorderPage({ client, navigateTo }) {
   return (<>
-            <section className="dashboard-panel selling-workspace-nav-panel" style={{ marginBottom: 18 }}>
-              <div className="selling-workspace-nav" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 16 }}>
-                <button type="button" className="primary-button"><span className="selling-nav-icon"><NavIcon type="dashboard" /></span><span>Dashboard / Summary</span></button>
-                <button type="button" className="secondary-button" onClick={() => navigateTo("pre-order-create")}><span className="selling-nav-icon"><NavIcon type="create" /></span><span>Create Post</span></button>
-              </div>
-            </section>
+
             <PreorderAdminPage client={client} onCreatePost={() => navigateTo("pre-order-create")} />
           </>);
 }
