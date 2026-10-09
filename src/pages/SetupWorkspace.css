@@ -1,9 +1,10 @@
 .setup-workspace { min-width: 0; }
-.setup-workspace-tabs { display: flex; align-items: center; gap: 7px; width: fit-content; max-width: 100%; margin: 0 0 22px; padding: 5px; overflow-x: auto; border: 1px solid #e1e7f0; border-radius: 13px; background: #fff; box-shadow: 0 4px 14px rgba(29, 53, 87, .04); }
-.setup-workspace-tabs button { display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-height: 40px; padding: 0 14px; border: 0; border-radius: 9px; color: #64748b; background: transparent; font-size: 12px; font-weight: 700; white-space: nowrap; transition: color .15s ease, background .15s ease, box-shadow .15s ease; }
-.setup-workspace-tabs button:hover { color: #243c5e; background: #f4f7fb; }
+.setup-workspace-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; width: 100%; margin: 0 0 22px; padding: 5px; overflow: hidden; border: 1px solid #e1e7f0; border-radius: 13px; background: #fff; box-shadow: 0 4px 14px rgba(29, 53, 87, .04); }
+.setup-workspace-tabs button { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-width: 0; min-height: 46px; padding: 0 12px; border: 0; border-right: 1px solid #edf1f6; border-radius: 8px; color: #64748b; background: transparent; font-size: 12px; font-weight: 700; white-space: nowrap; transition: color .15s ease, background .15s ease, box-shadow .15s ease; }
+.setup-workspace-tabs button:last-child { border-right: 0; }
+.setup-workspace-tabs button:hover { color: #243c5e; background: #f6f9fd; }
 .setup-workspace-tabs button.active { color: #1d4f86; background: #eaf3fd; box-shadow: inset 0 0 0 1px #d8e8f8; }
-.setup-tab-icon { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; }
+.setup-tab-icon { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 20px; width: 20px; height: 20px; }
 .setup-tab-icon svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .setup-workspace-content { min-width: 0; }
-@media(max-width:640px) { .setup-workspace-tabs { width: 100%; justify-content: flex-start; margin-bottom: 18px; } .setup-workspace-tabs button { padding: 0 11px; font-size: 11px; } }
+@media(max-width:640px) { .setup-workspace-tabs { margin-bottom: 18px; } .setup-workspace-tabs button { gap: 6px; min-height: 48px; padding: 0 5px; font-size: 10px; white-space: normal; line-height: 1.25; } .setup-tab-icon { flex-basis: 17px; width: 17px; } .setup-tab-icon svg { width: 15px; height: 15px; } }
