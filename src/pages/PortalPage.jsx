@@ -15,6 +15,7 @@ import DeliveriesPage from "./DeliveriesPage";
 import SalesPage from "./SalesPage";
 import InventoryPage from "./InventoryPage";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { supabase } from "../supabase";
 import SetupPage from "./SetupPage";
 import OnboardingPage from "./OnboardingPage";
@@ -26,6 +27,41 @@ import AccountSecurityPage from "./AccountSecurityPage";
 import PaymentMethodsSettings from "../components/PaymentMethodsSettings";
 import "./SetupWorkspace.css";
 import "./AccountSecurityWorkspace.css";
+
+function PortalPageContent({ page, homePage = "dashboard", backLabel = "Back to dashboard", onBack, children }) {
+  const contentRef = useRef(null);
+  const [banner, setBanner] = useState(null);
+
+  useEffect(() => {
+    const root = contentRef.current;
+    if (!root) return undefined;
+    const updateBanner = () => {
+      if (page === homePage) {
+        setBanner(null);
+        return;
+      }
+      const next = root.querySelector("header.dashboard-header, header.reports-page-hero");
+      setBanner((current) => current === next ? current : next);
+    };
+    updateBanner();
+    const observer = new MutationObserver(updateBanner);
+    observer.observe(root, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [homePage, page]);
+
+  return (
+    <div ref={contentRef} className="portal-route-content">
+      {children}
+      {banner && page !== homePage && createPortal(
+        <button className="page-banner-dashboard-link" type="button" onClick={onBack}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          <span>{backLabel}</span>
+        </button>,
+        banner,
+      )}
+    </div>
+  );
+}
 
 
 function FloatingMetaMessenger({ clientId }) {
@@ -775,11 +811,13 @@ export default function PortalPage({ session }) {
           </div>
         </aside>
         <main className="dashboard-content">
-          {page === "account-security" ? (
-            <AccountSecurityPage session={session} />
-          ) : (
-            <AdminClientsPage />
-          )}
+          <PortalPageContent page={page} homePage="admin-clients" backLabel="Back to clients" onBack={() => setPage("admin-clients")}>
+            {page === "account-security" ? (
+              <AccountSecurityPage session={session} />
+            ) : (
+              <AdminClientsPage />
+            )}
+          </PortalPageContent>
         </main>
       </div>
     );
@@ -974,26 +1012,13 @@ export default function PortalPage({ session }) {
           <span>{client?.name || "Portal"}</span>
         </div>
 
-        {page !== "dashboard" && (
-          <div style={{ display: "flex", justifyContent: "flex-start", marginBottom: 14 }}>
-            <button
-              type="button"
-              className="secondary-button icon-only-nav"
-            onClick={() => navigateTo("dashboard")}
-              aria-label="Back to main dashboard"
-              title="Back to main dashboard"
-            >
-              <span className="button-icon"><NavIcon type="dashboard" /></span>
-            </button>
-          </div>
-        )}
-
         {errorMessage && (
           <div className="dashboard-error global-error">
             {errorMessage}
           </div>
         )}
 
+        <PortalPageContent page={page} onBack={() => navigateTo("dashboard")}>
         {page === "admin-clients" && platformAdmin && (
           <AdminClientsPage />
         )}
@@ -1086,6 +1111,7 @@ export default function PortalPage({ session }) {
         )}
 
         {(page === "deliveries" || page === "delivery-detail") && <DeliveriesPage navigationFilter={navigationFilter} client={client} detailRequest={detailRequest} goToDeliveries={goToDeliveries} page={page} setErrorMessage={setErrorMessage} setPage={setPage} />}
+        </PortalPageContent>
 
       </main>
       <FloatingMetaMessenger clientId={client?.client_id} />
