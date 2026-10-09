@@ -2,6 +2,7 @@ import PostsPage from "./PostsPage";
 import RegularSalePage from "./RegularSalePage";
 import LiveSellingPage from "./LiveSellingPage";
 import FacebookPage from "./FacebookPage";
+import FacebookChatsPage from "./FacebookChatsPage";
 import StaffPage from "./StaffPage";
 import ReportsPage from "./ReportsPage";
 import AutomationControlPage from "./AutomationControlPage";
@@ -24,6 +25,7 @@ import PreorderPage from "./PreorderPage";
 import AutomatedMessagesPage from "./AutomatedMessagesPage";
 import AccountSecurityPage from "./AccountSecurityPage";
 import PaymentMethodsSettings from "../components/PaymentMethodsSettings";
+import "./SetupWorkspace.css";
 
 
 function FloatingMetaMessenger({ clientId }) {
@@ -409,6 +411,7 @@ const META_OPERATIONAL_PAGES = new Set([
   "pre-order",
   "pre-order-create",
   "regular-sale",
+  "facebook-chats",
 ]);
 
 function isMetaOperationalPage(page) {
@@ -428,6 +431,7 @@ export default function PortalPage({ session }) {
   const [onboardingStatus, setOnboardingStatus] = useState(null);
 
   const [page, setPage] = useState("dashboard");
+  const [setupSection, setSetupSection] = useState("configuration");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -456,6 +460,7 @@ export default function PortalPage({ session }) {
   const [paymentAccountLoading, setPaymentAccountLoading] = useState(false);
   const [paymentAccountMessage, setPaymentAccountMessage] = useState("");
 
+  // Facebook Chats uses Meta as the live source of truth. EO2MATE does not persist conversation content.
 
   // UI-first operational dashboards. Data wiring follows after UI approval.
   const [auctionWorkspaceTab, setAuctionWorkspaceTab] = useState("SUMMARY");
@@ -902,6 +907,14 @@ export default function PortalPage({ session }) {
               <SidebarSectionLabel>Facebook</SidebarSectionLabel>
 
               <SidebarNavButton
+                icon="chat"
+            className={`nav-item ${page === "facebook-chats" ? "active" : ""}`}
+            onClick={() => navigateTo("facebook-chats")}
+              >
+                Facebook Chats
+              </SidebarNavButton>
+
+              <SidebarNavButton
                 icon="facebook"
             className={`nav-item ${page === "facebook" ? "active" : ""}`}
             onClick={openFacebookSetup}
@@ -940,22 +953,6 @@ export default function PortalPage({ session }) {
             onClick={() => setPage("users-staff")}
           >
             Users &amp; Staff
-          </SidebarNavButton>
-
-          <SidebarNavButton
-            icon="automation"
-            className={`nav-item ${page === "automation-control" ? "active" : ""}`}
-            onClick={() => navigateTo("automation-control")}
-          >
-            Automation Control
-          </SidebarNavButton>
-
-          <SidebarNavButton
-            icon="chat"
-            className={`nav-item ${page === "automated-messages" ? "active" : ""}`}
-            onClick={() => navigateTo("automated-messages")}
-          >
-            Automated Messages
           </SidebarNavButton>
 
           <SidebarNavButton
@@ -1049,11 +1046,11 @@ export default function PortalPage({ session }) {
 
         {(page === "facebook") && <FacebookPage client={client} facebookLoading={facebookLoading} facebookMessage={facebookMessage} facebookStatus={facebookStatus} loadFacebookStatus={loadFacebookStatus} page={page} setFacebookMessage={setFacebookMessage} setPage={setPage} />}
 
+        {(page === "facebook-chats") && <FacebookChatsPage client={client} metaConnected={metaConnected} page={page} />}
+
         {(page === "users-staff") && <StaffPage page={page} />}
 
         {(page === "reports") && <ReportsPage client={client} page={page} setErrorMessage={setErrorMessage} />}
-
-        {(page === "automation-control") && <AutomationControlPage client={client} page={page} />}
 
         {(page === "post-mining") && <MiningPage client={client} metaConnected={metaConnected} miningWorkspaceTab={miningWorkspaceTab} navigateTo={navigateTo} page={page} setMiningWorkspaceTab={setMiningWorkspaceTab} />}
 
@@ -1079,16 +1076,29 @@ export default function PortalPage({ session }) {
           <PaymentMethodsSettings clientId={client?.client_id} onChanged={loadPortal} />
         )}
 
-        {page === "automated-messages" && (
-          <AutomatedMessagesPage client={client} />
-        )}
-
         {page === "account-security" && (
           <AccountSecurityPage session={session} />
         )}
 
         {page === "setup" && (
-          <SetupPage client={client} />
+          <div className="setup-workspace">
+            <nav className="setup-workspace-tabs" aria-label="Setup sections" role="tablist">
+              <button type="button" role="tab" aria-selected={setupSection === "configuration"} className={setupSection === "configuration" ? "active" : ""} onClick={() => setSetupSection("configuration")}>
+                <span className="setup-tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="m19.4 15 .1.1a1.7 1.7 0 0 1-2.4 2.4l-.1-.1a1.7 1.7 0 0 0-2.9 1.2v.2a1.7 1.7 0 0 1-3.4 0v-.2a1.7 1.7 0 0 0-2.9-1.2l-.1.1a1.7 1.7 0 0 1-2.4-2.4l.1-.1a1.7 1.7 0 0 0-1.2-2.9H4a1.7 1.7 0 0 1 0-3.4h.2A1.7 1.7 0 0 0 5.4 5.8l-.1-.1a1.7 1.7 0 0 1 2.4-2.4l.1.1a1.7 1.7 0 0 0 2.9-1.2V2a1.7 1.7 0 0 1 3.4 0v.2a1.7 1.7 0 0 0 2.9 1.2l.1-.1a1.7 1.7 0 0 1 2.4 2.4l-.1.1a1.7 1.7 0 0 0 1.2 2.9h.2a1.7 1.7 0 0 1 0 3.4h-.2a1.7 1.7 0 0 0-1.2 2.9Z"/></svg></span><span>Configuration</span>
+              </button>
+              <button type="button" role="tab" aria-selected={setupSection === "automation"} className={setupSection === "automation" ? "active" : ""} onClick={() => setSetupSection("automation")}>
+                <span className="setup-tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 2v10"/><path d="M6.2 5.8a8 8 0 1 0 11.6 0"/></svg></span><span>Automation Control</span>
+              </button>
+              <button type="button" role="tab" aria-selected={setupSection === "messages"} className={setupSection === "messages" ? "active" : ""} onClick={() => setSetupSection("messages")}>
+                <span className="setup-tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H8l-4 4V5Z"/><path d="M8 9h8M8 12h6"/></svg></span><span>Automated Messages</span>
+              </button>
+            </nav>
+            <div className="setup-workspace-content" role="tabpanel">
+              {setupSection === "configuration" && <SetupPage client={client} />}
+              {setupSection === "automation" && <AutomationControlPage client={client} page="automation-control" />}
+              {setupSection === "messages" && <AutomatedMessagesPage client={client} />}
+            </div>
+          </div>
         )}
 
         {(page === "deliveries" || page === "delivery-detail") && <DeliveriesPage navigationFilter={navigationFilter} client={client} detailRequest={detailRequest} goToDeliveries={goToDeliveries} page={page} setErrorMessage={setErrorMessage} setPage={setPage} />}
