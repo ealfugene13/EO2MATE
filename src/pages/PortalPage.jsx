@@ -2,7 +2,6 @@ import PostsPage from "./PostsPage";
 import RegularSalePage from "./RegularSalePage";
 import LiveSellingPage from "./LiveSellingPage";
 import FacebookPage from "./FacebookPage";
-import FacebookChatsPage from "./FacebookChatsPage";
 import StaffPage from "./StaffPage";
 import ReportsPage from "./ReportsPage";
 import AutomationControlPage from "./AutomationControlPage";
@@ -332,6 +331,7 @@ function SidebarLogo({ admin = false }) {
     >
       {!logoFailed ? (
         <img
+          className="eo2-sidebar-logo"
  src={`${import.meta.env.BASE_URL}eo2mate-logo.png`}
           alt="EO2MATE"
  onError={() => setLogoFailed(true)}
@@ -347,6 +347,7 @@ function SidebarLogo({ admin = false }) {
         />
       ) : (
         <div
+          className="eo2-sidebar-logo-fallback"
           aria-label="EO2MATE"
  style={{
             width: "100%",
@@ -386,6 +387,15 @@ function SidebarNavButton({ icon, children, ...props }) {
   );
 }
 
+function profileInitials(value) {
+  const parts = String(value || "EO2MATE").trim().split(/[\s@._-]+/).filter(Boolean);
+  return (parts.length > 1 ? `${parts[0][0]}${parts[1][0]}` : parts[0]?.slice(0, 2) || "EO").toUpperCase();
+}
+
+function SignOutIcon() {
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 17l5-5-5-5M15 12H3"/><path d="M12 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6"/></svg>;
+}
+
 function SidebarSectionLabel({ children }) {
   return (
     <div
@@ -412,7 +422,6 @@ const META_OPERATIONAL_PAGES = new Set([
   "pre-order",
   "pre-order-create",
   "regular-sale",
-  "facebook-chats",
 ]);
 
 function isMetaOperationalPage(page) {
@@ -461,8 +470,6 @@ export default function PortalPage({ session }) {
   const [paymentAccountStatus, setPaymentAccountStatus] = useState(null);
   const [paymentAccountLoading, setPaymentAccountLoading] = useState(false);
   const [paymentAccountMessage, setPaymentAccountMessage] = useState("");
-
-  // Facebook Chats uses Meta as the live source of truth. EO2MATE does not persist conversation content.
 
   // UI-first operational dashboards. Data wiring follows after UI approval.
   const [auctionWorkspaceTab, setAuctionWorkspaceTab] = useState("SUMMARY");
@@ -760,8 +767,11 @@ export default function PortalPage({ session }) {
             </SidebarNavButton>
           </nav>
           <div className="sidebar-footer" style={{ flexShrink: 0 }}>
-            <div className="user-mini-card"><strong>{session.user.email}</strong><span>{platformAdmin.role}</span></div>
-            <button className="logout-button" onClick={handleLogout}>Sign out</button>
+            <div className="eo2-profile-card" title={session.user.email}>
+              <span className="eo2-profile-avatar">{profileInitials(session.user.email)}</span>
+              <span className="eo2-profile-copy"><strong>{session.user.email}</strong><span>{String(platformAdmin.role || "ADMIN").replaceAll("_", " ")}</span></span>
+            </div>
+            <button className="logout-button" type="button" onClick={handleLogout}><SignOutIcon /><span>Sign out</span></button>
           </div>
         </aside>
         <main className="dashboard-content">
@@ -907,13 +917,6 @@ export default function PortalPage({ session }) {
             Purchases
           </SidebarNavButton>
 
-          {metaConnected && <>
-            <SidebarSectionLabel>Facebook</SidebarSectionLabel>
-            <SidebarNavButton icon="chat" className={`nav-item ${page === "facebook-chats" ? "active" : ""}`} onClick={() => navigateTo("facebook-chats")}>
-              Facebook Chats
-            </SidebarNavButton>
-          </>}
-
           <SidebarSectionLabel>Maintenance</SidebarSectionLabel>
 
           <SidebarNavButton
@@ -950,13 +953,16 @@ export default function PortalPage({ session }) {
         </nav>
 
         <div className="sidebar-footer" style={{ flexShrink: 0 }}>
-          <div className="user-mini-card">
-            <strong>{client?.name || session.user.email}</strong>
-            <span>{client?.role || "CLIENT"}</span>
+          <div className="eo2-profile-card" title={client?.name || session.user.email}>
+            <span className="eo2-profile-avatar">{profileInitials(client?.name || session.user.email)}</span>
+            <span className="eo2-profile-copy">
+              <strong>{client?.name || session.user.email}</strong>
+              <span>{String(client?.role || "CLIENT").replaceAll("_", " ")}</span>
+            </span>
           </div>
 
-          <button className="logout-button" onClick={handleLogout}>
-            Sign out
+          <button className="logout-button" type="button" onClick={handleLogout}>
+            <SignOutIcon /><span>Sign out</span>
           </button>
         </div>
       </aside>
@@ -1012,8 +1018,6 @@ export default function PortalPage({ session }) {
 
 
         {(page === "live-selling") && <LiveSellingPage liveSellingWorkspaceTab={liveSellingWorkspaceTab} metaConnected={metaConnected} page={page} setLiveSellingWorkspaceTab={setLiveSellingWorkspaceTab} />}
-
-        {(page === "facebook-chats") && <FacebookChatsPage client={client} metaConnected={metaConnected} page={page} />}
 
         {(page === "users-staff") && <StaffPage page={page} />}
 

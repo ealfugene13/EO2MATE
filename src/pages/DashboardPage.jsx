@@ -291,36 +291,20 @@ export default function DashboardPage({ client, facebookStatus, goToAuctions, go
   return (<>
     {page === "dashboard" && (
           <>
-            <section style={{
-              background: "linear-gradient(135deg, #08233f 0%, #0f3558 62%, #17623a 140%)",
-              borderRadius: 24,
-              padding: "28px clamp(20px, 4vw, 38px)",
-              color: "#fff",
-              marginBottom: 20,
-              boxShadow: "0 18px 45px rgba(8,35,63,.14)",
-              display: "flex",
-              justifyContent: "space-between",
-              gap: 20,
-              alignItems: "center",
-              flexWrap: "wrap",
-            }}>
-              <div style={{ minWidth: 260, flex: "1 1 520px" }}>
-                <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: ".14em", opacity: .72, marginBottom: 8 }}>EO2MATE CONTROL CENTER</div>
-                <h1 style={{ margin: 0, fontSize: "clamp(26px, 4vw, 38px)", lineHeight: 1.08 }}>
-                  {client?.name ? `Welcome, ${client.name}` : "Business dashboard"}
-                </h1>
-                <p style={{ margin: "10px 0 0", maxWidth: 720, color: "rgba(255,255,255,.78)", lineHeight: 1.55 }}>
-                  Sales, orders, payments, inventory and fulfillment — one operational view of your EO2MATE workspace.
-                </p>
+            <section className="eo2-dashboard-welcome">
+              <div className="eo2-dashboard-welcome-copy">
+                <div className="eo2-dashboard-kicker"><span className="eo2-dashboard-kicker-dot" /> YOUR EO2MATE WORKSPACE</div>
+                <h1>{client?.name ? `Welcome, ${client.name}` : "Business overview"}</h1>
+                <p>See your sales, orders, payments, inventory and deliveries in one place.</p>
               </div>
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                <button className="secondary-button" type="button" onClick={() => setPage("reports")} style={{ background: "rgba(255,255,255,.1)", borderColor: "rgba(255,255,255,.18)", color: "#fff" }}>
-                  <NavIcon type="reports" /> Reports
+              <div className="eo2-dashboard-welcome-actions">
+                <button className="eo2-welcome-secondary" type="button" onClick={() => setPage("reports")}>
+                  <NavIcon type="reports" /><span>Reports</span>
                 </button>
-                <button className="primary-button" type="button" onClick={() => navigateTo("posts")}>
-                  <NavIcon type="create" /> Create Post
+                <button className="eo2-welcome-primary" type="button" onClick={() => navigateTo("posts")}>
+                  <NavIcon type="create" /><span>Create Post</span>
                 </button>
-                <button className="icon-button refresh-icon-button" onClick={loadPortal} title="Refresh dashboard" aria-label="Refresh dashboard" style={{ background: "rgba(255,255,255,.1)", borderColor: "rgba(255,255,255,.18)", color: "#fff" }}>
+                <button className="eo2-welcome-refresh" type="button" onClick={loadPortal} title="Refresh dashboard" aria-label="Refresh dashboard">
                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v5h-5"/><path d="M4 18v-5h5"/><path d="M6.1 9a7 7 0 0 1 11.3-2.1L20 9"/><path d="M4 15l2.6 2.1A7 7 0 0 0 17.9 15"/></svg>
                 </button>
               </div>
