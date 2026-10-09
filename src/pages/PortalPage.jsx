@@ -2,7 +2,6 @@ import PostsPage from "./PostsPage";
 import RegularSalePage from "./RegularSalePage";
 import LiveSellingPage from "./LiveSellingPage";
 import FacebookPage from "./FacebookPage";
-import FacebookChatsPage from "./FacebookChatsPage";
 import StaffPage from "./StaffPage";
 import ReportsPage from "./ReportsPage";
 import AutomationControlPage from "./AutomationControlPage";
@@ -410,7 +409,6 @@ const META_OPERATIONAL_PAGES = new Set([
   "pre-order",
   "pre-order-create",
   "regular-sale",
-  "facebook-chats",
 ]);
 
 function isMetaOperationalPage(page) {
@@ -458,7 +456,6 @@ export default function PortalPage({ session }) {
   const [paymentAccountLoading, setPaymentAccountLoading] = useState(false);
   const [paymentAccountMessage, setPaymentAccountMessage] = useState("");
 
-  // Facebook Chats uses Meta as the live source of truth. EO2MATE does not persist conversation content.
 
   // UI-first operational dashboards. Data wiring follows after UI approval.
   const [auctionWorkspaceTab, setAuctionWorkspaceTab] = useState("SUMMARY");
@@ -905,14 +902,6 @@ export default function PortalPage({ session }) {
               <SidebarSectionLabel>Facebook</SidebarSectionLabel>
 
               <SidebarNavButton
-                icon="chat"
-            className={`nav-item ${page === "facebook-chats" ? "active" : ""}`}
-            onClick={() => navigateTo("facebook-chats")}
-              >
-                Facebook Chats
-              </SidebarNavButton>
-
-              <SidebarNavButton
                 icon="facebook"
             className={`nav-item ${page === "facebook" ? "active" : ""}`}
             onClick={openFacebookSetup}
@@ -1059,8 +1048,6 @@ export default function PortalPage({ session }) {
         {(page === "live-selling") && <LiveSellingPage liveSellingWorkspaceTab={liveSellingWorkspaceTab} metaConnected={metaConnected} page={page} setLiveSellingWorkspaceTab={setLiveSellingWorkspaceTab} />}
 
         {(page === "facebook") && <FacebookPage client={client} facebookLoading={facebookLoading} facebookMessage={facebookMessage} facebookStatus={facebookStatus} loadFacebookStatus={loadFacebookStatus} page={page} setFacebookMessage={setFacebookMessage} setPage={setPage} />}
-
-        {(page === "facebook-chats") && <FacebookChatsPage client={client} metaConnected={metaConnected} page={page} />}
 
         {(page === "users-staff") && <StaffPage page={page} />}
 
