@@ -3272,6 +3272,18 @@ button.post-type-card:hover { transform: translateY(-2px); border-color: #bcdcc3
 
 /* Shared page banner used across portal sections */
 .portal-route-content { display: contents; }
+.portal-route-page-setup,
+.portal-route-page-account-security { display: flex; flex-direction: column; gap: 0; }
+.portal-route-page-setup *,
+.portal-route-page-account-security * { order: 3; }
+.portal-route-page-setup .setup-workspace,
+.portal-route-page-setup .setup-workspace-content,
+.portal-route-page-account-security .account-security-workspace,
+.portal-route-page-account-security .account-security-workspace-content { display: contents; }
+.portal-route-page-setup header.dashboard-header,
+.portal-route-page-account-security header.dashboard-header { order: 1; margin-bottom: 14px; }
+.portal-route-page-setup .setup-workspace-tabs,
+.portal-route-page-account-security .account-security-tabs { order: 2; margin: 0 0 20px; }
 .dashboard-content .dashboard-header {
   position: relative;
   isolation: isolate;

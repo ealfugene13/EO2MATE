@@ -50,7 +50,7 @@ function PortalPageContent({ page, homePage = "dashboard", backLabel = "Back to 
   }, [homePage, page]);
 
   return (
-    <div ref={contentRef} className="portal-route-content">
+    <div ref={contentRef} className={`portal-route-content portal-route-page-${page}`}>
       {children}
       {banner && page !== homePage && createPortal(
         <button className="page-banner-dashboard-link" type="button" onClick={onBack}>
