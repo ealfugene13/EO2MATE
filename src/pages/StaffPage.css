@@ -1,0 +1,54 @@
+.staff-page { max-width: 1440px; margin: 0 auto; }
+.staff-header { align-items: center; margin-bottom: 23px; }
+.staff-heading { display: flex; align-items: center; gap: 14px; }
+.staff-heading > div > p:last-child { margin-top: 5px; }
+.staff-page-mark, .staff-section-icon, .staff-metric-icon, .staff-empty-icon, .staff-access-icon {
+  display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
+}
+.staff-page-mark { width: 42px; height: 42px; color: #285e9b; background: #eaf2fc; border: 1px solid #dce9f8; border-radius: 13px; }
+.staff-header .eyebrow { margin: 0 0 3px; }
+.staff-header h1 { margin: 0 0 6px; font-size: 29px; letter-spacing: -.035em; }
+.staff-header p:last-child { font-size: 13px; }
+.staff-add-button, .staff-action-button { display: inline-flex; align-items: center; justify-content: center; gap: 9px; }
+.staff-add-button { min-height: 44px; padding: 0 17px; box-shadow: 0 6px 16px rgba(38, 132, 71, .16); }
+.staff-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 15px; margin-bottom: 21px; }
+.staff-metric-card { display: flex; align-items: center; gap: 13px; min-height: 105px; padding: 17px; background: #fff; border: 1px solid #e2e8f1; border-radius: 14px; box-shadow: 0 5px 16px rgba(31, 43, 66, .035); }
+.staff-metric-icon { width: 42px; height: 42px; border-radius: 12px; color: #3976b8; background: #eef5fd; }
+.staff-metric-admin { color: #37805d; background: #edf8f1; }
+.staff-metric-clock { color: #aa7a24; background: #fff7e7; }
+.staff-metric-disabled { color: #758196; background: #f1f3f7; }
+.staff-metric-copy { display: grid; gap: 3px; min-width: 0; }
+.staff-metric-title { color: #64728a; font-size: 12px; font-weight: 700; }
+.staff-metric-copy strong { color: #1d293c; font-size: 23px; line-height: 1.1; }
+.staff-metric-copy small { color: #8994a6; font-size: 11px; }
+.staff-invite-panel { margin-bottom: 20px; padding: 21px 23px; }
+.staff-panel-heading, .staff-title-line { display: flex; align-items: center; gap: 11px; }
+.staff-section-icon { width: 38px; height: 38px; border-radius: 11px; color: #2f70ad; background: #edf5fd; }
+.staff-section-icon.small { width: 30px; height: 30px; border-radius: 9px; }
+.staff-panel-heading h2, .staff-users-heading h2 { margin: 0; color: #1e2b40; font-size: 17px; }
+.staff-panel-heading p, .staff-users-heading > div > p { margin: 4px 0 0; color: #77849a; font-size: 12px; }
+.staff-invite-note { display: flex; align-items: center; gap: 8px; margin: 17px 0; padding: 10px 12px; border: 1px solid #f3e4bd; border-radius: 9px; color: #80621f; background: #fffbef; font-size: 12px; }
+.staff-note-dot { width: 7px; height: 7px; flex: 0 0 auto; border-radius: 50%; background: #d49c32; }
+.staff-form-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.staff-form-grid label { display: grid; gap: 7px; color: #39465b; font-size: 12px; font-weight: 700; }
+.staff-form-grid input, .staff-form-grid select { width: 100%; min-height: 42px; padding: 10px 12px; border: 1px solid #d8e0eb; border-radius: 9px; color: #27354b; background: #fff; outline: none; }
+.staff-form-grid input:focus, .staff-form-grid select:focus, .staff-search:focus-within { border-color: #79a9d8; box-shadow: 0 0 0 3px rgba(67, 132, 195, .12); }
+.staff-form-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 17px; }
+.staff-action-button { min-height: 40px; padding: 0 14px; }
+.staff-action-button:disabled { cursor: not-allowed; }
+.staff-users-panel { box-shadow: 0 9px 24px rgba(31, 43, 66, .045); }
+.staff-users-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 19px 22px; border-bottom: 1px solid #edf1f6; }
+.staff-search { display: flex; align-items: center; gap: 8px; width: min(260px, 100%); min-height: 39px; padding: 0 11px; border: 1px solid #dce3ed; border-radius: 9px; color: #7d8ca2; background: #fff; transition: border-color .15s, box-shadow .15s; }
+.staff-search input { width: 100%; min-width: 0; padding: 0; border: 0; outline: 0; color: #27354b; background: transparent; font-size: 12px; }
+.staff-table th { padding: 12px 15px; background: #f8fafd; color: #708098; font-size: 10px; letter-spacing: .055em; text-transform: uppercase; }
+.staff-empty-state { display: flex; min-height: 174px; flex-direction: column; align-items: center; justify-content: center; gap: 7px; padding: 25px; text-align: center; white-space: normal; }
+.staff-empty-icon { width: 42px; height: 42px; margin-bottom: 4px; border-radius: 13px; color: #7b91ad; background: #f1f5fa; }
+.staff-empty-state strong { color: #34435b; font-size: 13px; }
+.staff-empty-state > span:last-child { max-width: 440px; color: #8591a3; font-size: 12px; line-height: 1.5; }
+.staff-access-note { display: flex; align-items: flex-start; gap: 11px; margin: 0 14px 14px; padding: 13px 14px; border: 1px solid #e8eef5; border-radius: 11px; background: #f8fafd; }
+.staff-access-icon { width: 31px; height: 31px; border-radius: 9px; color: #5479a5; background: #eaf1fa; }
+.staff-access-note strong { color: #34435a; font-size: 12px; }
+.staff-access-note p { margin: 3px 0 0; color: #6d7b90; font-size: 11px; line-height: 1.5; }
+@media (max-width: 1000px) { .staff-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .staff-header { align-items: flex-start; } .staff-form-grid { grid-template-columns: 1fr; } .staff-invite-panel { padding: 17px; } .staff-users-heading { align-items: flex-start; flex-direction: column; padding: 17px; } .staff-search { width: 100%; } .staff-table { min-width: 720px; } }
+@media (max-width: 480px) { .staff-metrics { gap: 9px; } .staff-metric-card { min-height: 91px; gap: 9px; padding: 12px 10px; } .staff-metric-icon { width: 35px; height: 35px; } .staff-metric-title { font-size: 11px; } .staff-metric-copy small { font-size: 10px; } .staff-heading { align-items: flex-start; gap: 10px; } .staff-page-mark { width: 36px; height: 36px; } .staff-header h1 { font-size: 25px; } .staff-add-button { min-height: 40px; } .staff-form-actions { width: 100%; } .staff-form-actions button { flex: 1; } }
