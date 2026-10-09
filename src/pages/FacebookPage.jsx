@@ -66,8 +66,8 @@ export default function FacebookPage({ client, facebookLoading, facebookMessage,
                 <p>Authorize your Facebook account and connect the Page that will run auctions.</p>
               </div>
 
-              <button className="secondary-button" onClick={loadFacebookStatus} disabled={facebookLoading}>
-                {facebookLoading ? "Checking..." : "Refresh Status"}
+              <button className="icon-button refresh-icon-button" type="button" onClick={loadFacebookStatus} disabled={facebookLoading} title="Refresh Facebook status" aria-label="Refresh Facebook status">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v5h-5"/><path d="M4 18v-5h5"/><path d="M6.1 9a7 7 0 0 1 11.3-2.1L20 9"/><path d="M4 15l2.6 2.1A7 7 0 0 0 17.9 15"/></svg>
               </button>
             </header>
 
@@ -104,16 +104,18 @@ export default function FacebookPage({ client, facebookLoading, facebookMessage,
               </div>
 
               <div className="facebook-connect-actions">
-                <button className="primary-button" onClick={connectFacebook}>
-                  {facebookStatus?.connected ? "Reconnect Facebook" : "Connect Facebook"}
+                <button className="primary-button facebook-action-button" onClick={connectFacebook}>
+                  <span className="facebook-action-mark" aria-hidden="true">f</span>
+                  <span>{facebookStatus?.connected ? "Reconnect Facebook" : "Connect Facebook"}</span>
                 </button>
 
                 <button
-                  className="secondary-button"
+                  className="secondary-button facebook-action-button"
                   type="button"
                   onClick={() => setPage("dashboard")}
                 >
-                  {facebookStatus?.connected ? "Continue to Dashboard" : "Skip for Now"}
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                  <span>{facebookStatus?.connected ? "Continue to Dashboard" : "Skip for Now"}</span>
                 </button>
               </div>
             </section>

@@ -26,6 +26,7 @@ import AutomatedMessagesPage from "./AutomatedMessagesPage";
 import AccountSecurityPage from "./AccountSecurityPage";
 import PaymentMethodsSettings from "../components/PaymentMethodsSettings";
 import "./SetupWorkspace.css";
+import "./AccountSecurityWorkspace.css";
 
 
 function FloatingMetaMessenger({ clientId }) {
@@ -432,6 +433,7 @@ export default function PortalPage({ session }) {
 
   const [page, setPage] = useState("dashboard");
   const [setupSection, setSetupSection] = useState("configuration");
+  const [accountSecuritySection, setAccountSecuritySection] = useState("security");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -474,7 +476,8 @@ export default function PortalPage({ session }) {
     const params = new URLSearchParams(window.location.search);
     const facebookResult = params.get("facebook");
     if (facebookResult) {
-      setPage("facebook");
+      setPage("account-security");
+      setAccountSecuritySection("facebook");
       setFacebookMessage(
         facebookResult === "connected"
           ? "Facebook authorization completed. Refreshing connection status..."
@@ -519,7 +522,8 @@ export default function PortalPage({ session }) {
         const facebookResult = params.get("facebook");
 
         if (facebookResult) {
-          setPage("facebook");
+          setPage("account-security");
+          setAccountSecuritySection("facebook");
           setFacebookMessage(
             facebookResult === "connected"
               ? "Facebook authorization completed. Connection status refreshed."
@@ -574,7 +578,8 @@ export default function PortalPage({ session }) {
   }
 
   async function openFacebookSetup() {
-    setPage("facebook");
+    setAccountSecuritySection("facebook");
+    setPage("account-security");
     await loadFacebookStatus({
       preserveCurrentPage: true,
     });
@@ -902,48 +907,12 @@ export default function PortalPage({ session }) {
             Purchases
           </SidebarNavButton>
 
-          {metaConnected ? (
-            <>
-              <SidebarSectionLabel>Facebook</SidebarSectionLabel>
-
-              <SidebarNavButton
-                icon="chat"
-            className={`nav-item ${page === "facebook-chats" ? "active" : ""}`}
-            onClick={() => navigateTo("facebook-chats")}
-              >
-                Facebook Chats
-              </SidebarNavButton>
-
-              <SidebarNavButton
-                icon="facebook"
-            className={`nav-item ${page === "facebook" ? "active" : ""}`}
-            onClick={openFacebookSetup}
-              >
-                Facebook Setup
-              </SidebarNavButton>
-            </>
-          ) : (
-            <>
-              <SidebarSectionLabel>Integrations</SidebarSectionLabel>
-              <SidebarNavButton
-                icon="facebook"
-            className={`nav-item ${page === "facebook" ? "active" : ""}`}
-            onClick={openFacebookSetup}
-              >
-                Connect Facebook
-              </SidebarNavButton>
-            </>
-          )}
-
-          <SidebarSectionLabel>Shared</SidebarSectionLabel>
-
-          <SidebarNavButton
-            icon="payments"
-            className={`nav-item ${page === "payment-settings" ? "active" : ""}`}
-            onClick={() => navigateTo("payment-settings")}
-          >
-            Payment Settings
-          </SidebarNavButton>
+          {metaConnected && <>
+            <SidebarSectionLabel>Facebook</SidebarSectionLabel>
+            <SidebarNavButton icon="chat" className={`nav-item ${page === "facebook-chats" ? "active" : ""}`} onClick={() => navigateTo("facebook-chats")}>
+              Facebook Chats
+            </SidebarNavButton>
+          </>}
 
           <SidebarSectionLabel>Maintenance</SidebarSectionLabel>
 
@@ -958,7 +927,7 @@ export default function PortalPage({ session }) {
           <SidebarNavButton
             icon="users"
             className={`nav-item ${page === "account-security" ? "active" : ""}`}
-            onClick={() => navigateTo("account-security")}
+            onClick={() => { setAccountSecuritySection("security"); navigateTo("account-security"); }}
           >
             Account &amp; Security
           </SidebarNavButton>
@@ -1044,8 +1013,6 @@ export default function PortalPage({ session }) {
 
         {(page === "live-selling") && <LiveSellingPage liveSellingWorkspaceTab={liveSellingWorkspaceTab} metaConnected={metaConnected} page={page} setLiveSellingWorkspaceTab={setLiveSellingWorkspaceTab} />}
 
-        {(page === "facebook") && <FacebookPage client={client} facebookLoading={facebookLoading} facebookMessage={facebookMessage} facebookStatus={facebookStatus} loadFacebookStatus={loadFacebookStatus} page={page} setFacebookMessage={setFacebookMessage} setPage={setPage} />}
-
         {(page === "facebook-chats") && <FacebookChatsPage client={client} metaConnected={metaConnected} page={page} />}
 
         {(page === "users-staff") && <StaffPage page={page} />}
@@ -1072,12 +1039,25 @@ export default function PortalPage({ session }) {
 
         {(page === "payments" || page === "payment-detail") && <PaymentsPage navigationFilter={navigationFilter} client={client} detailRequest={detailRequest} page={page} paymentAccountStatus={paymentAccountStatus} setErrorMessage={setErrorMessage} setPage={setPage} />}
 
-        {page === "payment-settings" && (
-          <PaymentMethodsSettings clientId={client?.client_id} onChanged={loadPortal} />
-        )}
-
         {page === "account-security" && (
-          <AccountSecurityPage session={session} />
+          <div className="account-security-workspace">
+            <nav className="account-security-tabs" aria-label="Account and integration settings" role="tablist">
+              <button type="button" role="tab" aria-selected={accountSecuritySection === "security"} className={accountSecuritySection === "security" ? "active" : ""} onClick={() => setAccountSecuritySection("security")}>
+                <span className="account-security-tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M5 21v-2a7 7 0 0 1 14 0v2"/></svg></span><span>Account Security</span>
+              </button>
+              <button type="button" role="tab" aria-selected={accountSecuritySection === "facebook"} className={accountSecuritySection === "facebook" ? "active" : ""} onClick={() => setAccountSecuritySection("facebook")}>
+                <span className="account-security-tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M14 8h3V4h-3a5 5 0 0 0-5 5v3H6v4h3v4h4v-4h3l1-4h-4V9a1 1 0 0 1 1-1Z"/></svg></span><span>Facebook Setup</span>
+              </button>
+              <button type="button" role="tab" aria-selected={accountSecuritySection === "payments"} className={accountSecuritySection === "payments" ? "active" : ""} onClick={() => setAccountSecuritySection("payments")}>
+                <span className="account-security-tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h3"/></svg></span><span>Payment Settings</span>
+              </button>
+            </nav>
+            <div className="account-security-workspace-content" role="tabpanel">
+              {accountSecuritySection === "security" && <AccountSecurityPage session={session} />}
+              {accountSecuritySection === "facebook" && <FacebookPage client={client} facebookLoading={facebookLoading} facebookMessage={facebookMessage} facebookStatus={facebookStatus} loadFacebookStatus={loadFacebookStatus} page="facebook" setFacebookMessage={setFacebookMessage} setPage={setPage} />}
+              {accountSecuritySection === "payments" && <PaymentMethodsSettings clientId={client?.client_id} onChanged={loadPortal} />}
+            </div>
+          </div>
         )}
 
         {page === "setup" && (
