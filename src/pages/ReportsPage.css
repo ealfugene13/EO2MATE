@@ -1,7 +1,19 @@
 .reports-workspace{min-width:0}
+.reports-workspace .reports-page-hero{position:relative;isolation:isolate;display:flex;align-items:center;justify-content:space-between;gap:28px;min-height:152px;margin:0 0 22px;padding:26px 30px;overflow:hidden;border:1px solid #17354a;border-radius:20px;background:radial-gradient(ellipse at 88% 12%,rgba(69,181,94,.19),transparent 34%),linear-gradient(118deg,#102b40 0%,#173b50 58%,#174b45 100%);box-shadow:0 14px 34px rgba(17,43,63,.14)}
+.reports-workspace .reports-page-hero:after{position:absolute;z-index:-1;right:15%;top:-116px;width:270px;height:270px;border:1px solid rgba(188,255,204,.13);border-radius:50%;content:"";box-shadow:0 0 0 28px rgba(188,255,204,.035),0 0 0 60px rgba(188,255,204,.025)}
+.reports-workspace .reports-hero-copy{position:relative;z-index:1;min-width:0;max-width:760px}
+.reports-workspace .reports-hero-kicker{display:flex;align-items:center;gap:10px;margin-bottom:13px;color:#a8dcb3;font-size:10px;font-weight:850;letter-spacing:.16em}
+.reports-workspace .reports-hero-kicker i{display:inline-block;width:4px;height:4px;margin:0 2px;border-radius:50%;background:#67ce7c;vertical-align:middle}
+.reports-workspace .reports-hero-mark{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border:1px solid rgba(175,235,187,.23);border-radius:9px;background:rgba(255,255,255,.08);color:#8fe2a0}
+.reports-workspace .reports-hero-mark svg{width:16px;height:16px}
+.reports-workspace .reports-page-hero h1{margin:0;color:#fff;font-size:clamp(27px,3vw,36px);font-weight:850;line-height:1.12;letter-spacing:-.04em}
+.reports-workspace .reports-page-hero .reports-hero-copy>p{max-width:650px;margin:10px 0 0;color:rgba(238,246,250,.76);font-size:13px;line-height:1.55}
 .reports-workspace .report-export-actions{display:flex;align-items:center;flex-wrap:wrap;gap:12px}
-.reports-workspace .report-icon-action{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:40px;padding:10px 15px;line-height:1.2;white-space:nowrap}
+.reports-workspace .report-icon-action{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:42px;padding:10px 15px;line-height:1.2;white-space:nowrap;border-radius:11px;font-weight:750;transition:transform .15s ease,background .15s ease,border-color .15s ease,opacity .15s ease}
 .reports-workspace .report-icon-action svg{width:18px;height:18px;flex:0 0 18px}
+.reports-workspace .reports-page-hero .report-icon-action{border:1px solid rgba(255,255,255,.25);color:#f7fbff;background:rgba(255,255,255,.09);backdrop-filter:blur(6px)}
+.reports-workspace .reports-page-hero .report-icon-action:not(:disabled):hover{transform:translateY(-2px);border-color:rgba(255,255,255,.42);background:rgba(255,255,255,.17)}
+.reports-workspace .reports-page-hero .report-icon-action:disabled{opacity:.48;cursor:not-allowed}
 .reports-workspace .report-filter-actions{gap:12px}
 .reports-workspace .report-card-title{display:flex;align-items:center;gap:10px;min-width:0}
 .reports-workspace .report-card-icon{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;flex:0 0 34px;border:1px solid #dfebe3;border-radius:10px;background:#f1f8f3;color:#308c42}
@@ -11,5 +23,6 @@
 .reports-workspace .report-catalog-button:focus-visible,.reports-workspace .report-icon-action:focus-visible{outline:2px solid #399947;outline-offset:3px}
 .reports-workspace .report-metric-title{display:flex;align-items:center;gap:8px}
 .reports-workspace .report-metric-title svg{width:16px;height:16px;flex:0 0 16px;color:#398d47}
-@media(max-width:600px){.reports-workspace .report-export-actions{width:100%;gap:12px}.reports-workspace .report-export-actions button{flex:1;min-width:110px}.reports-workspace .report-filter-actions{gap:12px}.reports-workspace .report-card-title{gap:9px}}
+@media(max-width:760px){.reports-workspace .reports-page-hero{align-items:flex-start;flex-direction:column;gap:20px;min-height:0;padding:23px}.reports-workspace .report-export-actions{width:100%}}
+@media(max-width:600px){.reports-workspace .reports-page-hero{gap:18px;margin-bottom:17px;padding:20px;border-radius:16px}.reports-workspace .reports-page-hero h1{font-size:27px}.reports-workspace .reports-page-hero .reports-hero-copy>p{font-size:12px}.reports-workspace .report-export-actions{gap:10px}.reports-workspace .report-export-actions button{flex:1;min-width:110px}.reports-workspace .report-filter-actions{gap:12px}.reports-workspace .report-card-title{gap:9px}}
 @media(prefers-reduced-motion:reduce){.reports-workspace .report-catalog-button{transition:none}.reports-workspace .report-catalog-button:hover{transform:none}}

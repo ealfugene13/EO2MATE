@@ -467,11 +467,11 @@ export default function ReportsPage({ client, page, setErrorMessage }) {
   return (<div className="reports-workspace">
     {page === "reports" && (
           <>
-            <header className="dashboard-header">
-              <div>
-                <p className="eyebrow">REPORTS · INSIGHTS</p>
+            <header className="reports-page-hero">
+              <div className="reports-hero-copy">
+                <div className="reports-hero-kicker"><span className="reports-hero-mark"><ReportIcon type="sales-summary" /></span><span>REPORTS <i /> INSIGHTS</span></div>
                 <h1>Reports &amp; Insights</h1>
-                <p>Operational reports plus EO2MATE insights designed to help clients decide what to sell, collect and improve next.</p>
+                <p>Turn your EO2MATE sales, payments, orders and deliveries into clear next steps.</p>
               </div>
               <div className="report-export-actions">
                 <button className="secondary-button report-icon-action" type="button" aria-label="Generate Excel" title="Export report to Excel" onClick={exportReportExcel} disabled={!generatedReport}><ReportIcon type="excel"/><span>Excel</span></button>
