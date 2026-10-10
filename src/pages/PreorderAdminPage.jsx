@@ -57,11 +57,11 @@ export default function PreorderAdminPage({ client, onCreatePost }) {
     <header className="dashboard-header preorder-admin-header selling-hero"><div><p className="eyebrow">SELLING · PRE-ORDER</p><h1>Pre-Order</h1><p>Summary, Pre-Order posts and buyer reservations in one workspace.</p></div><button className="icon-button refresh-icon-button" type="button" onClick={load} disabled={loading} title="Refresh" aria-label="Refresh"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v5h-5"/><path d="M4 18v-5h5"/><path d="M6.1 9a7 7 0 0 1 11.3-2.1L20 9"/><path d="M4 15l2.6 2.1A7 7 0 0 0 17.9 15"/></svg></button></header>
     {notice&&<div className="success-message global-error">{notice}</div>}{error&&<div className="dashboard-error global-error">{error}</div>}
 
-    <section className="selling-tabs preorder-workspace-tabs">
-      <div className="preorder-workspace-actions">
-        {tabs.map(tab=><button key={tab} type="button" className={workspaceTab===tab?"primary-button":"secondary-button"} onClick={()=>{setWorkspaceTab(tab);if(tab!=="POSTS"){setSelected(null);setEntries([])}}}><span className="preorder-tab-icon" aria-hidden="true">{tab==="DASHBOARD"?"▦":"▤"}</span>{tab==="POSTS"?"Posts":tab.charAt(0)+tab.slice(1).toLowerCase()}</button>)}
-        <button type="button" className="secondary-button" onClick={()=>onCreatePost?.()}><span className="preorder-tab-icon" aria-hidden="true">＋</span>Create Post</button>
+    <section className="selling-workspace-tabs preorder-workspace-tabs">
+      <div className="selling-workspace-tablist" role="tablist" aria-label="Pre-Order sections">
+        {tabs.map(tab=><button key={tab} id={`preorder-tab-${tab.toLowerCase()}`} role="tab" aria-selected={workspaceTab===tab} type="button" className={`selling-workspace-tab${workspaceTab===tab?" active":""}`} onClick={()=>{setWorkspaceTab(tab);if(tab!=="POSTS"){setSelected(null);setEntries([])}}}><span className="preorder-tab-icon" aria-hidden="true">{tab==="DASHBOARD"?<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>:<svg viewBox="0 0 24 24"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/></svg>}</span>{tab==="POSTS"?"Posts":"Summary"}</button>)}
       </div>
+      <button type="button" className="primary-button selling-workspace-tab-action" onClick={()=>onCreatePost?.()}><span className="preorder-tab-icon" aria-hidden="true">＋</span>Create Post</button>
     </section>
     </>}
 

@@ -494,17 +494,8 @@ export default function RegularSalePage({ client, metaConnected, page, regularSa
               </div>
             </header>
 
-            <section className="metrics-grid">
-              <MetricCard title="Total posts" value={regularSaleStats.total} subtitle="All Regular Sale posts" />
-              <MetricCard title="Active" value={regularSaleStats.active} subtitle="Currently accepting orders" />
-              <MetricCard title="Sold out" value={regularSaleStats.soldOut} subtitle="Closed after stock sold out" />
-              <MetricCard title="Orders" value={regularSaleStats.orders} subtitle="Accepted customer orders" />
-              <MetricCard title="Items sold" value={regularSaleStats.itemsSold} subtitle="Total allocated quantity" />
-              <MetricCard title="Sales value" value={formatCurrency(regularSaleStats.value)} subtitle="Gross Regular Sale value" />
-            </section>
-
-            <section className="dashboard-panel selling-workspace-nav-panel" style={{ marginBottom: 18 }}>
-              <div className="selling-workspace-nav" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 16 }}>
+            <section className="selling-workspace-tabs">
+              <div className="selling-workspace-tablist selling-workspace-nav" role="tablist" aria-label="Regular Sale sections">
                 {[
                   { key: "SUMMARY", label: "Summary", icon: "dashboard" },
                   { key: "POSTS", label: "Posts", icon: "sales" },
@@ -513,7 +504,10 @@ export default function RegularSalePage({ client, metaConnected, page, regularSa
                   <button
                     key={tab.key}
                     type="button"
-                    className={regularSaleWorkspaceTab === tab.key ? "primary-button" : "secondary-button"}
+                    id={`regular-sale-tab-${tab.key.toLowerCase()}`}
+                    role="tab"
+                    aria-selected={regularSaleWorkspaceTab === tab.key}
+                    className={`selling-workspace-tab${regularSaleWorkspaceTab === tab.key ? " active" : ""}`}
                     onClick={() => setRegularSaleWorkspaceTab(tab.key)}
                   >
                     <span className="selling-nav-icon"><NavIcon type={tab.icon} /></span>
@@ -525,6 +519,14 @@ export default function RegularSalePage({ client, metaConnected, page, regularSa
 
             {regularSaleWorkspaceTab === "SUMMARY" && (
               <>
+                <section className="metrics-grid">
+                  <MetricCard title="Total posts" value={regularSaleStats.total} subtitle="All Regular Sale posts" />
+                  <MetricCard title="Active" value={regularSaleStats.active} subtitle="Currently accepting orders" />
+                  <MetricCard title="Sold out" value={regularSaleStats.soldOut} subtitle="Closed after stock sold out" />
+                  <MetricCard title="Orders" value={regularSaleStats.orders} subtitle="Accepted customer orders" />
+                  <MetricCard title="Items sold" value={regularSaleStats.itemsSold} subtitle="Total allocated quantity" />
+                  <MetricCard title="Sales value" value={formatCurrency(regularSaleStats.value)} subtitle="Gross Regular Sale value" />
+                </section>
                 <section className="toolbar-card">
                   <select className="filter-select" defaultValue="ALL">
                     <option value="ALL">All statuses</option>

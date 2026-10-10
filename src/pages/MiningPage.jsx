@@ -497,19 +497,8 @@ export default function MiningPage({ client, metaConnected, miningWorkspaceTab, 
               </div>
             </header>
 
-            <section className="metrics-grid">
-              <MetricCard title="Total posts" value={miningStats.total} subtitle="All mining posts" />
-              <MetricCard title="Active" value={miningStats.active} subtitle="Currently accepting MINE" />
-              <MetricCard title="Live Mining" value="0" subtitle="Active live sessions" />
-              <MetricCard title="Completed" value={miningStats.completed} subtitle="Closed mining posts" />
-              <MetricCard title="Cancelled" value={miningStats.cancelled} subtitle="Cancelled posts" />
-              <MetricCard title="Total claims" value={miningStats.claims} subtitle="Recorded MINE claims" />
-              <MetricCard title="Unique buyers" value={miningStats.buyers} subtitle="Mining customers" />
-              <MetricCard title="Claimed value" value={formatCurrency(miningStats.value)} subtitle="Gross claimed sales" />
-            </section>
-
-            <section className="dashboard-panel selling-workspace-nav-panel" style={{ marginBottom: 18 }}>
-              <div className="selling-workspace-nav" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 16 }}>
+            <section className="selling-workspace-tabs">
+              <div className="selling-workspace-tablist selling-workspace-nav" role="tablist" aria-label="Mining sections">
                 {[
                   { key: "SUMMARY", label: "Summary", icon: "dashboard" },
                   { key: "POSTS", label: "Posts", icon: "mining" },
@@ -520,22 +509,32 @@ export default function MiningPage({ client, metaConnected, miningWorkspaceTab, 
                   <button
                     key={tab.key}
                     type="button"
-                    className={miningWorkspaceTab === tab.key ? "primary-button" : "secondary-button"}
+                    id={`mining-tab-${tab.key.toLowerCase().replaceAll(" ", "-")}`}
+                    role="tab"
+                    aria-selected={miningWorkspaceTab === tab.key}
+                    className={`selling-workspace-tab${miningWorkspaceTab === tab.key ? " active" : ""}`}
                     onClick={() => setMiningWorkspaceTab(tab.key)}
                   >
                     <span className="selling-nav-icon"><NavIcon type={tab.icon} /></span>
                     <span>{tab.label}</span>
                   </button>
                 ))}
-                <button type="button" className="secondary-button" onClick={() => navigateTo("mining-create")}>
-                  <span className="selling-nav-icon"><NavIcon type="create" /></span>
-                  <span>Create Post</span>
-                </button>
               </div>
+              <button type="button" className="primary-button selling-workspace-tab-action" onClick={() => navigateTo("mining-create")}><span className="selling-nav-icon"><NavIcon type="create" /></span><span>Create Post</span></button>
             </section>
 
             {miningWorkspaceTab === "SUMMARY" && (
               <>
+                <section className="metrics-grid">
+                  <MetricCard title="Total posts" value={miningStats.total} subtitle="All mining posts" />
+                  <MetricCard title="Active" value={miningStats.active} subtitle="Currently accepting MINE" />
+                  <MetricCard title="Live Mining" value="0" subtitle="Active live sessions" />
+                  <MetricCard title="Completed" value={miningStats.completed} subtitle="Closed mining posts" />
+                  <MetricCard title="Cancelled" value={miningStats.cancelled} subtitle="Cancelled posts" />
+                  <MetricCard title="Total claims" value={miningStats.claims} subtitle="Recorded MINE claims" />
+                  <MetricCard title="Unique buyers" value={miningStats.buyers} subtitle="Mining customers" />
+                  <MetricCard title="Claimed value" value={formatCurrency(miningStats.value)} subtitle="Gross claimed sales" />
+                </section>
                 <section className="toolbar-card">
                   <select className="filter-select" value={miningStatusFilter} onChange={(e) => setMiningStatusFilter(e.target.value)}>
                     <option value="ALL">All statuses</option>

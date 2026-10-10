@@ -3352,7 +3352,6 @@ button.post-type-card:hover { transform: translateY(-2px); border-color: #bcdcc3
   gap: 10px;
   margin-left: auto;
 }
-.portal-native-refresh-hidden { display: none !important; }
 .page-banner-refresh-button {
   width: 42px;
   height: 42px;
@@ -3381,3 +3380,95 @@ button.post-type-card:hover { transform: translateY(-2px); border-color: #bcdcc3
   .page-banner-dashboard-link { min-height: 40px; }
 }
 @media(prefers-reduced-motion:reduce) { .page-banner-dashboard-link { transition: none; } .page-banner-dashboard-link:hover { transform: none; } }
+
+/* Segmented workspace tabs for selling pages */
+.selling-workspace-tabs,
+.selling-workspace-tabs.preorder-workspace-tabs {
+  display: flex !important;
+  align-items: stretch !important;
+  gap: 8px !important;
+  width: 100% !important;
+  margin: 0 0 20px !important;
+  padding: 5px !important;
+  overflow: hidden !important;
+  border: 1px solid #dce4ef !important;
+  border-radius: 13px !important;
+  background: #fff !important;
+  box-shadow: 0 4px 14px rgba(29, 53, 87, .04) !important;
+}
+.selling-workspace-tabs .selling-workspace-tablist {
+  display: grid !important;
+  grid-auto-columns: minmax(0, 1fr) !important;
+  grid-auto-flow: column !important;
+  align-items: stretch !important;
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  gap: 0 !important;
+  overflow-x: auto !important;
+  border-radius: 9px !important;
+  background: #fff !important;
+}
+.selling-workspace-tabs .selling-workspace-tablist > .selling-workspace-tab {
+  position: relative !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 9px !important;
+  min-width: 112px !important;
+  min-height: 46px !important;
+  margin: 0 !important;
+  padding: 0 14px !important;
+  border: 0 !important;
+  border-right: 1px solid #edf1f6 !important;
+  border-radius: 8px !important;
+  color: #61718c !important;
+  background: transparent !important;
+  font: inherit !important;
+  font-size: 12px !important;
+  font-weight: 750 !important;
+  line-height: 1.25 !important;
+  white-space: nowrap !important;
+  cursor: pointer !important;
+  transition: color .15s ease, background .15s ease, box-shadow .15s ease !important;
+}
+.selling-workspace-tabs .selling-workspace-tablist > .selling-workspace-tab:last-child { border-right: 0 !important; }
+.selling-workspace-tabs .selling-workspace-tablist > .selling-workspace-tab:hover { color: #284a72 !important; background: #f6f9fd !important; }
+.selling-workspace-tabs .selling-workspace-tablist > .selling-workspace-tab.active,
+.selling-workspace-tabs .selling-workspace-tablist > .selling-workspace-tab[aria-selected="true"] {
+  color: #1f568f !important;
+  background: #eaf3fd !important;
+  box-shadow: inset 0 0 0 1px #d8e8f8 !important;
+}
+.selling-workspace-tabs .selling-nav-icon,
+.selling-workspace-tabs .preorder-tab-icon {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 18px !important;
+  height: 18px !important;
+  flex: 0 0 18px !important;
+  color: currentColor !important;
+}
+.selling-workspace-tabs .selling-nav-icon svg,
+.selling-workspace-tabs .preorder-tab-icon svg { width: 17px !important; height: 17px !important; fill: none !important; stroke: currentColor !important; stroke-width: 1.8 !important; stroke-linecap: round !important; stroke-linejoin: round !important; }
+.selling-workspace-tabs .selling-workspace-tab-action {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  flex: 0 0 auto !important;
+  min-height: 42px !important;
+  margin: 0 0 0 4px !important;
+  padding: 0 15px !important;
+  border-radius: 9px !important;
+  white-space: nowrap !important;
+}
+.selling-workspace-tabs .selling-workspace-tab:focus-visible,
+.selling-workspace-tabs .selling-workspace-tab-action:focus-visible { outline: 2px solid #3b82c4 !important; outline-offset: 2px !important; }
+@media(max-width:640px) {
+  .selling-workspace-tabs,
+  .selling-workspace-tabs.preorder-workspace-tabs { flex-wrap: wrap !important; gap: 6px !important; padding: 5px !important; }
+  .selling-workspace-tabs .selling-workspace-tablist { grid-auto-columns: minmax(132px, 1fr) !important; grid-template-rows: auto !important; }
+  .selling-workspace-tabs .selling-workspace-tab-action { flex: 1 1 100% !important; min-height: 42px !important; margin: 0 !important; }
+}
+@media(prefers-reduced-motion:reduce) { .selling-workspace-tabs .selling-workspace-tab { transition: none !important; } }

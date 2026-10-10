@@ -361,37 +361,33 @@ export default function AuctionPage({ auctionWorkspaceTab, client, detailRequest
               </button>
             </header>
 
-            <section className="metrics-grid">
-              <MetricCard title="Total auctions" value={auctions.length} subtitle="All auction items" onClick={() => { setAuctionWorkspaceTab("AUCTIONS"); setAuctionStatusFilter("ALL"); }} />
-              <MetricCard title="Active" value={auctions.filter((a) => a.ui_status === "ACTIVE").length} subtitle="Currently open" onClick={() => { setAuctionWorkspaceTab("AUCTIONS"); setAuctionStatusFilter("ACTIVE"); }} />
-              <MetricCard title="Completed" value={auctions.filter((a) => ["COMPLETED", "COMPLETED_WITH_WINNER", "CLOSED_NO_WINNER"].includes(a.ui_status)).length} subtitle="Closed auctions" />
-              <MetricCard title="Cancelled" value={auctions.filter((a) => a.ui_status === "CANCELLED").length} subtitle="Cancelled auctions" />
-              <MetricCard title="Total bids" value={auctions.reduce((sum, a) => sum + Number(a.valid_bid_count || a.bid_count || 0), 0)} subtitle="Recorded valid bids" />
-              <MetricCard title="Winning value" value={formatCurrency(auctions.reduce((sum, a) => sum + Number(a.highest_bid || 0), 0))} subtitle="Current / final highest bids" />
-            </section>
-
-            <section className="dashboard-panel selling-workspace-nav-panel" style={{ marginBottom: 18 }}>
-              <div className="selling-workspace-nav" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 16 }}>
+            <section className="selling-workspace-tabs">
+              <div className="selling-workspace-tablist selling-workspace-nav" role="tablist" aria-label="Auction sections">
                 {[
                   { key: "SUMMARY", label: "Summary", icon: "dashboard" },
                   { key: "AUCTIONS", label: "Auctions", icon: "auction" },
                   { key: "BIDS", label: "Bids", icon: "sales" },
                   { key: "WINNERS", label: "Winners", icon: "users" },
                 ].map((tab) => (
-                  <button key={tab.key} type="button" className={auctionWorkspaceTab === tab.key ? "primary-button" : "secondary-button"} onClick={() => setAuctionWorkspaceTab(tab.key)}>
+                  <button key={tab.key} id={`auction-tab-${tab.key.toLowerCase()}`} role="tab" aria-selected={auctionWorkspaceTab === tab.key} type="button" className={`selling-workspace-tab${auctionWorkspaceTab === tab.key ? " active" : ""}`} onClick={() => setAuctionWorkspaceTab(tab.key)}>
                     <span className="selling-nav-icon"><NavIcon type={tab.icon} /></span>
                     <span>{tab.label}</span>
                   </button>
                 ))}
-                <button type="button" className="secondary-button" onClick={() => navigateTo("facebook-post")}>
-                  <span className="selling-nav-icon"><NavIcon type="create" /></span>
-                  <span>Create Post</span>
-                </button>
               </div>
+              <button type="button" className="primary-button selling-workspace-tab-action" onClick={() => navigateTo("facebook-post")}><span className="selling-nav-icon"><NavIcon type="create" /></span><span>Create Post</span></button>
             </section>
 
             {auctionWorkspaceTab === "SUMMARY" && (
               <>
+                <section className="metrics-grid">
+                  <MetricCard title="Total auctions" value={auctions.length} subtitle="All auction items" onClick={() => { setAuctionWorkspaceTab("AUCTIONS"); setAuctionStatusFilter("ALL"); }} />
+                  <MetricCard title="Active" value={auctions.filter((a) => a.ui_status === "ACTIVE").length} subtitle="Currently open" onClick={() => { setAuctionWorkspaceTab("AUCTIONS"); setAuctionStatusFilter("ACTIVE"); }} />
+                  <MetricCard title="Completed" value={auctions.filter((a) => ["COMPLETED", "COMPLETED_WITH_WINNER", "CLOSED_NO_WINNER"].includes(a.ui_status)).length} subtitle="Closed auctions" />
+                  <MetricCard title="Cancelled" value={auctions.filter((a) => a.ui_status === "CANCELLED").length} subtitle="Cancelled auctions" />
+                  <MetricCard title="Total bids" value={auctions.reduce((sum, a) => sum + Number(a.valid_bid_count || a.bid_count || 0), 0)} subtitle="Recorded valid bids" />
+                  <MetricCard title="Winning value" value={formatCurrency(auctions.reduce((sum, a) => sum + Number(a.highest_bid || 0), 0))} subtitle="Current / final highest bids" />
+                </section>
                 <section className="toolbar-card">
                   <select className="filter-select" value={auctionStatusFilter} onChange={(e) => setAuctionStatusFilter(e.target.value)}>
                     <option value="ALL">All statuses</option><option value="ACTIVE">Active</option><option value="DRAFT">Scheduled / Draft</option><option value="COMPLETED_WITH_WINNER">Completed</option><option value="CANCELLED">Cancelled</option>
