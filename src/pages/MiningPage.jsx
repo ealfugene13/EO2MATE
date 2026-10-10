@@ -281,7 +281,7 @@ function SellingPostDetailPanel({ detail, loading, error, onClose }) {
         <div className="metric-card"><span>{mining ? "Claimed value" : "Listed value"}</span><strong>{formatCurrency(value)}</strong><small>{mining ? "Total claim price" : "Price × quantity"}</small></div>
       </section>
 
-      <section className="selling-tabs" style={{marginBottom:16}}><div>{tabs.map(t=><button key={t} type="button" className={detailTab===t?"primary-button":"secondary-button"} onClick={()=>setDetailTab(t)}>{t.charAt(0)+t.slice(1).toLowerCase()}</button>)}</div></section>
+      <section className="selling-workspace-tabs detail-workspace-tabs"><div className="selling-workspace-tablist" role="tablist" aria-label="Post details">{tabs.map(t=><button key={t} role="tab" aria-selected={detailTab===t} type="button" className={`selling-workspace-tab${detailTab===t?" active":""}`} onClick={()=>setDetailTab(t)}>{t.charAt(0)+t.slice(1).toLowerCase()}</button>)}</div></section>
 
       {detailTab === "OVERVIEW" && <section className="dashboard-panel selling-card">
         <div className="panel-header"><div><h2>Post overview</h2><p>Facebook reference, lifecycle and source information.</p></div></div>

@@ -232,24 +232,8 @@ export default function OrdersPage({ client, detailRequest, page, setErrorMessag
                 <button type="button" className="icon-button refresh-icon-button orders-icon-action" onClick={loadPortal} title="Refresh Orders" aria-label="Refresh Orders"><OrdersIcon type="refresh"/></button>
               </div>
             </header>
-            <section className="toolbar-card orders-top-filters" aria-label="Order filters">
-              <OrderField label="Search"><input className="search-input" value={orderSearch} onChange={event=>setOrderSearch(event.target.value)} placeholder="Order, buyer or item…"/></OrderField>
-              <OrderField label="Channel"><select className="filter-select" value={channel} onChange={event=>setChannel(event.target.value)}><option value="ALL">All channels</option>{channels.map(value=><option key={value} value={value}>{statusLabel(value)}</option>)}</select></OrderField>
-              <OrderField label="Order status"><select className="filter-select" value={orderStatusFilter} onChange={event=>setOrderStatusFilter(event.target.value)}><option value="ALL">All statuses</option>{statuses.map(value=><option key={value} value={value}>{statusLabel(value)}</option>)}</select></OrderField>
-              <OrderField label="From (Manila)"><input type="date" value={from} onChange={event=>setFrom(event.target.value)}/></OrderField>
-              <OrderField label="To (Manila)"><input type="date" value={to} onChange={event=>setTo(event.target.value)}/></OrderField>
-              <button type="button" className="secondary-button orders-icon-action" onClick={resetFilters}><OrdersIcon type="reset"/><span>Reset</span></button>
-            </section>
-            {invalidRange && <div className="error-message" role="alert">The end date must be on or after the start date.</div>}
-            <section className="metrics-grid orders-summary" aria-label="Order summary">
-              <OrderMetric title="Order subtotal" value={formatCurrency(activeOrders.reduce((sum,order)=>sum+amount(order.subtotal),0))} note="Matching active orders"/>
-              <OrderMetric title="Order total" value={formatCurrency(activeOrders.reduce((sum,order)=>sum+amount(order.total_amount),0))} note="Including recorded shipping charges"/>
-              <OrderMetric title="Transactions" value={filteredOrders.length} note={`${activeOrders.length} active; ${filteredOrders.length-activeOrders.length} cancelled / expired / forfeited`}/>
-              <OrderMetric title="Awaiting payment" value={activeOrders.filter(order=>["PENDING","PAYMENT_PENDING","PARTIAL","PARTIALLY_PAID","UNPAID","PAYMENT_REOPENED"].includes(normalized(order.payment_status||order.latest_payment_status))).length} note="Orders by recorded payment status"/>
-            </section>
-
-            <section className="dashboard-panel selling-workspace-nav-panel orders-workspace-nav-panel" style={{ marginBottom: 18 }}>
-              <div role="tablist" aria-label="Order sections" className="selling-workspace-nav">
+            <section className="selling-workspace-tabs orders-workspace-tabs" style={{ marginBottom: 18 }}>
+              <div role="tablist" aria-label="Order sections" className="selling-workspace-tablist selling-workspace-nav">
                 {[
                   { key: "SUMMARY", label: "Summary", icon: "summary" },
                   { key: "ORDERS", label: "Orders", icon: "transactions" },
@@ -261,7 +245,7 @@ export default function OrdersPage({ client, detailRequest, page, setErrorMessag
                     role="tab"
                     aria-selected={activeTab === key}
                     aria-controls="orders-panel"
-                    className={activeTab === key ? "primary-button" : "secondary-button"}
+                    className={`selling-workspace-tab${activeTab === key ? " active" : ""}`}
                     onClick={() => setActiveTab(key)}
                   >
                     <span className="selling-nav-icon"><OrdersIcon type={icon} /></span>
@@ -270,6 +254,23 @@ export default function OrdersPage({ client, detailRequest, page, setErrorMessag
                 ))}
               </div>
             </section>
+            <section className="toolbar-card orders-top-filters" aria-label="Order filters">
+              <OrderField label="Search"><input className="search-input" value={orderSearch} onChange={event=>setOrderSearch(event.target.value)} placeholder="Order, buyer or item…"/></OrderField>
+              <OrderField label="Channel"><select className="filter-select" value={channel} onChange={event=>setChannel(event.target.value)}><option value="ALL">All channels</option>{channels.map(value=><option key={value} value={value}>{statusLabel(value)}</option>)}</select></OrderField>
+              <OrderField label="Order status"><select className="filter-select" value={orderStatusFilter} onChange={event=>setOrderStatusFilter(event.target.value)}><option value="ALL">All statuses</option>{statuses.map(value=><option key={value} value={value}>{statusLabel(value)}</option>)}</select></OrderField>
+              <OrderField label="From (Manila)"><input type="date" value={from} onChange={event=>setFrom(event.target.value)}/></OrderField>
+              <OrderField label="To (Manila)"><input type="date" value={to} onChange={event=>setTo(event.target.value)}/></OrderField>
+              <button type="button" className="secondary-button orders-icon-action" onClick={resetFilters}><OrdersIcon type="reset"/><span>Reset</span></button>
+            </section>
+            {invalidRange && <div className="error-message" role="alert">The end date must be on or after the start date.</div>}
+            {activeTab === "SUMMARY" && (
+              <section className="metrics-grid orders-summary" aria-label="Order summary">
+              <OrderMetric title="Order subtotal" value={formatCurrency(activeOrders.reduce((sum,order)=>sum+amount(order.subtotal),0))} note="Matching active orders"/>
+              <OrderMetric title="Order total" value={formatCurrency(activeOrders.reduce((sum,order)=>sum+amount(order.total_amount),0))} note="Including recorded shipping charges"/>
+              <OrderMetric title="Transactions" value={filteredOrders.length} note={`${activeOrders.length} active; ${filteredOrders.length-activeOrders.length} cancelled / expired / forfeited`}/>
+              <OrderMetric title="Awaiting payment" value={activeOrders.filter(order=>["PENDING","PAYMENT_PENDING","PARTIAL","PARTIALLY_PAID","UNPAID","PAYMENT_REOPENED"].includes(normalized(order.payment_status||order.latest_payment_status))).length} note="Orders by recorded payment status"/>
+            </section>
+            )}
 
             <section className="dashboard-panel" id="orders-panel" role="tabpanel">
               <div className="panel-header">

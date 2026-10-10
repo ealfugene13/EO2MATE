@@ -952,6 +952,40 @@ export default function PurchasesPage({ client }) {
       ) : (
         !error && (
           <>
+            <section
+              className="selling-workspace-tabs"
+              style={{ marginBottom: 18 }}
+            >
+              <div
+                className="selling-workspace-tablist selling-workspace-nav"
+                role="tablist"
+                aria-label="Purchase sections"
+              >
+                {[
+                  ["SUMMARY", "Summary", "summary"],
+                  ["PURCHASES", "Purchases", "purchases"],
+                  ["SUPPLIERS", "Suppliers", "suppliers"],
+                  ["RECEIVING", "Receiving", "receiving"],
+                ].map(([k, label, icon]) => (
+                  <button
+                    type="button"
+                    key={k}
+                    role="tab"
+                    aria-selected={tab === k}
+                    aria-controls="purchase-panel"
+                    className={`selling-workspace-tab${tab === k ? " active" : ""}`}
+                    onClick={() => setTab(k)}
+                  >
+                    <span className="selling-nav-icon">
+                      <Icon type={icon} />
+                    </span>
+                    <span>{label}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+            {tab === "SUMMARY" && (
+              <>
             <section className="metrics-grid">
               <Metric
                 title="Purchases"
@@ -997,40 +1031,8 @@ export default function PurchasesPage({ client }) {
                 note="Recorded supplier balance"
               />
             </section>
-            <section
-              className="dashboard-panel selling-workspace-nav-panel"
-              style={{ marginBottom: 18 }}
-            >
-              <div
-                className="selling-workspace-nav"
-                role="tablist"
-                aria-label="Purchase sections"
-              >
-                {[
-                  ["SUMMARY", "Summary", "summary"],
-                  ["PURCHASES", "Purchases", "purchases"],
-                  ["SUPPLIERS", "Suppliers", "suppliers"],
-                  ["RECEIVING", "Receiving", "receiving"],
-                ].map(([k, label, icon]) => (
-                  <button
-                    type="button"
-                    key={k}
-                    role="tab"
-                    aria-selected={tab === k}
-                    aria-controls="purchase-panel"
-                    className={
-                      tab === k ? "primary-button" : "secondary-button"
-                    }
-                    onClick={() => setTab(k)}
-                  >
-                    <span className="selling-nav-icon">
-                      <Icon type={icon} />
-                    </span>
-                    <span>{label}</span>
-                  </button>
-                ))}
-              </div>
-            </section>
+              </>
+            )}
             {tab !== "SUPPLIERS" && (
               <section className="toolbar-card purchase-filters">
                 <Field label="Search">

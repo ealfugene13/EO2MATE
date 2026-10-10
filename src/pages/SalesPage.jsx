@@ -72,13 +72,13 @@ export default function SalesPage({client,orderLabels=[],navigationFilter}) {
  <header className="dashboard-header"><div><p className="eyebrow">SALES &amp; ORDER MANAGEMENT</p><h1>Sales &amp; Orders</h1><p>One workspace for sales performance, customer orders and order groups.</p></div><div className="sales-actions"><button className="icon-button refresh-icon-button" title="Refresh Sales & Orders" aria-label="Refresh Sales & Orders" disabled={busy} onClick={load}><Icon type="refresh"/></button></div></header>
  {error&&<div className="error-message" role="alert">{error} <button className="secondary-button" onClick={load}>Retry</button></div>}
  {busy?<div className="loading-card" role="status">Loading Sales…</div>:!error&&<>
- <section className="dashboard-panel selling-workspace-nav-panel" style={{ marginBottom: 18 }}>
-   <div role="tablist" aria-label="Sales and order sections" className="selling-workspace-nav" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 16 }}>
+ <section className="selling-workspace-tabs">
+   <div role="tablist" aria-label="Sales and order sections" className="selling-workspace-tablist selling-workspace-nav">
      {[
        { key: 'SUMMARY', label: 'Sales summary', icon: 'summary' },
        { key: 'TRANSACTIONS', label: 'Orders', icon: 'transactions' },
        { key: 'GROUPS', label: 'Order groups', icon: 'groups' },
-     ].map(({key,label,icon}) => <button key={key} type="button" role="tab" aria-selected={tab===key} aria-controls="sales-panel" className={tab===key?'primary-button':'secondary-button'} onClick={()=>setTab(key)}><span className="selling-nav-icon"><WorkspaceIcon type={icon}/></span><span>{label}</span></button>)}
+     ].map(({key,label,icon}) => <button key={key} type="button" role="tab" aria-selected={tab===key} aria-controls="sales-panel" className={`selling-workspace-tab${tab===key?" active":""}`} onClick={()=>setTab(key)}><span className="selling-nav-icon"><WorkspaceIcon type={icon}/></span><span>{label}</span></button>)}
    </div>
  </section>
  <section className="toolbar-card sales-tab-filters" aria-label={`${tab==='SUMMARY'?'Sales summary':tab==='GROUPS'?'Order group':'Order'} filters`}>

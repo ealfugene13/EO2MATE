@@ -3398,6 +3398,7 @@ button.post-type-card:hover { transform: translateY(-2px); border-color: #bcdcc3
 }
 .selling-workspace-tabs .selling-workspace-tablist {
   display: grid !important;
+  grid-template-rows: minmax(46px, auto) !important;
   grid-auto-columns: minmax(0, 1fr) !important;
   grid-auto-flow: column !important;
   align-items: stretch !important;
@@ -3468,7 +3469,7 @@ button.post-type-card:hover { transform: translateY(-2px); border-color: #bcdcc3
 @media(max-width:640px) {
   .selling-workspace-tabs,
   .selling-workspace-tabs.preorder-workspace-tabs { flex-wrap: wrap !important; gap: 6px !important; padding: 5px !important; }
-  .selling-workspace-tabs .selling-workspace-tablist { grid-auto-columns: minmax(132px, 1fr) !important; grid-template-rows: auto !important; }
+  .selling-workspace-tabs .selling-workspace-tablist { grid-auto-columns: minmax(132px, 1fr) !important; }
   .selling-workspace-tabs .selling-workspace-tab-action { flex: 1 1 100% !important; min-height: 42px !important; margin: 0 !important; }
 }
 @media(prefers-reduced-motion:reduce) { .selling-workspace-tabs .selling-workspace-tab { transition: none !important; } }

@@ -207,6 +207,26 @@ export default function LiveSellingPage({ liveSellingWorkspaceTab, metaConnected
                 <p>Live-selling dashboard for sessions, claims, buyers and sales performance. Transaction processing will activate when the Live Selling module is enabled.</p>
               </div>
             </header>
+            <section className="selling-workspace-tabs" style={{ marginBottom: 18 }}>
+              <div role="tablist" aria-label="Live Selling sections" className="selling-workspace-tablist selling-workspace-nav">
+                {[
+                  { key: "DASHBOARD", label: "Dashboard", icon: "dashboard" },
+                  { key: "SUMMARY", label: "Summary", icon: "reports" },
+                  { key: "POSTS", label: "Posts", icon: "sales" },
+                ].map((tab) => (
+                  <button key={tab.key} type="button" role="tab" aria-selected={liveSellingWorkspaceTab === tab.key} className={`selling-workspace-tab${liveSellingWorkspaceTab === tab.key ? " active" : ""}`} onClick={() => setLiveSellingWorkspaceTab(tab.key)}>
+                    <span className="selling-nav-icon"><NavIcon type={tab.icon} /></span>
+                    <span>{tab.label}</span>
+                  </button>
+                ))}
+              </div>
+              <button type="button" className="secondary-button selling-workspace-tab-action" disabled title="Coming soon">
+                  <span className="selling-nav-icon"><NavIcon type="create" /></span>
+                  <span>Create Post · Soon</span>
+              </button>
+            </section>
+            {liveSellingWorkspaceTab === "DASHBOARD" && (
+              <>
             <section className="metrics-grid">
               <MetricCard title="Live sessions" value="0" subtitle="Sessions in selected period" />
               <MetricCard title="Active session" value="0" subtitle="Currently live" />
@@ -215,24 +235,8 @@ export default function LiveSellingPage({ liveSellingWorkspaceTab, metaConnected
               <MetricCard title="Items sold" value="0" subtitle="Allocated quantity" />
               <MetricCard title="Sales value" value={formatCurrency(0)} subtitle="Gross live-selling value" />
             </section>
-            <section className="dashboard-panel selling-workspace-nav-panel" style={{ marginBottom: 18 }}>
-              <div className="selling-workspace-nav" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 16 }}>
-                {[
-                  { key: "DASHBOARD", label: "Dashboard", icon: "dashboard" },
-                  { key: "SUMMARY", label: "Summary", icon: "reports" },
-                  { key: "POSTS", label: "Posts", icon: "sales" },
-                ].map((tab) => (
-                  <button key={tab.key} type="button" className={liveSellingWorkspaceTab === tab.key ? "primary-button" : "secondary-button"} onClick={() => setLiveSellingWorkspaceTab(tab.key)}>
-                    <span className="selling-nav-icon"><NavIcon type={tab.icon} /></span>
-                    <span>{tab.label}</span>
-                  </button>
-                ))}
-                <button type="button" className="secondary-button" disabled title="Coming soon">
-                  <span className="selling-nav-icon"><NavIcon type="create" /></span>
-                  <span>Create Post · Soon</span>
-                </button>
-              </div>
-            </section>
+              </>
+            )}
             <section className="dashboard-panel">
               <div className="panel-header"><div><h2>{liveSellingWorkspaceTab === "POSTS" ? "Live Selling posts" : liveSellingWorkspaceTab === "SUMMARY" ? "Live Selling summary" : "Live Selling dashboard"}</h2><p>Ready for the Live Selling backend connection without exposing placeholder data as real activity.</p></div></div>
               <div className="table-wrapper"><table><thead><tr><th>Session / Post</th><th>Status</th><th>Claims</th><th>Buyers</th><th>Items</th><th>Sales</th></tr></thead><tbody><tr><td colSpan="6">No Live Selling records yet.</td></tr></tbody></table></div>
