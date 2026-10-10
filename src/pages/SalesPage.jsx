@@ -23,6 +23,7 @@ function WorkspaceIcon({ type }) {
     summary: <><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></>,
     transactions: <><path d="M4 20V10m6 10V4m6 16v-8M2 20h20"/></>,
     groups: <><rect x="3" y="3" width="13" height="13" rx="2"/><path d="M8 21h11a2 2 0 0 0 2-2V8M7 7h5M7 11h5"/></>,
+    tools: <><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4l-5.8 5.8a2 2 0 0 0 2.8 2.8l5.8-5.8a4 4 0 0 0 5.4-5.4l-2.3 2.3-2.8-2.8 2.3-2.3Z"/></>,
     purchases: <><path d="M3 3h2l3 12h10l3-9H6"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></>,
     suppliers: <><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0M16 5a3 3 0 0 1 0 6M17 14a5 5 0 0 1 4 6"/></>,
     receiving: <><path d="m3 7 9-4 9 4-9 4-9-4ZM3 7v10l9 4 9-4V7M12 11v10m-5-5 3 3 6-6"/></>,
@@ -69,16 +70,17 @@ export default function SalesPage({client,orderLabels=[],navigationFilter,naviga
  function exportCSV() { if(tab==='GROUPS'){const header=['Created (Manila)','Group','Buyer','Total','Group status'];const lines=list.map(g=>[date(g.created_at),g.group_number||g.order_group_id,g.buyer_name,g.total_amount,g.group_status||g.payment_status]);downloadCSV([header,...lines],'EO2MATE-Order-Groups.csv');return;} if(tab==='SUMMARY'){const header=['Channel','Paid orders','Subtotal','Paid order value'];downloadCSV([header,...summary.map(row=>[row.channel,row.count,row.subtotal,row.total])],'EO2MATE-Paid-Sales-Summary.csv');return;} const header=['Date (Manila)','Order','Channel','Buyer','Item','Subtotal','Total','Order status','Payment status','Order group'];const lines=filtered.map(row=>[date(row.created_at),row.order_number||row.order_id,row.source_type,row.buyer_name,row.item_label,row.subtotal,row.total_amount,row.order_status,row.payment_status,groupMap.get(row.order_group_id)?.group_number||row.order_group_id]); downloadCSV([header,...lines],'EO2MATE-Orders.csv'); }
  function downloadCSV(lines,filename){const url=URL.createObjectURL(new Blob(['\uFEFF'+lines.map(line=>line.map(csvCell).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8;'}));const anchor=document.createElement('a');anchor.href=url;anchor.download=filename;anchor.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
  return <div className="sales-workspace">
- <header className="dashboard-header"><div><p className="eyebrow">SALES &amp; ORDER MANAGEMENT</p><h1>Sales &amp; Orders</h1><p>One workspace for sales performance, customer orders and order groups.</p></div><div className="sales-actions"><button type="button" className="secondary-button" onClick={()=>navigatePage?.('orders')}>Order tools</button><button className="icon-button refresh-icon-button" title="Refresh Sales & Orders" aria-label="Refresh Sales & Orders" disabled={busy} onClick={load}><Icon type="refresh"/></button></div></header>
+ <header className="dashboard-header"><div><p className="eyebrow">SALES &amp; ORDER MANAGEMENT</p><h1>Sales &amp; Orders</h1><p>One workspace for sales performance, customer orders and order groups.</p></div><div className="sales-actions"><button className="icon-button refresh-icon-button" title="Refresh Sales & Orders" aria-label="Refresh Sales & Orders" disabled={busy} onClick={load}><Icon type="refresh"/></button></div></header>
  {error&&<div className="error-message" role="alert">{error} <button className="secondary-button" onClick={load}>Retry</button></div>}
  {busy?<div className="loading-card" role="status">Loading Sales…</div>:!error&&<>
- <section className="dashboard-panel selling-workspace-nav-panel" style={{ marginBottom: 18 }}>
-   <div role="tablist" aria-label="Sales and order sections" className="selling-workspace-nav" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 16 }}>
+ <section className="dashboard-panel selling-workspace-nav-panel sales-tabs-panel" style={{ marginBottom: 18 }}>
+   <div role="tablist" aria-label="Sales and order sections" className="selling-workspace-nav sales-workspace-tabs">
      {[
        { key: 'SUMMARY', label: 'Sales summary', icon: 'summary' },
        { key: 'TRANSACTIONS', label: 'Orders', icon: 'transactions' },
        { key: 'GROUPS', label: 'Order groups', icon: 'groups' },
-     ].map(({key,label,icon}) => <button key={key} type="button" role="tab" aria-selected={tab===key} aria-controls="sales-panel" className={tab===key?'primary-button':'secondary-button'} onClick={()=>setTab(key)}><span className="selling-nav-icon"><WorkspaceIcon type={icon}/></span><span>{label}</span></button>)}
+     ].map(({key,label,icon}) => <button key={key} type="button" role="tab" aria-selected={tab===key} aria-controls="sales-panel" className={`sales-workspace-tab${tab===key?' is-active':''}`} onClick={()=>setTab(key)}><span className="selling-nav-icon"><WorkspaceIcon type={icon}/></span><span>{label}</span></button>)}
+     <button type="button" className="sales-workspace-tab sales-tools-tab" onClick={()=>navigatePage?.('orders')} aria-label="Open order tools"><span className="selling-nav-icon"><WorkspaceIcon type="tools"/></span><span>Order tools</span></button>
    </div>
  </section>
  <section className="toolbar-card sales-tab-filters" aria-label={`${tab==='SUMMARY'?'Sales summary':tab==='GROUPS'?'Order group':'Order'} filters`}>
