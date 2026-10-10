@@ -3272,6 +3272,7 @@ button.post-type-card:hover { transform: translateY(-2px); border-color: #bcdcc3
 
 /* Shared page banner used across portal sections */
 .portal-route-content { display: contents; }
+.portal-route-content-body { display: contents; }
 .portal-route-page-setup,
 .portal-route-page-account-security { display: flex; flex-direction: column; gap: 0; }
 .portal-route-page-setup *,
@@ -3341,14 +3342,37 @@ button.post-type-card:hover { transform: translateY(-2px); border-color: #bcdcc3
   backdrop-filter: blur(6px);
   transition: transform .15s ease, background .15s ease, border-color .15s ease;
 }
+.portal-page-banner-actions {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-left: auto;
+}
+.portal-native-refresh-hidden { display: none !important; }
+.page-banner-refresh-button {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  border-color: rgba(255,255,255,.78);
+  border-radius: 11px;
+  color: #334863;
+  background: #fff;
+}
+.page-banner-refresh-button:hover:not(:disabled) { border-color: #fff; color: #1e3a50; background: #f1f5f9; }
+.page-banner-refresh-button:focus-visible { outline: 2px solid #9de6a9; outline-offset: 3px; }
 .page-banner-dashboard-link:hover { transform: translateY(-2px); border-color: rgba(255,255,255,.42); background: rgba(255,255,255,.17); }
 .page-banner-dashboard-link:focus-visible { outline: 2px solid #9de6a9; outline-offset: 3px; }
 .page-banner-dashboard-link svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; }
-.reports-workspace .reports-page-hero .page-banner-dashboard-link { margin-left: auto; }
+.reports-workspace .reports-page-hero .portal-page-banner-actions { margin-left: 0; }
 @media(max-width:760px) {
   .dashboard-content .dashboard-header { align-items: flex-start; min-height: 0; padding: 22px; border-radius: 17px; }
   .dashboard-content .dashboard-header > div:first-child { flex-basis: 100%; }
-  .page-banner-dashboard-link { margin-left: 0; }
+  .portal-page-banner-actions { margin-left: 0; }
+  .reports-workspace .reports-page-hero .portal-page-banner-actions { width: 100%; justify-content: flex-start; }
 }
 @media(max-width:520px) {
   .dashboard-content .dashboard-header { gap: 16px; padding: 19px; border-radius: 15px; }
