@@ -1060,7 +1060,6 @@ export default function FacebookPostPage({
   const uploadButtonRef = useRef(null);
   const fieldRefs = useRef({});
   const itemsRef = useRef([]);
-  const inventoryRequestIdRef = useRef(0);
 
   const [pages, setPages] = useState([]);
   const [subscription, setSubscription] = useState(null);
@@ -1098,9 +1097,6 @@ export default function FacebookPostPage({
   const [miningLockPrice, setMiningLockPrice] = useState("");
   const [miningEndDate, setMiningEndDate] = useState("");
   const [inventoryItems, setInventoryItems] = useState([]);
-  const [inventoryLoading, setInventoryLoading] = useState(false);
-  const [inventoryError, setInventoryError] = useState("");
-  const [inventoryReloadKey, setInventoryReloadKey] = useState(0);
   const [sharedRules, setSharedRules] = useState({
     ...DEFAULT_RULES,
   });
@@ -1129,67 +1125,6 @@ export default function FacebookPostPage({
       );
     };
   }, [client?.client_id]);
-
-  // Inventory is page scoped and can change while this posting screen is open.
-  // Load it independently from the selling setup, after the selected Page is
-  // known, so a failed inventory request does not silently leave Multiple mode
-  // with an empty picker.
-  useEffect(() => {
-    if (!client?.client_id) {
-      setInventoryItems([]);
-      setInventoryError("");
-      setInventoryLoading(false);
-      return undefined;
-    }
-
-    let active = true;
-    const requestId = ++inventoryRequestIdRef.current;
-    const pageId = selectedPageId;
-
-    setInventoryLoading(true);
-    setInventoryError("");
-
-    (async () => {
-      try {
-        const { data, error } = await supabase.functions.invoke("eo2mate", {
-          method: "POST",
-          headers: { "x-eo2mate-route": "inventory-admin" },
-          body: {
-            action: "LIST_ITEMS",
-            client_id: client.client_id,
-            status: "ACTIVE",
-            search: "",
-            ...(pageId ? { fb_page_id: pageId } : {}),
-          },
-        });
-
-        if (error) throw error;
-        if (!data?.success) {
-          throw new Error(data?.message || data?.error || "Inventory items could not be loaded.");
-        }
-
-        if (active && requestId === inventoryRequestIdRef.current) {
-          setInventoryItems(Array.isArray(data.items) ? data.items : []);
-        }
-      } catch (error) {
-        if (active && requestId === inventoryRequestIdRef.current) {
-          setInventoryItems([]);
-          setInventoryError(
-            await getEdgeFunctionErrorMessage(error, "Inventory items could not be loaded.")
-          );
-          console.warn("Inventory list unavailable; manual posting remains enabled.", error);
-        }
-      } finally {
-        if (active && requestId === inventoryRequestIdRef.current) {
-          setInventoryLoading(false);
-        }
-      }
-    })();
-
-    return () => {
-      active = false;
-    };
-  }, [client?.client_id, selectedPageId, inventoryReloadKey]);
 
   const selectableEnvironments = useMemo(
     () => normalizeEnvironmentRows(environments),
@@ -1334,6 +1269,40 @@ export default function FacebookPostPage({
       setEnvironments(environmentRows);
       setPostTypes(postTypeRows);
 
+      try {
+        const {
+          data: inventoryData,
+          error: inventoryError,
+        } =
+          await supabase.functions.invoke(
+            "eo2mate",
+            {
+              method: "POST",
+              headers: { "x-eo2mate-route": "inventory-admin" },
+              body: {
+                action: "LIST_ITEMS",
+                client_id: client.client_id,
+                status: "ACTIVE",
+                search: "",
+              },
+            }
+          );
+
+        if (inventoryError) throw inventoryError;
+
+        setInventoryItems(
+          inventoryData?.success
+            ? inventoryData.items || []
+            : []
+        );
+      } catch (inventoryError) {
+        console.warn(
+          "Inventory list unavailable; manual posting remains enabled.",
+          inventoryError
+        );
+        setInventoryItems([]);
+      }
+
       setPostType((current) => {
         if (
           current &&
@@ -1422,12 +1391,9 @@ export default function FacebookPostPage({
       lines.push(sellerCaption.trim(), "");
     }
 
-    if (postMode === "AUCTION" && environment) {
-      lines.push(`EO2MATE-${environment}`);
-      lines.push("");
-    }
-
-    if (selectedPostType?.caption_marker) {
+    // Auction environment and type are sent as registration metadata so
+    // internal routing labels do not appear in the public Facebook caption.
+    if (postMode !== "AUCTION" && selectedPostType?.caption_marker) {
       lines.push(
         selectedPostType.caption_marker
       );
@@ -1440,7 +1406,7 @@ export default function FacebookPostPage({
       if (regularSaleQuantity) lines.push(`Available Qty: ${regularSaleQuantity}`);
       if (regularSaleMaxPerBuyer) lines.push(`Max Qty / Buyer: ${regularSaleMaxPerBuyer}`);
       const command = regularSaleParticipationCommands.find((row) => row?.command_text === "+")?.command_text || "+";
-      lines.push(`Comment ${command}<qty> to buy, e.g. ${command}1 or ${command} 1.`);
+      lines.push(`To buy, comment ${command}<qty> ${isMultiple ? "on the item photo" : "below"}. Example: ${command}1.`);
     } else if (postMode === "MINING") {
       if (!isMultiple && singleItem.trim()) lines.push(`Item: ${singleItem.trim()}`);
       const cmd = (action, fallback) => miningParticipationCommands.find((row) => String(row?.action_code || "").toUpperCase() === action)?.command_text || fallback;
@@ -1449,9 +1415,9 @@ export default function FacebookPostPage({
       if (take !== null) lines.push(`${cmd("TAKE","TAKE")}: ${formatMoneyForCaption(miningTakePrice)}`);
       if (lock !== null) lines.push(`${cmd("LOCK","LOCK")}: ${formatMoneyForCaption(miningLockPrice)}`);
       if (miningEndDate) lines.push(`Mining Ends: ${formatFacebookAuctionDate(miningEndDate)}`);
-      lines.push(`Comment ${cmd("MINE","MINE")}, ${cmd("TAKE","TAKE")}, or ${cmd("LOCK","LOCK")}${isMultiple ? " on the item photo" : ""}.`);
+      lines.push(`For this item, comment ${cmd("MINE","MINE")}, ${cmd("TAKE","TAKE")}, or ${cmd("LOCK","LOCK")} ${isMultiple ? "on its photo" : "below"}.`);
     } else if (postMode === "PREORDER") {
-      if (singleItem.trim()) lines.push(`Item: ${singleItem.trim()}`);
+      if (!isMultiple && singleItem.trim()) lines.push(`Item: ${singleItem.trim()}`);
       const price = normalizeMoney(preorderPrice);
       if (price !== null) lines.push(`Price: ${formatMoneyForCaption(preorderPrice)}`);
       const downPayment = normalizeMoney(preorderDownPayment);
@@ -1461,7 +1427,7 @@ export default function FacebookPostPage({
       if (preorderDeadline) lines.push(`Pre-Order Until: ${formatFacebookAuctionDate(preorderDeadline)}`);
       if (preorderPaymentDeadline) lines.push(`Payment Deadline: ${formatFacebookAuctionDate(preorderPaymentDeadline)}`);
       const configuredCommand = preorderParticipationCommands.find((row) => row?.command_text === "+")?.command_text || preorderParticipationCommands[0]?.command_text || "+";
-      lines.push(`Comment ${configuredCommand}<qty> to order, e.g. ${configuredCommand}1 or ${configuredCommand} 1.`);
+      lines.push(`To order, comment ${configuredCommand}<qty> ${isMultiple ? "on the item photo" : "below"}. Example: ${configuredCommand}1.`);
     } else if (!isMultiple) {
       lines.push(
         ...buildRuleLines(sharedRules, {
@@ -1469,12 +1435,15 @@ export default function FacebookPostPage({
           item: singleItem,
         })
       );
+      lines.push("To bid, comment your bid amount below.");
     } else {
       lines.push(
         ...buildRuleLines(sharedRules)
       );
+      lines.push("To bid, comment your amount on the photo of the item.");
     }
 
+    lines.push("", "Follow this page for more great finds and new arrivals!");
     return lines.join("\n").trim();
   }, [
     sellerCaption,
@@ -1505,7 +1474,7 @@ export default function FacebookPostPage({
         const price = item.regularSalePrice !== "" ? item.regularSalePrice : regularSalePrice;
         const qty = item.regularSaleQuantity !== "" ? item.regularSaleQuantity : regularSaleQuantity;
         const max = item.regularSaleMaxPerBuyer !== "" ? item.regularSaleMaxPerBuyer : regularSaleMaxPerBuyer;
-        return [`Item: ${item.item.trim()}`, `Price: ${formatMoneyForCaption(price)}`, `Available Qty: ${qty}`, ...(max ? [`Max Qty / Buyer: ${max}`] : []), `Comment ${command}<qty> to buy, e.g. ${command}1 or ${command} 1.`].join("\n");
+        return [`Item: ${item.item.trim()}`, `Price: ${formatMoneyForCaption(price)}`, `Available Qty: ${qty}`, ...(max ? [`Max Qty / Buyer: ${max}`] : []), `To buy, comment ${command}<qty> on this photo. Example: ${command}1.`].join("\n");
       });
     }
     if (postMode === "MINING") {
@@ -1515,7 +1484,7 @@ export default function FacebookPostPage({
         const take = item.miningTakePrice !== "" ? item.miningTakePrice : miningTakePrice;
         const lock = item.miningLockPrice !== "" ? item.miningLockPrice : miningLockPrice;
         const endDate = item.miningEndDate || miningEndDate;
-        return [`Item: ${item.item.trim()}`, `${cmd("MINE","MINE")}: ${formatMoneyForCaption(mine)}`, `${cmd("TAKE","TAKE")}: ${formatMoneyForCaption(take)}`, `${cmd("LOCK","LOCK")}: ${formatMoneyForCaption(lock)}`, `Mining Ends: ${formatFacebookAuctionDate(endDate)}`, `Comment ${cmd("MINE","MINE")}, ${cmd("TAKE","TAKE")}, or ${cmd("LOCK","LOCK")} on this photo.`].join("\n");
+        return [`Item: ${item.item.trim()}`, `${cmd("MINE","MINE")}: ${formatMoneyForCaption(mine)}`, `${cmd("TAKE","TAKE")}: ${formatMoneyForCaption(take)}`, `${cmd("LOCK","LOCK")}: ${formatMoneyForCaption(lock)}`, `Mining Ends: ${formatFacebookAuctionDate(endDate)}`, `For this item, comment ${cmd("MINE","MINE")}, ${cmd("TAKE","TAKE")}, or ${cmd("LOCK","LOCK")} on this photo.`].join("\n");
       });
     }
     if (postMode === "PREORDER") {
@@ -1543,11 +1512,14 @@ export default function FacebookPostPage({
         if (preorderPaymentRequirement === "DOWN_PAYMENT" && dp !== null) lines.push(preorderDownPaymentType === "PERCENTAGE" ? `Required Down Payment: ${dp}%` : `Required Down Payment: ${formatMoneyForCaption(preorderDownPayment)} per item`);
         if (preorderDeadline) lines.push(`Pre-Order Until: ${formatFacebookAuctionDate(preorderDeadline)}`);
         if (preorderPaymentDeadline) lines.push(`Payment Deadline: ${formatFacebookAuctionDate(preorderPaymentDeadline)}`);
-        lines.push(`Comment ${command}<qty> to order, e.g. ${command}1 or ${command} 1.`);
+        lines.push(`To order, comment ${command}<qty> on this photo. Example: ${command}1.`);
         return lines.join("\n");
       });
     }
-    return items.map((item) => buildRuleLines(mergeRules(sharedRules, item), {includeItem:true,item:item.item}).join("\n"));
+    return items.map((item) => [
+      ...buildRuleLines(mergeRules(sharedRules, item), {includeItem:true,item:item.item}),
+      "To bid, comment your amount on this photo.",
+    ].join("\n"));
   }, [isMultiple, postMode, items, sharedRules, preorderPrice, preorderQuantity, preorderMaxPerBuyer, preorderDownPayment, preorderDownPaymentType, preorderDeadline, preorderPaymentDeadline, preorderParticipationCommands, miningParticipationCommands, miningMinePrice, miningTakePrice, miningLockPrice, miningEndDate, regularSaleParticipationCommands, regularSalePrice, regularSaleQuantity, regularSaleMaxPerBuyer]);
 
   function changePostType(nextType) {
@@ -3647,18 +3619,6 @@ export default function FacebookPostPage({
                       </option>
                     ))}
                   </select>
-                  {inventoryLoading && <small>Loading Master Inventory items…</small>}
-                  {!inventoryLoading && !inventoryError && pageInventoryItems.length === 0 && (
-                    <small>No active inventory items with available stock are assigned to this Page.</small>
-                  )}
-                  {inventoryError && (
-                    <small className="eo2-field-error-text">
-                      {inventoryError}{" "}
-                      <button type="button" className="secondary-button" onClick={() => setInventoryReloadKey((key) => key + 1)} disabled={inventoryLoading}>
-                        Retry
-                      </button>
-                    </small>
-                  )}
                 </label>
               )}
               <label>Item Name *
@@ -3864,18 +3824,6 @@ export default function FacebookPostPage({
                             </option>
                           ))}
                         </select>
-                        {inventoryLoading && <small>Loading Master Inventory items…</small>}
-                        {!inventoryLoading && !inventoryError && pageInventoryItems.length === 0 && (
-                          <small>No active inventory items with available stock are assigned to this Page.</small>
-                        )}
-                        {inventoryError && (
-                          <small className="eo2-field-error-text">
-                            {inventoryError}{" "}
-                            <button type="button" className="secondary-button" onClick={() => setInventoryReloadKey((key) => key + 1)} disabled={inventoryLoading}>
-                              Retry
-                            </button>
-                          </small>
-                        )}
                       </label>
                     )}
                   </div>
