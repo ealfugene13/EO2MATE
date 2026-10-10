@@ -1060,6 +1060,7 @@ export default function FacebookPostPage({
   const uploadButtonRef = useRef(null);
   const fieldRefs = useRef({});
   const itemsRef = useRef([]);
+  const inventoryRequestIdRef = useRef(0);
 
   const [pages, setPages] = useState([]);
   const [subscription, setSubscription] = useState(null);
@@ -1097,6 +1098,9 @@ export default function FacebookPostPage({
   const [miningLockPrice, setMiningLockPrice] = useState("");
   const [miningEndDate, setMiningEndDate] = useState("");
   const [inventoryItems, setInventoryItems] = useState([]);
+  const [inventoryLoading, setInventoryLoading] = useState(false);
+  const [inventoryError, setInventoryError] = useState("");
+  const [inventoryReloadKey, setInventoryReloadKey] = useState(0);
   const [sharedRules, setSharedRules] = useState({
     ...DEFAULT_RULES,
   });
@@ -1125,6 +1129,67 @@ export default function FacebookPostPage({
       );
     };
   }, [client?.client_id]);
+
+  // Inventory is page scoped and can change while this posting screen is open.
+  // Load it independently from the selling setup, after the selected Page is
+  // known, so a failed inventory request does not silently leave Multiple mode
+  // with an empty picker.
+  useEffect(() => {
+    if (!client?.client_id) {
+      setInventoryItems([]);
+      setInventoryError("");
+      setInventoryLoading(false);
+      return undefined;
+    }
+
+    let active = true;
+    const requestId = ++inventoryRequestIdRef.current;
+    const pageId = selectedPageId;
+
+    setInventoryLoading(true);
+    setInventoryError("");
+
+    (async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke("eo2mate", {
+          method: "POST",
+          headers: { "x-eo2mate-route": "inventory-admin" },
+          body: {
+            action: "LIST_ITEMS",
+            client_id: client.client_id,
+            status: "ACTIVE",
+            search: "",
+            ...(pageId ? { fb_page_id: pageId } : {}),
+          },
+        });
+
+        if (error) throw error;
+        if (!data?.success) {
+          throw new Error(data?.message || data?.error || "Inventory items could not be loaded.");
+        }
+
+        if (active && requestId === inventoryRequestIdRef.current) {
+          setInventoryItems(Array.isArray(data.items) ? data.items : []);
+        }
+      } catch (error) {
+        if (active && requestId === inventoryRequestIdRef.current) {
+          setInventoryItems([]);
+          setInventoryError(
+            await getEdgeFunctionErrorMessage(error, "Inventory items could not be loaded.")
+          );
+          console.warn("Inventory list unavailable; manual posting remains enabled.", error);
+        }
+      } finally {
+        if (active && requestId === inventoryRequestIdRef.current) {
+          setInventoryLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [client?.client_id, selectedPageId, inventoryReloadKey]);
 
   const selectableEnvironments = useMemo(
     () => normalizeEnvironmentRows(environments),
@@ -1268,40 +1333,6 @@ export default function FacebookPostPage({
       setSubscription(data.subscription || null);
       setEnvironments(environmentRows);
       setPostTypes(postTypeRows);
-
-      try {
-        const {
-          data: inventoryData,
-          error: inventoryError,
-        } =
-          await supabase.functions.invoke(
-            "eo2mate",
-            {
-              method: "POST",
-              headers: { "x-eo2mate-route": "inventory-admin" },
-              body: {
-                action: "LIST_ITEMS",
-                client_id: client.client_id,
-                status: "ACTIVE",
-                search: "",
-              },
-            }
-          );
-
-        if (inventoryError) throw inventoryError;
-
-        setInventoryItems(
-          inventoryData?.success
-            ? inventoryData.items || []
-            : []
-        );
-      } catch (inventoryError) {
-        console.warn(
-          "Inventory list unavailable; manual posting remains enabled.",
-          inventoryError
-        );
-        setInventoryItems([]);
-      }
 
       setPostType((current) => {
         if (
@@ -3616,6 +3647,18 @@ export default function FacebookPostPage({
                       </option>
                     ))}
                   </select>
+                  {inventoryLoading && <small>Loading Master Inventory items…</small>}
+                  {!inventoryLoading && !inventoryError && pageInventoryItems.length === 0 && (
+                    <small>No active inventory items with available stock are assigned to this Page.</small>
+                  )}
+                  {inventoryError && (
+                    <small className="eo2-field-error-text">
+                      {inventoryError}{" "}
+                      <button type="button" className="secondary-button" onClick={() => setInventoryReloadKey((key) => key + 1)} disabled={inventoryLoading}>
+                        Retry
+                      </button>
+                    </small>
+                  )}
                 </label>
               )}
               <label>Item Name *
@@ -3821,6 +3864,18 @@ export default function FacebookPostPage({
                             </option>
                           ))}
                         </select>
+                        {inventoryLoading && <small>Loading Master Inventory items…</small>}
+                        {!inventoryLoading && !inventoryError && pageInventoryItems.length === 0 && (
+                          <small>No active inventory items with available stock are assigned to this Page.</small>
+                        )}
+                        {inventoryError && (
+                          <small className="eo2-field-error-text">
+                            {inventoryError}{" "}
+                            <button type="button" className="secondary-button" onClick={() => setInventoryReloadKey((key) => key + 1)} disabled={inventoryLoading}>
+                              Retry
+                            </button>
+                          </small>
+                        )}
                       </label>
                     )}
                   </div>
