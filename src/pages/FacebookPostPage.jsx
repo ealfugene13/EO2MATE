@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../supabase";
 
-const MAX_IMAGES = 10;
+const MAX_IMAGES = 50;
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+let heicConverterPromise = null;
 
 const DEFAULT_RULES = {
   minBid: "500",
@@ -587,6 +588,52 @@ function canvasToBlob(canvas, type = "image/jpeg", quality = 0.92) {
   });
 }
 
+function isHeicFile(file) {
+  return /\.hei[cf]$/i.test(String(file?.name || "")) ||
+    /^image\/hei[cf](?:-sequence)?$/i.test(String(file?.type || ""));
+}
+
+async function getHeicConverter() {
+  if (typeof window.heic2any === "function") return window.heic2any;
+  if (!heicConverterPromise) {
+    heicConverterPromise = new Promise((resolve, reject) => {
+      const existing = document.querySelector('script[data-eo2mate-heic-converter="true"]');
+      const script = existing || document.createElement("script");
+      const finish = () => {
+        if (typeof window.heic2any === "function") resolve(window.heic2any);
+        else reject(new Error("The HEIC converter did not load."));
+      };
+      script.addEventListener("load", finish, { once: true });
+      script.addEventListener("error", () => {
+        script.remove();
+        reject(new Error("Unable to load the HEIC converter."));
+      }, { once: true });
+      if (!existing) {
+        script.src = "https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js";
+        script.async = true;
+        script.dataset.eo2mateHeicConverter = "true";
+        document.head.appendChild(script);
+      } else if (script.dataset.loaded === "true") {
+        finish();
+      }
+      script.addEventListener("load", () => { script.dataset.loaded = "true"; }, { once: true });
+    }).catch((error) => {
+      heicConverterPromise = null;
+      throw error;
+    });
+  }
+  return heicConverterPromise;
+}
+
+async function convertHeicFileToJpeg(file) {
+  const convert = await getHeicConverter();
+  const converted = await convert({ blob: file, toType: "image/jpeg", quality: 0.92 });
+  const jpegBlob = Array.isArray(converted) ? converted[0] : converted;
+  if (!(jpegBlob instanceof Blob)) throw new Error("HEIC conversion returned no image.");
+  const baseName = String(file.name || "eo2mate-image").replace(/\.[^.]+$/, "");
+  return new File([jpegBlob], `${baseName}.jpg`, { type: "image/jpeg", lastModified: Date.now() });
+}
+
 async function renderPositionedImageForMeta(item) {
   const source = await loadImageForRender(item.file);
   const sourceWidth = source.width || source.naturalWidth;
@@ -638,10 +685,10 @@ async function renderPositionedImageForMeta(item) {
 }
 
 async function appendRenderedPostImages(formData, items) {
-  const renderedFiles = await Promise.all(items.map(renderPositionedImageForMeta));
-  renderedFiles.forEach((file, index) => {
+  for (let index = 0; index < items.length; index++) {
+    const file = await renderPositionedImageForMeta(items[index]);
     formData.append(`image_${index}`, file, file.name);
-  });
+  }
 }
 
 function createItem(file, index) {
@@ -1551,31 +1598,30 @@ export default function FacebookPostPage({
 
       const errors = [];
 
-      const accepted =
-        selected.filter((file) => {
-          if (
-            ![
-              "image/jpeg",
-              "image/png",
-            ].includes(file.type)
-          ) {
-            errors.push(
-              `${file.name}: use JPG or PNG.`
-            );
-            return false;
-          }
+      const accepted = [];
+      for (const file of selected) {
+        const heic = isHeicFile(file);
+        if (
+          !heic && ![
+            "image/jpeg",
+            "image/png",
+          ].includes(file.type)
+        ) {
+          errors.push(`${file.name}: use JPG, PNG, HEIC, or HEIF.`);
+          continue;
+        }
 
-          if (
-            file.size > MAX_IMAGE_BYTES
-          ) {
-            errors.push(
-              `${file.name}: maximum size is 10 MB.`
-            );
-            return false;
-          }
+        if (file.size > MAX_IMAGE_BYTES) {
+          errors.push(`${file.name}: maximum size is 10 MB.`);
+          continue;
+        }
 
-          return true;
-        });
+        try {
+          accepted.push(heic ? await convertHeicFileToJpeg(file) : file);
+        } catch (error) {
+          errors.push(`${file.name}: could not convert HEIC to JPG. ${error?.message || ""}`.trim());
+        }
+      }
 
       if (
         files.length > remaining
@@ -3739,7 +3785,7 @@ export default function FacebookPostPage({
             <h2>3. {postMode === "PREORDER" ? "Pre-Order photos" : postMode === "MINING" ? "Mining photos" : postMode === "REGULAR_SALE" ? "Regular Sale photos" : "Auction photos"}</h2>
 
             <p>
-              Upload up to {MAX_IMAGES} JPG/PNG images.
+              Upload up to {MAX_IMAGES} JPG, PNG, HEIC, or HEIF images. HEIC/HEIF photos are converted to JPG before publishing.
             </p>
           </div>
         </div>
@@ -3748,7 +3794,7 @@ export default function FacebookPostPage({
           key={fileInputKey}
           ref={fileInputRef}
           type="file"
-          accept="image/jpeg,image/png"
+          accept="image/jpeg,image/png,image/heic,image/heif,image/heic-sequence,image/heif-sequence,.heic,.heif"
           multiple
           hidden
           onChange={(e) =>
