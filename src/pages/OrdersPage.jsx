@@ -128,7 +128,7 @@ export default function OrdersPage({ client, detailRequest, page, setErrorMessag
   const [manualPaymentMethod, setManualPaymentMethod] = useState("CASH");
   const [manualPaymentReference, setManualPaymentReference] = useState("");
 
-  const canUseManualActions = ["ADMIN","OWNER","SUPER_ADMIN","STAFF"].includes(String(client?.role || "").toUpperCase());
+  const canUseManualActions = ["ADMIN","CLIENT_ADMIN","OWNER","SUPER_ADMIN","STAFF"].includes(String(client?.role || "").toUpperCase());
 
   async function openManualOrder() {
     setManualNotice(""); setManualRequestId(newRequestId()); setManualOrderOpen(true); setManualItems([{inventory_item_id:"",quantity:"1",unit_price:""}]);

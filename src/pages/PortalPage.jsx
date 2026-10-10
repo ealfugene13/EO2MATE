@@ -31,9 +31,6 @@ import "./AccountSecurityWorkspace.css";
 function PortalPageContent({ page, homePage = "dashboard", backLabel = "Back to dashboard", onBack, children }) {
   const contentRef = useRef(null);
   const [banner, setBanner] = useState(null);
-  const [refreshButton, setRefreshButton] = useState(null);
-  const [refreshDisabled, setRefreshDisabled] = useState(false);
-  const [refreshVersion, setRefreshVersion] = useState(0);
 
   useEffect(() => {
     const root = contentRef.current;
@@ -41,46 +38,25 @@ function PortalPageContent({ page, homePage = "dashboard", backLabel = "Back to 
     const updateBanner = () => {
       if (page === homePage) {
         setBanner(null);
-        setRefreshButton(null);
         return;
       }
       const next = root.querySelector("header.dashboard-header, header.reports-page-hero");
-      const nativeRefresh = root.querySelector(".refresh-icon-button");
-      root.querySelectorAll(".portal-native-refresh-hidden").forEach((button) => {
-        if (button !== nativeRefresh) button.classList.remove("portal-native-refresh-hidden");
-      });
-      nativeRefresh?.classList.add("portal-native-refresh-hidden");
       setBanner((current) => current === next ? current : next);
-      setRefreshButton((current) => current === nativeRefresh ? current : nativeRefresh);
-      setRefreshDisabled(Boolean(nativeRefresh?.disabled));
     };
     updateBanner();
     const observer = new MutationObserver(updateBanner);
-    observer.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ["disabled"] });
-    return () => {
-      observer.disconnect();
-      root.querySelectorAll(".portal-native-refresh-hidden").forEach((button) => button.classList.remove("portal-native-refresh-hidden"));
-    };
+    observer.observe(root, { childList: true, subtree: true });
+    return () => observer.disconnect();
   }, [homePage, page]);
-
-  const refreshPage = () => {
-    if (refreshButton && !refreshButton.disabled) refreshButton.click();
-    else if (!refreshButton) setRefreshVersion((version) => version + 1);
-  };
 
   return (
     <div ref={contentRef} className={`portal-route-content portal-route-page-${page}`}>
-      <div key={refreshVersion} className="portal-route-content-body">{children}</div>
+      {children}
       {banner && page !== homePage && createPortal(
-        <div className="portal-page-banner-actions">
-          <button className="icon-button refresh-icon-button page-banner-refresh-button" type="button" onClick={refreshPage} disabled={refreshDisabled} title={`Refresh ${banner.querySelector("h1")?.textContent?.trim() || "page"}`} aria-label={`Refresh ${banner.querySelector("h1")?.textContent?.trim() || "page"}`}>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v5h-5"/><path d="M4 18v-5h5"/><path d="M6.1 9a7 7 0 0 1 11.3-2.1L20 9"/><path d="M4 15l2.6 2.1A7 7 0 0 0 17.9 15"/></svg>
-          </button>
-          <button className="page-banner-dashboard-link" type="button" onClick={onBack}>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-            <span>{backLabel}</span>
-          </button>
-        </div>,
+        <button className="page-banner-dashboard-link" type="button" onClick={onBack}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          <span>{backLabel}</span>
+        </button>,
         banner,
       )}
     </div>
@@ -1083,12 +1059,12 @@ export default function PortalPage({ session }) {
         )}
 
         {page === "sales" && (
-          <SalesPage client={client} navigationFilter={navigationFilter} />
+          <SalesPage client={client} navigationFilter={navigationFilter} navigatePage={setPage} />
         )}
 
         {(page === "purchases") && <PurchasesPage client={client} />}
 
-        {(page === "order-detail") && <OrdersPage navigationFilter={navigationFilter} client={client} detailRequest={detailRequest} page={page} setErrorMessage={setErrorMessage} setPage={(next) => setPage(next === "orders" ? "sales" : next)} />}
+        {(page === "orders" || page === "order-detail") && <OrdersPage navigationFilter={navigationFilter} client={client} detailRequest={detailRequest} page={page} setErrorMessage={setErrorMessage} setPage={(next) => setPage(next)} />}
 
         {(page === "payments" || page === "payment-detail") && <PaymentsPage navigationFilter={navigationFilter} client={client} detailRequest={detailRequest} page={page} paymentAccountStatus={paymentAccountStatus} setErrorMessage={setErrorMessage} setPage={setPage} />}
 
