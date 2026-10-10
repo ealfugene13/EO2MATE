@@ -131,10 +131,11 @@ export default function AutomationControlPage({ client, page }) {
           method: "POST",
           headers: { "x-eo2mate-route": "automation-admin" },
           body: {
-            action: "SET",
+            action: automationModal.scopeType === "PAGE_PAYMENT" ? "SET_PAGE_PAYMENT_AUTOMATION" : "SET",
             client_id: client.client_id,
-            scope_type: automationModal.scopeType,
-            scope_id: automationModal.scopeId,
+            ...(automationModal.scopeType === "PAGE_PAYMENT"
+              ? { fb_page_id: automationModal.scopeId }
+              : { scope_type: automationModal.scopeType, scope_id: automationModal.scopeId }),
             is_enabled: automationModal.enabled,
             reason: automationReason.trim() || null,
           },
@@ -208,7 +209,9 @@ export default function AutomationControlPage({ client, page }) {
                     <small>
                       {automationModal.enabled
                         ? "Processing can resume immediately, subject to any higher-level suspension."
-                        : "New automated activity will stop at this scope. Existing records are preserved."}
+                        : automationModal.scopeType === "PAGE_PAYMENT"
+                          ? "Payment messages and order/payment Messenger commands will stop for this Page. Sales participation stays enabled. Existing orders and payments are preserved."
+                          : "New automated activity will stop at this scope. Existing records are preserved."}
                     </small>
                   </div>
 
@@ -221,7 +224,9 @@ export default function AutomationControlPage({ client, page }) {
                       placeholder={
                         automationModal.enabled
                           ? "Example: Subscription renewed"
-                          : "Example: Subscription overdue"
+                          : automationModal.scopeType === "PAGE_PAYMENT"
+                            ? "Example: Switching this Page to manual payment"
+                            : "Example: Subscription overdue"
                       }
                     />
                   </label>
@@ -286,7 +291,7 @@ export default function AutomationControlPage({ client, page }) {
               <div className="automation-hierarchy-icon">i</div>
               <div>
                 <strong>Control priority</strong>
-                <span>Client OFF overrides Page ON and Post ON. Page OFF overrides Post ON. A post runs only when all three levels are enabled.</span>
+                <span>Client OFF overrides general Page ON and Post ON. The separate Page payment control pauses payment messages and buyer order/payment commands without pausing sales participation.</span>
               </div>
             </section>
 
@@ -423,6 +428,53 @@ export default function AutomationControlPage({ client, page }) {
                     No connected Facebook Pages found for this client.
                   </div>
                 )}
+              </div>
+            </section>
+
+            <section className="dashboard-panel automation-control-panel">
+              <div className="panel-header">
+                <div>
+                  <h2>Facebook Page payment automation</h2>
+                  <p>Control payment messages, checkout links, and buyer order/payment commands separately for each Page.</p>
+                </div>
+              </div>
+
+              <div className="automation-page-list">
+                {(automationPages || []).map((fbPage) => {
+                  const enabled = fbPage.payment_automation_enabled !== false;
+                  return (
+                    <div className="automation-control-row" key={`payment-${fbPage.fb_page_id}`}>
+                      <div className={`automation-switch-orb ${enabled ? "enabled" : "disabled"}`}><span /></div>
+                      <div className="automation-control-copy">
+                        <strong>{fbPage.page_name || "Facebook Page"}</strong>
+                        <span>{fbPage.fb_page_id}</span>
+                        {!enabled && <small>Automated payment messages and buyer !ORDER / !PAY commands are blocked for this Page.</small>}
+                        {enabled && fbPage.payment_automation_reason && <small>Last change: {fbPage.payment_automation_reason}</small>}
+                      </div>
+                      <StatusBadge status={enabled ? "ACTIVE" : "SUSPENDED"} />
+                      <button
+                        type="button"
+                        className={enabled ? "control-off-button" : "control-on-button"}
+                        disabled={automationControlLoading || !["ADMIN", "OWNER", "SUPER_ADMIN"].includes(String(client?.role || "").toUpperCase())}
+                        title={!["ADMIN", "OWNER", "SUPER_ADMIN"].includes(String(client?.role || "").toUpperCase()) ? "Admin access is required" : `${enabled ? "Disable" : "Enable"} payment automation for this Page`}
+                        onClick={() => requestAutomationChange({
+                          scopeType: "PAGE_PAYMENT",
+                          scopeId: fbPage.fb_page_id,
+                          label: `${fbPage.page_name || fbPage.fb_page_id} payment automation`,
+                          enabled: !enabled,
+                        })}
+                      >
+                        {enabled ? "Turn Off" : "Turn On"}
+                      </button>
+                    </div>
+                  );
+                })}
+                {!automationControlLoading && !(automationPages || []).length && (
+                  <div className="empty-control-state">Connect a Facebook Page to configure its payment automation.</div>
+                )}
+              </div>
+              <div className="automation-permission-note">
+                This setting only pauses payment-related automation for the selected Page. Selling participation remains available; buyer !ORDER and !PAY keywords and payment-related notifications are suppressed while it is off.
               </div>
             </section>
 
