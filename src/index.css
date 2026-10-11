@@ -2852,6 +2852,8 @@ button.post-type-card:hover { transform: translateY(-2px); border-color: #bcdcc3
 .post-caption-editor .template-variable-row span { display:flex; align-items:flex-start; gap:6px; }
 .post-caption-editor .default-message-preview { flex:0 0 auto; max-height:22vh; margin:0 20px 14px; overflow:auto; }
 .post-caption-editor .eo2-modal-actions { position:sticky; bottom:0; z-index:2; flex:0 0 auto; margin-top:auto; padding:12px 20px; }
+.post-caption-editor .eo2-modal-actions button { display:inline-flex; align-items:center; justify-content:center; gap:8px; width:auto; min-height:40px; padding:10px 15px; line-height:1.2; white-space:nowrap; }
+.post-caption-editor .eo2-modal-actions button svg { display:block; flex:0 0 17px; width:17px; height:17px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
 @media(max-height:760px) {
   .post-caption-editor .eo2-modal-header { padding-top:12px; padding-bottom:12px; }
   .post-caption-editor .message-editor-label { padding-top:10px; }
