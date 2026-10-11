@@ -4,6 +4,7 @@ import LoginPage from "./pages/LoginPage";
 import PortalPage from "./pages/PortalPage";
 import MfaGate from "./pages/MfaGate";
 import PasswordResetPage from "./pages/PasswordResetPage";
+import PublicHomePage from "./pages/PublicHomePage";
 
 function LoadingScreen() {
   return (
@@ -21,6 +22,7 @@ export default function App() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -50,7 +52,7 @@ export default function App() {
 
   if (loading) return <LoadingScreen />;
   if (passwordRecovery && session) return <PasswordResetPage onComplete={() => setPasswordRecovery(false)} />;
-  if (!session) return <LoginPage />;
+  if (!session) return showLogin ? <LoginPage onBack={() => setShowLogin(false)} /> : <PublicHomePage onLogin={() => setShowLogin(true)} />;
   return (
     <MfaGate>
       <PortalPage session={session} />
