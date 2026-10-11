@@ -2843,6 +2843,32 @@ button.post-type-card:hover { transform: translateY(-2px); border-color: #bcdcc3
 .message-editor-help { margin:0 22px 18px; padding:11px 12px; border-radius:10px; background:#f4f7fa; color:#6e7b8e; font-size:10px; line-height:1.55; }
 .message-editor-help code { color:#257b3d; font-size:9px; }
 .eo2-modal-actions { display:flex; justify-content:flex-end; gap:9px; padding:16px 22px; border-top:1px solid #edf1f5; background:#fafbfd; }
+.post-caption-editor { display:flex; flex-direction:column; max-height:calc(100vh - 32px); max-height:calc(100dvh - 32px); overflow-y:auto; overscroll-behavior:contain; }
+.post-caption-editor .eo2-modal-header { flex:0 0 auto; padding:16px 20px; }
+.post-caption-editor .message-editor-label { flex:0 0 auto; padding:14px 20px 10px; }
+.post-caption-editor .message-editor-label textarea { min-height:112px; max-height:24vh; resize:vertical; }
+.post-caption-editor .message-editor-help { flex:0 0 auto; max-height:22vh; margin:0 20px 12px; overflow:auto; }
+.post-caption-editor .template-variable-row { margin:7px 0 8px; }
+.post-caption-editor .template-variable-row span { display:flex; align-items:flex-start; gap:6px; }
+.post-caption-editor .default-message-preview { flex:0 0 auto; max-height:22vh; margin:0 20px 14px; overflow:auto; }
+.post-caption-editor .eo2-modal-actions { position:sticky; bottom:0; z-index:2; flex:0 0 auto; margin-top:auto; padding:12px 20px; }
+@media(max-height:760px) {
+  .post-caption-editor .eo2-modal-header { padding-top:12px; padding-bottom:12px; }
+  .post-caption-editor .message-editor-label { padding-top:10px; }
+  .post-caption-editor .message-editor-label textarea { min-height:82px; max-height:18vh; }
+  .post-caption-editor .message-editor-help { max-height:19vh; margin-bottom:9px; }
+  .post-caption-editor .default-message-preview { max-height:18vh; margin-bottom:10px; }
+  .post-caption-editor .eo2-modal-actions { padding-top:10px; padding-bottom:10px; }
+}
+@media(max-width:560px) {
+  .post-caption-editor { width:100%; max-height:calc(100dvh - 20px); }
+  .post-caption-editor .eo2-modal-header { gap:8px; padding-right:14px; padding-left:14px; }
+  .post-caption-editor .message-editor-label { padding-right:14px; padding-left:14px; }
+  .post-caption-editor .message-editor-help { margin-right:14px; margin-left:14px; }
+  .post-caption-editor .default-message-preview { margin-right:14px; margin-left:14px; }
+  .post-caption-editor .eo2-modal-actions { flex-direction:row; padding-right:14px; padding-left:14px; }
+  .post-caption-editor .eo2-modal-actions button { width:auto; }
+}
 @media(max-width:900px){.message-template-grid{grid-template-columns:1fr}.preorder-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.preorder-panel .panel-header{padding:16px;flex-direction:column}.message-template-grid{padding:12px}.message-template-head{flex-direction:column}.preorder-summary-grid{grid-template-columns:1fr}.eo2-modal-backdrop{padding:10px}.eo2-modal-actions{flex-direction:column-reverse}.eo2-modal-actions button{width:100%}}
 
