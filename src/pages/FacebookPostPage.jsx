@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../supabase";
+import { captionTemplateSettingKey, DEFAULT_POST_CAPTION_TEMPLATES, renderPostCaptionTemplate } from "../postCaptionTemplates";
 
 const MAX_IMAGES = 50;
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
@@ -1126,6 +1127,7 @@ export default function FacebookPostPage({
   const [preorderPostTypes, setPreorderPostTypes] = useState([]);
   const [miningPostTypes, setMiningPostTypes] = useState([]);
   const [regularSalePostTypes, setRegularSalePostTypes] = useState([]);
+  const [captionTemplates, setCaptionTemplates] = useState({});
   const [selectedPageId, setSelectedPageId] = useState("");
   const [environment, setEnvironment] = useState("");
   const [postType, setPostType] = useState("");
@@ -1326,6 +1328,19 @@ export default function FacebookPostPage({
       setPostTypes(postTypeRows);
 
       try {
+        const { data: captionRows, error: captionError } = await supabase
+          .from("eo2mate_settings")
+          .select("setting_key,setting_value")
+          .eq("client_id", client.client_id)
+          .like("setting_key", "META_POST_CAPTION_TEMPLATE_%");
+        if (captionError) throw captionError;
+        setCaptionTemplates(Object.fromEntries((captionRows || []).map((row) => [row.setting_key, row.setting_value])));
+      } catch (captionError) {
+        console.warn("Post caption overrides unavailable; EO2MATE defaults remain active.", captionError);
+        setCaptionTemplates({});
+      }
+
+      try {
         const {
           data: inventoryData,
           error: inventoryError,
@@ -1462,68 +1477,56 @@ export default function FacebookPostPage({
   };
 
   const mainCaption = useMemo(() => {
-    const lines = [];
-
-    if (sellerCaption.trim()) {
-      lines.push(sellerCaption.trim(), "");
-    }
-
-    // Auction environment and type are sent as registration metadata so
-    // internal routing labels do not appear in the public Facebook caption.
-    if (postMode !== "AUCTION" && selectedPostType?.caption_marker) {
-      lines.push(
-        selectedPostType.caption_marker
-      );
-    }
+    const details = [];
+    let instructions = "";
+    const cmd = (commands, action, fallback) => commands.find((row) => String(row?.action_code || "").toUpperCase() === action)?.command_text || fallback;
 
     if (postMode === "REGULAR_SALE") {
-      if (!isMultiple && singleItem.trim()) lines.push(`Item: ${singleItem.trim()}`);
+      if (!isMultiple && singleItem.trim()) details.push(`Item: ${singleItem.trim()}`);
       const price = normalizeMoney(regularSalePrice);
-      if (price !== null) lines.push(`Price: ${formatMoneyForCaption(regularSalePrice)}`);
-      if (regularSaleQuantity) lines.push(`Available Qty: ${regularSaleQuantity}`);
-      if (regularSaleMaxPerBuyer) lines.push(`Max Qty / Buyer: ${regularSaleMaxPerBuyer}`);
+      if (price !== null) details.push(`Price: ${formatMoneyForCaption(regularSalePrice)}`);
+      if (regularSaleQuantity) details.push(`Available Qty: ${regularSaleQuantity}`);
+      if (regularSaleMaxPerBuyer) details.push(`Max Qty / Buyer: ${regularSaleMaxPerBuyer}`);
       const command = regularSaleParticipationCommands.find((row) => row?.command_text === "+")?.command_text || "+";
-      lines.push(`To buy, comment ${command}<qty> ${isMultiple ? "on the item photo" : "below"}. Example: ${command}1.`);
+      instructions = `To buy, comment ${command}<qty> ${isMultiple ? "on the item photo" : "below"}. Example: ${command}1.`;
     } else if (postMode === "MINING") {
-      if (!isMultiple && singleItem.trim()) lines.push(`Item: ${singleItem.trim()}`);
-      const cmd = (action, fallback) => miningParticipationCommands.find((row) => String(row?.action_code || "").toUpperCase() === action)?.command_text || fallback;
+      if (!isMultiple && singleItem.trim()) details.push(`Item: ${singleItem.trim()}`);
       const mine = normalizeMoney(miningMinePrice), take = normalizeMoney(miningTakePrice), lock = normalizeMoney(miningLockPrice);
-      if (mine !== null) lines.push(`${cmd("MINE","MINE")}: ${formatMoneyForCaption(miningMinePrice)}`);
-      if (take !== null) lines.push(`${cmd("TAKE","TAKE")}: ${formatMoneyForCaption(miningTakePrice)}`);
-      if (lock !== null) lines.push(`${cmd("LOCK","LOCK")}: ${formatMoneyForCaption(miningLockPrice)}`);
-      if (miningEndDate) lines.push(`Mining Ends: ${formatFacebookAuctionDate(miningEndDate)}`);
-      lines.push(`For this item, comment ${cmd("MINE","MINE")}, ${cmd("TAKE","TAKE")}, or ${cmd("LOCK","LOCK")} ${isMultiple ? "on its photo" : "below"}.`);
+      if (mine !== null) details.push(`${cmd(miningParticipationCommands, "MINE", "MINE")}: ${formatMoneyForCaption(miningMinePrice)}`);
+      if (take !== null) details.push(`${cmd(miningParticipationCommands, "TAKE", "TAKE")}: ${formatMoneyForCaption(miningTakePrice)}`);
+      if (lock !== null) details.push(`${cmd(miningParticipationCommands, "LOCK", "LOCK")}: ${formatMoneyForCaption(miningLockPrice)}`);
+      if (miningEndDate) details.push(`Mining Ends: ${formatFacebookAuctionDate(miningEndDate)}`);
+      instructions = `For this item, comment ${cmd(miningParticipationCommands, "MINE", "MINE")}, ${cmd(miningParticipationCommands, "TAKE", "TAKE")}, or ${cmd(miningParticipationCommands, "LOCK", "LOCK")} ${isMultiple ? "on its photo" : "below"}.`;
     } else if (postMode === "PREORDER") {
-      if (!isMultiple && singleItem.trim()) lines.push(`Item: ${singleItem.trim()}`);
+      if (!isMultiple && singleItem.trim()) details.push(`Item: ${singleItem.trim()}`);
       const price = normalizeMoney(preorderPrice);
-      if (price !== null) lines.push(`Price: ${formatMoneyForCaption(preorderPrice)}`);
+      if (price !== null) details.push(`Price: ${formatMoneyForCaption(preorderPrice)}`);
       const downPayment = normalizeMoney(preorderDownPayment);
-      if (preorderPaymentRequirement === "DOWN_PAYMENT" && downPayment !== null) lines.push(preorderDownPaymentType === "PERCENTAGE" ? `Required Down Payment: ${downPayment}%` : `Required Down Payment: ${formatMoneyForCaption(preorderDownPayment)} per item`);
-      if (preorderQuantity) lines.push(`Available Qty: ${preorderQuantity}`);
-      if (preorderMaxPerBuyer) lines.push(`Max Qty / Buyer: ${preorderMaxPerBuyer}`);
-      if (preorderDeadline) lines.push(`Pre-Order Until: ${formatFacebookAuctionDate(preorderDeadline)}`);
-      if (preorderPaymentDeadline) lines.push(`Payment Deadline: ${formatFacebookAuctionDate(preorderPaymentDeadline)}`);
-      const configuredCommand = preorderParticipationCommands.find((row) => row?.command_text === "+")?.command_text || preorderParticipationCommands[0]?.command_text || "+";
-      lines.push(`To order, comment ${configuredCommand}<qty> ${isMultiple ? "on the item photo" : "below"}. Example: ${configuredCommand}1.`);
-    } else if (!isMultiple) {
-      lines.push(
-        ...buildRuleLines(sharedRules, {
-          includeItem: true,
-          item: singleItem,
-        })
-      );
-      lines.push("To bid, comment your bid amount below.");
+      if (preorderPaymentRequirement === "DOWN_PAYMENT" && downPayment !== null) details.push(preorderDownPaymentType === "PERCENTAGE" ? `Required Down Payment: ${downPayment}%` : `Required Down Payment: ${formatMoneyForCaption(preorderDownPayment)} per item`);
+      if (preorderQuantity) details.push(`Available Qty: ${preorderQuantity}`);
+      if (preorderMaxPerBuyer) details.push(`Max Qty / Buyer: ${preorderMaxPerBuyer}`);
+      if (preorderDeadline) details.push(`Pre-Order Until: ${formatFacebookAuctionDate(preorderDeadline)}`);
+      if (preorderPaymentDeadline) details.push(`Payment Deadline: ${formatFacebookAuctionDate(preorderPaymentDeadline)}`);
+      const command = preorderParticipationCommands.find((row) => row?.command_text === "+")?.command_text || preorderParticipationCommands[0]?.command_text || "+";
+      instructions = `To order, comment ${command}<qty> ${isMultiple ? "on the item photo" : "below"}. Example: ${command}1.`;
     } else {
-      lines.push(
-        ...buildRuleLines(sharedRules)
-      );
-      lines.push("To bid, comment your amount on the photo of the item.");
+      details.push(...buildRuleLines(sharedRules, isMultiple ? {} : { includeItem: true, item: singleItem }));
+      instructions = isMultiple ? "To bid, comment your amount on the photo of the item." : "To bid, comment your bid amount below.";
     }
 
-    lines.push("", "Follow this page for more great finds and new arrivals!");
-    return lines.join("\n").trim();
+    const context = isMultiple ? "MAIN_MULTIPLE" : "MAIN_SINGLE";
+    const template = captionTemplates[captionTemplateSettingKey(postMode, context)] ?? DEFAULT_POST_CAPTION_TEMPLATES[postMode]?.[context];
+    return renderPostCaptionTemplate(template, {
+      seller_caption: sellerCaption.trim(),
+      // Auction labels are internal registration metadata, never public caption text.
+      caption_marker: postMode !== "AUCTION" ? selectedPostType?.caption_marker || "" : "",
+      details: details.join("\n"),
+      instructions,
+      follow_text: "Follow this page for more great finds and new arrivals!",
+    });
   }, [
     sellerCaption,
+    captionTemplates,
     environment,
     postMode,
     selectedPostType,
@@ -1545,13 +1548,17 @@ export default function FacebookPostPage({
 
   const photoCaptions = useMemo(() => {
     if (!isMultiple) return [];
+    const formatPhoto = (details, instructions) => {
+      const template = captionTemplates[captionTemplateSettingKey(postMode, "PHOTO_MULTIPLE")] ?? DEFAULT_POST_CAPTION_TEMPLATES[postMode]?.PHOTO_MULTIPLE;
+      return renderPostCaptionTemplate(template, { details, instructions });
+    };
     if (postMode === "REGULAR_SALE") {
       const command = regularSaleParticipationCommands.find((row) => row?.command_text === "+")?.command_text || "+";
       return items.map((item) => {
         const price = item.regularSalePrice !== "" ? item.regularSalePrice : regularSalePrice;
         const qty = item.regularSaleQuantity !== "" ? item.regularSaleQuantity : regularSaleQuantity;
         const max = item.regularSaleMaxPerBuyer !== "" ? item.regularSaleMaxPerBuyer : regularSaleMaxPerBuyer;
-        return [`Item: ${item.item.trim()}`, `Price: ${formatMoneyForCaption(price)}`, `Available Qty: ${qty}`, ...(max ? [`Max Qty / Buyer: ${max}`] : []), `To buy, comment ${command}<qty> on this photo. Example: ${command}1.`].join("\n");
+        return formatPhoto([`Item: ${item.item.trim()}`, `Price: ${formatMoneyForCaption(price)}`, `Available Qty: ${qty}`, ...(max ? [`Max Qty / Buyer: ${max}`] : [])].join("\n"), `To buy, comment ${command}<qty> on this photo. Example: ${command}1.`);
       });
     }
     if (postMode === "MINING") {
@@ -1561,7 +1568,7 @@ export default function FacebookPostPage({
         const take = item.miningTakePrice !== "" ? item.miningTakePrice : miningTakePrice;
         const lock = item.miningLockPrice !== "" ? item.miningLockPrice : miningLockPrice;
         const endDate = item.miningEndDate || miningEndDate;
-        return [`Item: ${item.item.trim()}`, `${cmd("MINE","MINE")}: ${formatMoneyForCaption(mine)}`, `${cmd("TAKE","TAKE")}: ${formatMoneyForCaption(take)}`, `${cmd("LOCK","LOCK")}: ${formatMoneyForCaption(lock)}`, `Mining Ends: ${formatFacebookAuctionDate(endDate)}`, `For this item, comment ${cmd("MINE","MINE")}, ${cmd("TAKE","TAKE")}, or ${cmd("LOCK","LOCK")} on this photo.`].join("\n");
+        return formatPhoto([`Item: ${item.item.trim()}`, `${cmd("MINE","MINE")}: ${formatMoneyForCaption(mine)}`, `${cmd("TAKE","TAKE")}: ${formatMoneyForCaption(take)}`, `${cmd("LOCK","LOCK")}: ${formatMoneyForCaption(lock)}`, `Mining Ends: ${formatFacebookAuctionDate(endDate)}`].join("\n"), `For this item, comment ${cmd("MINE","MINE")}, ${cmd("TAKE","TAKE")}, or ${cmd("LOCK","LOCK")} on this photo.`);
       });
     }
     if (postMode === "PREORDER") {
@@ -1589,15 +1596,11 @@ export default function FacebookPostPage({
         if (preorderPaymentRequirement === "DOWN_PAYMENT" && dp !== null) lines.push(preorderDownPaymentType === "PERCENTAGE" ? `Required Down Payment: ${dp}%` : `Required Down Payment: ${formatMoneyForCaption(preorderDownPayment)} per item`);
         if (preorderDeadline) lines.push(`Pre-Order Until: ${formatFacebookAuctionDate(preorderDeadline)}`);
         if (preorderPaymentDeadline) lines.push(`Payment Deadline: ${formatFacebookAuctionDate(preorderPaymentDeadline)}`);
-        lines.push(`To order, comment ${command}<qty> on this photo. Example: ${command}1.`);
-        return lines.join("\n");
+        return formatPhoto(lines.join("\n"), `To order, comment ${command}<qty> on this photo. Example: ${command}1.`);
       });
     }
-    return items.map((item) => [
-      ...buildRuleLines(mergeRules(sharedRules, item), {includeItem:true,item:item.item}),
-      "To bid, comment your amount on this photo.",
-    ].join("\n"));
-  }, [isMultiple, postMode, items, sharedRules, preorderPrice, preorderQuantity, preorderMaxPerBuyer, preorderDownPayment, preorderDownPaymentType, preorderDeadline, preorderPaymentDeadline, preorderParticipationCommands, miningParticipationCommands, miningMinePrice, miningTakePrice, miningLockPrice, miningEndDate, regularSaleParticipationCommands, regularSalePrice, regularSaleQuantity, regularSaleMaxPerBuyer]);
+    return items.map((item) => formatPhoto(buildRuleLines(mergeRules(sharedRules, item), {includeItem:true,item:item.item}).join("\n"), "To bid, comment your amount on this photo."));
+  }, [isMultiple, postMode, items, captionTemplates, sharedRules, preorderPrice, preorderQuantity, preorderMaxPerBuyer, preorderDownPayment, preorderDownPaymentType, preorderDeadline, preorderPaymentDeadline, preorderParticipationCommands, miningParticipationCommands, miningMinePrice, miningTakePrice, miningLockPrice, miningEndDate, regularSaleParticipationCommands, regularSalePrice, regularSaleQuantity, regularSaleMaxPerBuyer]);
 
   function changePostType(nextType) {
     setPostType(nextType);

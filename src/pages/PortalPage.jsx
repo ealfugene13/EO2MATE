@@ -23,6 +23,7 @@ import AdminClientsPage from "./AdminClientsPage";
 import FacebookPostPage from "./FacebookPostPage";
 import PreorderPage from "./PreorderPage";
 import AutomatedMessagesPage from "./AutomatedMessagesPage";
+import PostCaptionTemplatePage from "./PostCaptionTemplatePage";
 import AccountSecurityPage from "./AccountSecurityPage";
 import PaymentMethodsSettings from "../components/PaymentMethodsSettings";
 import "./SetupWorkspace.css";
@@ -1101,11 +1102,15 @@ export default function PortalPage({ session }) {
               <button type="button" role="tab" aria-selected={setupSection === "messages"} className={setupSection === "messages" ? "active" : ""} onClick={() => setSetupSection("messages")}>
                 <span className="setup-tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H8l-4 4V5Z"/><path d="M8 9h8M8 12h6"/></svg></span><span>Automated Messages</span>
               </button>
+              <button type="button" role="tab" aria-selected={setupSection === "caption-templates"} className={setupSection === "caption-templates" ? "active" : ""} onClick={() => setSetupSection("caption-templates")}>
+                <span className="setup-tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M8 9h8M8 12h8M8 15h5"/><path d="m16 15 2 2 3-4"/></svg></span><span>Post Caption Template</span>
+              </button>
             </nav>
             <div className="setup-workspace-content" role="tabpanel">
               {setupSection === "configuration" && <SetupPage client={client} />}
               {setupSection === "automation" && <AutomationControlPage client={client} page="automation-control" />}
               {setupSection === "messages" && <AutomatedMessagesPage client={client} />}
+              {setupSection === "caption-templates" && <PostCaptionTemplatePage client={client} />}
             </div>
           </div>
         )}
