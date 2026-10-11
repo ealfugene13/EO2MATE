@@ -1,43 +1,82 @@
-const modules = [
-  { icon: "◎", title: "Live Selling", text: "Run real-time selling sessions with staff-assisted order capture." },
-  { icon: "⚒", title: "Mining", text: "Manage Mine, Take and Lock claims for single or multiple items." },
-  { icon: "↗", title: "Auctions", text: "Publish auction posts, track bids and manage winners." },
-  { icon: "＋", title: "Pre-Order & Regular Sale", text: "Accept quantity-based reservations and standard sale claims." },
-  { icon: "▦", title: "Inventory", text: "Keep products, stock levels and sales activity organized." },
-  { icon: "▤", title: "Orders & Delivery", text: "Follow orders from checkout through fulfillment." },
+import { useEffect, useState } from "react";
+
+const postModes = [
+  {
+    id: "auction", icon: "↗", title: "Auction", text: "Collect bids on one item or across multiple item photos.",
+    variants: [
+      { name: "Single", summary: "One auction item is described in the main post. Buyers comment their bids below it.", post: "Vintage collectible · Starting bid ₱100 · Increment ₱10", comment: "Buyer: ₱120", reply: "Bid recorded. Current bid: ₱120.", steps: ["Set the starting bid, bid increment and end time.", "Buyers comment a bid amount on the post.", "EO2MATE checks the bid and updates the current leader.", "At closing, review the winner and continue to checkout."], tag: "One item · Main post" },
+      { name: "Multiple", summary: "Each item has its own photo and auction details. Buyers comment on the photo of the item they want.", post: "Item A · Start ₱100 · Item B · Start ₱200", comment: "On Item A photo: ₱120", reply: "Bid recorded for Item A. Current bid: ₱120.", steps: ["Add several auction items and their photos.", "Set a starting bid and rules for each item.", "Bids are matched to the item photo they reference.", "Review each item's bidders and winner after closing."], tag: "Several items · Item photo comments" },
+    ],
+  },
+  {
+    id: "mining", icon: "⚒", title: "Mining", text: "Offer Mine, Take and Lock prices for single or multiple items.",
+    variants: [
+      { name: "Single", summary: "One item is offered with Mine, Take and Lock price levels in the main post.", post: "Collectible figure · MINE ₱100 · TAKE ₱120 · LOCK ₱150", comment: "Buyer: MINE", reply: "MINE claim received. Your claim is being recorded.", steps: ["Set the MINE, TAKE and LOCK prices.", "Buyers comment the action they choose below the post.", "EO2MATE records the claim and applies the configured price.", "A valid LOCK claim closes that item immediately."], tag: "One item · Main post" },
+      { name: "Multiple", summary: "Each photo represents a separate item. Buyers comment MINE, TAKE or LOCK on that item's photo.", post: "Item A · M/T/L prices · Item B · M/T/L prices", comment: "On Item B photo: LOCK", reply: "LOCK claim received for Item B.", steps: ["Add multiple items and set per-item price overrides where needed.", "Buyers choose MINE, TAKE or LOCK on the matching photo.", "Claims and availability are tracked independently per item.", "A LOCK claim closes its item while other items remain available."], tag: "Several items · Item photo comments" },
+    ],
+  },
+  {
+    id: "preorder", icon: "＋", title: "Pre-Order", text: "Accept quantity-based reservations with ordering and payment deadlines.",
+    variants: [
+      { name: "Single", summary: "Reserve quantities of one item from the main post.", post: "Pre-order · ₱500 each · Available 20 · Order by Friday", comment: "Buyer: +2", reply: "Pre-order request received: 2 units.", steps: ["Set the item price, available quantity and ordering deadline.", "Set a down payment and payment deadline if required.", "Buyers comment +quantity below the post.", "EO2MATE validates the quantity and records the reservation."], tag: "One item · Main post" },
+      { name: "Multiple", summary: "Offer several items, each with its own photo, quantity and optional price overrides.", post: "Item A · ₱500 · Item B · ₱750 · Order by Friday", comment: "On Item B photo: +2", reply: "Pre-order request received for Item B: 2 units.", steps: ["Add multiple items and configure each item's quantity and price.", "Set ordering and payment deadlines.", "Buyers comment +quantity on the item photo.", "Reservations and remaining quantities are tracked per item."], tag: "Several items · Item photo comments" },
+    ],
+  },
+  {
+    id: "regular", icon: "▣", title: "Regular Sale", text: "Sell available stock at a fixed price until it sells out.",
+    variants: [
+      { name: "Single", summary: "Offer one fixed-price item in the main post; buyers claim a quantity.", post: "Collectible card · ₱250 each · Available 10", comment: "Buyer: +2", reply: "Sale request received: 2 units.", steps: ["Set the unit price, available quantity and optional buyer limit.", "Publish the post with the +quantity instruction.", "Buyers comment +quantity below the post.", "EO2MATE accepts eligible requests and closes the item when sold out."], tag: "One item · Main post" },
+      { name: "Multiple", summary: "Sell several fixed-price items, with buyers claiming from each item's photo.", post: "Item A · ₱250 · Item B · ₱400 · Quantities shown", comment: "On Item B photo: +1", reply: "Sale request received for Item B: 1 unit.", steps: ["Add item photos, prices and quantities.", "Buyers comment +quantity on the photo of the item.", "EO2MATE tracks accepted quantities and stock per item.", "Each item closes when sold out; the parent post closes when all items are sold out."], tag: "Several items · Item photo comments" },
+    ],
+  },
 ];
 
+const functions = [
+  { id: "live", icon: "◉", title: "Live Selling", text: "Review live-selling sessions and sales activity.", detail: "The Live Selling workspace brings session posts, summary and sales activity together. Availability of transaction processing depends on the enabled module and backend connection.", steps: ["Open the Live Selling workspace.", "Review session posts and status.", "Use the configured live workflow for staff-assisted selling.", "Follow captured activity in the session summary."], tag: "Session overview" },
+  { id: "inventory", icon: "▦", title: "Inventory", text: "Manage products, SKUs, stock and item details.", detail: "Inventory is the product and stock workspace. Products can be organized by category, SKU and item attributes, then selected when creating supported posts.", steps: ["Add or import products and variants.", "Review SKU, price and available quantity.", "Assign product images in the inventory workspace.", "Use eligible inventory items in a selling post."], tag: "Products · Stock · SKUs" },
+  { id: "orders", icon: "▤", title: "Orders & Checkout", text: "Follow buyer requests through order review and checkout.", detail: "Accepted claims feed into EO2MATE order management. Buyers can use the available checkout flow to review their order and provide requested details.", steps: ["A valid claim is recorded against its post and item.", "Review the resulting order and order group.", "Send or open the buyer checkout link when available.", "Track shipping details and order status."], tag: "Claims to order" },
+  { id: "payments", icon: "₱", title: "Payments", text: "Configure supported payment handling and review payment status.", detail: "Payment behavior follows the client's payment and automation settings. Manual payment operation can be used when automated payment mode is off.", steps: ["Choose the configured payment mode.", "For automated payments, use an enabled provider and checkout flow.", "For manual payments, record and review payment according to the workflow.", "Confirm the order status reflects the payment result."], tag: "Manual or automated" },
+  { id: "delivery", icon: "⌁", title: "Delivery", text: "Track fulfillment details, courier references and delivery status.", detail: "The delivery workspace keeps order fulfillment details together, including courier information and waybill or delivery reference values entered for the order.", steps: ["Open the order ready for fulfillment.", "Record the courier and waybill/reference number.", "Update the delivery status as the parcel moves.", "Review delivery completion on the order."], tag: "Fulfillment tracking" },
+  { id: "reports", icon: "▥", title: "Reports", text: "Review sales, auction, order and delivery activity.", detail: "Reports provide filtered operational views based on available EO2MATE records, with printable report output for supported reports.", steps: ["Choose a report and date range.", "Filter by Page, channel or status where available.", "Review the matching summary and records.", "Print or save a PDF from the report view."], tag: "Filters · Summaries · Print" },
+  { id: "setup", icon: "⚙", title: "Setup & Automation", text: "Manage client settings, templates and automation controls.", detail: "Setup contains client-level controls such as payment automation and configurable message or caption templates. Protected changes require the configured account verification flow.", steps: ["Open Setup and select the relevant setting.", "Review the current value and its effect.", "Verify your account when prompted.", "Save and confirm the updated setting."], tag: "Settings · Templates · Controls" },
+];
+
+function DemoDialog({ demo, onClose }) {
+  const [variantIndex, setVariantIndex] = useState(0);
+  const hasVariants = Boolean(demo.variants);
+  const sample = hasVariants ? demo.variants[variantIndex] : demo;
+  useEffect(() => {
+    function onKeyDown(event) { if (event.key === "Escape") onClose(); }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  return <div className="public-demo-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <section className="public-demo-dialog" role="dialog" aria-modal="true" aria-labelledby="public-demo-title">
+      <header className="public-demo-header"><div><span className="public-kicker">PUBLIC PRODUCT OVERVIEW · SAMPLE ONLY</span><h2 id="public-demo-title">{demo.title} demo</h2></div><button className="public-demo-close" type="button" onClick={onClose} aria-label="Close demo">×</button></header>
+      {hasVariants && <div className="public-demo-tabs" role="tablist" aria-label={`${demo.title} post mode`}>{demo.variants.map((variant, index) => <button type="button" role="tab" aria-selected={variantIndex === index} className={variantIndex === index ? "active" : ""} onClick={() => setVariantIndex(index)} key={variant.name}>{variant.name} Post</button>)}</div>}
+      <div className="public-demo-content">
+        <div className="public-demo-explainer"><span className="demo-tag">{sample.tag}</span><p>{sample.summary || sample.detail}</p><h3>How it works</h3><ol>{sample.steps.map((step, index) => <li key={step}><span>{index + 1}</span>{step}</li>)}</ol></div>
+        <div className="public-demo-preview"><div className="demo-preview-label"><span>SIMULATED FACEBOOK EXAMPLE</span><span>Not a live post</span></div><div className="demo-post-card"><div className="demo-page-avatar">E</div><div className="demo-page-name">Euan Collectibles <small>· Sample</small></div><div className="demo-post-text">{sample.post || sample.detail}</div><div className="demo-interaction"><span className="demo-person">Buyer</span><div className="demo-comment">{sample.comment || "Sample activity"}</div></div><div className="demo-interaction demo-interaction-reply"><span className="demo-person">EO2MATE</span><div className="demo-comment">{sample.reply || "Sample status update"}</div></div></div><div className="demo-flow-note"><span>✓</span> {sample.tag}</div></div>
+      </div>
+      <footer className="public-demo-footer"><span>All names, comments and values shown are illustrative sample content.</span><button className="public-demo-login" type="button" onClick={onClose}>Close overview <span aria-hidden="true">✓</span></button></footer>
+    </section>
+  </div>;
+}
+
 export default function PublicHomePage({ onLogin }) {
+  const [activeDemo, setActiveDemo] = useState(null);
   return (
     <main className="public-home">
-      <nav className="public-nav">
-        <a className="public-brand" href="#top" aria-label="EO2MATE home"><span className="public-brand-mark">E</span><span>EO2MATE</span></a>
-        <div className="public-nav-actions"><a href="#functions">Functions</a><button className="public-login-button" onClick={onLogin}>Sign in</button></div>
-      </nav>
-      <section className="public-hero" id="top">
-        <div className="public-hero-copy">
-          <span className="public-kicker"><i /> SOCIAL COMMERCE OPERATIONS</span>
-          <h1>Run your selling<br/><em>from one place.</em></h1>
-          <p>EO2MATE helps Facebook sellers manage posts, claims, inventory, orders and delivery in a connected workspace.</p>
-          <div className="public-hero-actions"><button className="public-primary-button" onClick={onLogin}>Sign in to your workspace <span aria-hidden="true">→</span></button><a href="#functions">Explore functions</a></div>
-          <div className="public-trust-line"><span className="public-check">✓</span> Secure account access <span className="public-dot">·</span> Facebook Page automation <span className="public-dot">·</span> Order management</div>
-        </div>
-        <div className="public-dashboard-preview" aria-label="Illustration of EO2MATE workspace">
-          <div className="preview-top"><span className="preview-logo">E</span><div><b>Workspace overview</b><small>Sales operations at a glance</small></div><span className="preview-live"><i/> LIVE</span></div>
-          <div className="preview-metrics"><div><small>Active posts</small><strong>12</strong><span>Across selling modes</span></div><div><small>Open orders</small><strong>28</strong><span>Ready for follow-up</span></div></div>
-          <div className="preview-activity-title">RECENT ACTIVITY <span>View workspace →</span></div>
-          <div className="preview-activity"><span className="activity-icon purple">↗</span><div><b>Auction activity</b><small>New bid received</small></div><time>Just now</time></div>
-          <div className="preview-activity"><span className="activity-icon green">＋</span><div><b>Sale claim</b><small>Order added to queue</small></div><time>2 min ago</time></div>
-          <div className="preview-activity"><span className="activity-icon amber">▦</span><div><b>Inventory update</b><small>Stock level refreshed</small></div><time>5 min ago</time></div>
-          <div className="preview-lock-note"><span>⌑</span> Workspace data is available after sign in</div>
-        </div>
-        <div className="public-orb public-orb-one"/><div className="public-orb public-orb-two"/>
-      </section>
-      <section className="public-modules" id="functions">
-        <div className="public-section-heading"><div><span className="public-kicker">THE EO2MATE WORKSPACE</span><h2>Tools for every step of a sale</h2></div><p>Explore the platform functions. Sign in is required to access business data and operate each tool.</p></div>
-        <div className="public-module-grid">{modules.map((item) => <button className="public-module-card" key={item.title} onClick={onLogin}><span className="module-icon">{item.icon}</span><span className="module-lock" aria-label="Sign in required">↗</span><strong>{item.title}</strong><span>{item.text}</span><small>Sign in to access <b>→</b></small></button>)}</div>
+      <nav className="public-nav"><a className="public-brand" href="#top" aria-label="EO2MATE home"><span className="public-brand-mark">E</span><span>EO2MATE</span></a><div className="public-nav-actions"><a href="#functions">Functions</a><button className="public-login-button" onClick={onLogin}>Sign in</button></div></nav>
+      <section className="public-hero" id="top"><div className="public-hero-copy"><span className="public-kicker"><i /> SOCIAL COMMERCE OPERATIONS</span><h1>Run your selling<br/><em>from one place.</em></h1><p>EO2MATE helps Facebook sellers manage posts, claims, inventory, orders and delivery in a connected workspace.</p><div className="public-hero-actions"><button className="public-primary-button" onClick={onLogin}>Sign in to your workspace <span aria-hidden="true">→</span></button><a href="#functions">Explore functions</a></div><div className="public-trust-line"><span className="public-check">✓</span> Secure account access <span className="public-dot">·</span> Facebook Page automation <span className="public-dot">·</span> Order management</div></div>
+        <div className="public-dashboard-preview" aria-label="Illustrative EO2MATE workspace preview"><div className="preview-top"><span className="preview-logo">E</span><div><b>Workspace preview</b><small>Illustrative sample activity</small></div><span className="preview-live"><i/> DEMO</span></div><div className="preview-metrics"><div><small>Post modes</small><strong>04</strong><span>Auction · Mining · Pre-Order · Sale</span></div><div><small>Order flow</small><strong>→</strong><span>Claim · Checkout · Fulfillment</span></div></div><div className="preview-activity-title">SAMPLE WORKFLOW <span>Overview only</span></div><div className="preview-activity"><span className="activity-icon purple">↗</span><div><b>Auction bid</b><small>Example bid recorded</small></div><time>Sample</time></div><div className="preview-activity"><span className="activity-icon green">＋</span><div><b>Sale claim</b><small>Example quantity request</small></div><time>Sample</time></div><div className="preview-activity"><span className="activity-icon amber">▦</span><div><b>Stock & delivery</b><small>Example order workflow</small></div><time>Sample</time></div><div className="preview-lock-note"><span>⌑</span> Live workspace data requires sign in</div></div><div className="public-orb public-orb-one"/><div className="public-orb public-orb-two"/></section>
+      <section className="public-modules" id="functions"><div className="public-section-heading"><div><span className="public-kicker">THE EO2MATE WORKSPACE</span><h2>Explore post modes and tools</h2></div><p>Open a sample demo to see the flow. Sign in is required to access business data and operate functions.</p></div>
+        <div className="public-subheading"><span>POST MODES</span><p>Single and Multiple post examples</p></div><div className="public-module-grid">{postModes.map((item) => <article className="public-module-card" key={item.id}><span className="module-icon">{item.icon}</span><strong>{item.title}</strong><span>{item.text}</span><button type="button" className="public-card-demo" onClick={() => setActiveDemo(item)}>View Single / Multiple demo <b>→</b></button><button type="button" className="public-card-signin" onClick={onLogin}>Sign in to use</button></article>)}</div>
+        <div className="public-subheading public-subheading-functions"><span>OTHER FUNCTIONS</span><p>Supporting the selling and fulfillment workflow</p></div><div className="public-module-grid">{functions.map((item) => <article className="public-module-card" key={item.id}><span className="module-icon">{item.icon}</span><strong>{item.title}</strong><span>{item.text}</span><button type="button" className="public-card-demo" onClick={() => setActiveDemo(item)}>View function demo <b>→</b></button><button type="button" className="public-card-signin" onClick={onLogin}>Sign in to use</button></article>)}</div>
       </section>
       <footer className="public-footer"><a className="public-brand" href="#top"><span className="public-brand-mark">E</span><span>EO2MATE</span></a><span>© {new Date().getFullYear()} EO2MATE · Social selling operations</span><div><a href="/privacy/">Privacy</a><a href="/terms/">Terms</a><a href="/data-deletion/">Data deletion</a></div></footer>
+      {activeDemo && <DemoDialog demo={activeDemo} onClose={() => setActiveDemo(null)}/>}
     </main>
   );
 }
