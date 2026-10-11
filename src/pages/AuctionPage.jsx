@@ -361,7 +361,7 @@ export default function AuctionPage({ auctionWorkspaceTab, client, detailRequest
               </button>
             </header>
 
-            <section className="selling-workspace-tabs">
+            <section className="selling-workspace-tabs selling-workspace-tabs-with-action">
               <div className="selling-workspace-tablist selling-workspace-nav" role="tablist" aria-label="Auction sections">
                 {[
                   { key: "SUMMARY", label: "Summary", icon: "dashboard" },

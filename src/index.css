@@ -3697,3 +3697,41 @@ button.post-type-card:hover { transform: translateY(-2px); border-color: #bcdcc3
     transition: none !important;
   }
 }
+
+
+/* Keep the Create Post action on the same row as the primary selling tabs. */
+.selling-workspace-tabs-with-action {
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 12px !important;
+}
+
+.selling-workspace-tabs-with-action .selling-workspace-tablist {
+  flex: 1 1 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+}
+
+.selling-workspace-tabs-with-action .selling-workspace-tab-action {
+  align-self: center !important;
+  flex: 0 0 auto !important;
+  min-height: 46px !important;
+  margin: 0 !important;
+  white-space: nowrap !important;
+}
+
+@media (max-width: 760px) {
+  .selling-workspace-tabs-with-action {
+    flex-wrap: wrap !important;
+  }
+
+  .selling-workspace-tabs-with-action .selling-workspace-tablist {
+    flex: 1 1 100% !important;
+    width: 100% !important;
+  }
+
+  .selling-workspace-tabs-with-action .selling-workspace-tab-action {
+    align-self: flex-end !important;
+    margin-left: auto !important;
+  }
+}

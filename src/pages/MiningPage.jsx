@@ -497,7 +497,7 @@ export default function MiningPage({ client, metaConnected, miningWorkspaceTab, 
               </div>
             </header>
 
-            <section className="selling-workspace-tabs">
+            <section className="selling-workspace-tabs selling-workspace-tabs-with-action">
               <div className="selling-workspace-tablist selling-workspace-nav" role="tablist" aria-label="Mining sections">
                 {[
                   { key: "SUMMARY", label: "Summary", icon: "dashboard" },
