@@ -3,6 +3,13 @@ import { supabase } from "../supabase";
 
 const MAX_IMAGES = 50;
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const CAPTION_EMOJIS = ["✨", "🔥", "🎉", "🛍️", "📣", "💖", "✅", "📦", "🏷️", "👇", "🛒", "😊", "🙏", "⭐", "💬", "📍"];
+const CAPTION_SYMBOLS = ["•", "✓", "→", "➜", "★", "♡", "♥", "|", "━", "—", "₱", "📌"];
+const CAPTION_QUICK_TEXT = [
+  "Follow our page for more updates!",
+  "Message us for inquiries.",
+  "Thank you for supporting our shop!",
+];
 let heicConverterPromise = null;
 
 const DEFAULT_RULES = {
@@ -1105,6 +1112,7 @@ export default function FacebookPostPage({
 }) {
   const fileInputRef = useRef(null);
   const uploadButtonRef = useRef(null);
+  const sellerCaptionRef = useRef(null);
   const fieldRefs = useRef({});
   const itemsRef = useRef([]);
 
@@ -1122,6 +1130,7 @@ export default function FacebookPostPage({
   const [environment, setEnvironment] = useState("");
   const [postType, setPostType] = useState("");
   const [sellerCaption, setSellerCaption] = useState("");
+  const [captionHelperTab, setCaptionHelperTab] = useState("emoji");
   const [singleItem, setSingleItem] = useState("");
   const [singleItemSource, setSingleItemSource] = useState("MANUAL");
   const [singleInventoryItemId, setSingleInventoryItemId] = useState("");
@@ -1430,6 +1439,27 @@ export default function FacebookPostPage({
     }),
     [inventoryItems, selectedPageId]
   );
+
+  const insertCaptionText = (text, asNewLine = false) => {
+    const textarea = sellerCaptionRef.current;
+    const current = sellerCaption || "";
+    const start = textarea?.selectionStart ?? current.length;
+    const end = textarea?.selectionEnd ?? start;
+    const before = current.slice(0, start);
+    const after = current.slice(end);
+    const prefix = asNewLine && before && !before.endsWith("\n") ? "\n" : "";
+    const suffix = asNewLine && after && !after.startsWith("\n") ? "\n" : "";
+    const inserted = `${prefix}${text}${suffix}`;
+    const nextCaption = `${before}${inserted}${after}`;
+
+    setSellerCaption(nextCaption);
+    requestAnimationFrame(() => {
+      if (!textarea) return;
+      const cursor = before.length + inserted.length - suffix.length;
+      textarea.focus();
+      textarea.setSelectionRange(cursor, cursor);
+    });
+  };
 
   const mainCaption = useMemo(() => {
     const lines = [];
@@ -3633,18 +3663,99 @@ export default function FacebookPostPage({
           </div>
         </div>
 
-        <label>
-          Seller Caption
+        <div className="fb-caption-tools-layout">
+          <label className="fb-seller-caption-field">
+            Seller Caption
 
-          <textarea
-            rows="5"
-            value={sellerCaption}
-            onChange={(e) =>
-              setSellerCaption(e.target.value)
-            }
-            disabled={publishing}
-          />
-        </label>
+            <textarea
+              ref={sellerCaptionRef}
+              rows="5"
+              value={sellerCaption}
+              onChange={(e) =>
+                setSellerCaption(e.target.value)
+              }
+              disabled={publishing}
+              placeholder="Write an optional introduction for your post. Use the helpers to insert emojis, symbols, or quick text."
+            />
+          </label>
+
+          <aside className="fb-caption-helpers" aria-label="Caption helpers">
+            <div className="fb-caption-helpers-heading">
+              <strong>Caption helpers</strong>
+              <span>Insert at cursor</span>
+            </div>
+            <div className="fb-caption-helper-tabs" role="tablist" aria-label="Caption helper type">
+              {[
+                ["emoji", "Emojis"],
+                ["symbols", "Symbols"],
+                ["quick", "Quick text"],
+              ].map(([tab, label]) => (
+                <button
+                  key={tab}
+                  type="button"
+                  role="tab"
+                  aria-selected={captionHelperTab === tab}
+                  className={captionHelperTab === tab ? "active" : ""}
+                  onClick={() => setCaptionHelperTab(tab)}
+                  disabled={publishing}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {captionHelperTab === "emoji" && (
+              <div className="fb-caption-helper-grid" role="tabpanel" aria-label="Emojis">
+                {CAPTION_EMOJIS.map((emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    className="fb-caption-insert-button fb-caption-emoji"
+                    aria-label={`Insert ${emoji}`}
+                    title={`Insert ${emoji}`}
+                    onClick={() => insertCaptionText(emoji)}
+                    disabled={publishing}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {captionHelperTab === "symbols" && (
+              <div className="fb-caption-helper-grid fb-caption-symbol-grid" role="tabpanel" aria-label="Symbols">
+                {CAPTION_SYMBOLS.map((symbol, index) => (
+                  <button
+                    key={`${symbol}-${index}`}
+                    type="button"
+                    className="fb-caption-insert-button"
+                    aria-label={`Insert ${symbol}`}
+                    title={`Insert ${symbol}`}
+                    onClick={() => insertCaptionText(symbol)}
+                    disabled={publishing}
+                  >
+                    {symbol}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {captionHelperTab === "quick" && (
+              <div className="fb-caption-quick-text" role="tabpanel" aria-label="Quick text">
+                {CAPTION_QUICK_TEXT.map((text) => (
+                  <button
+                    key={text}
+                    type="button"
+                    onClick={() => insertCaptionText(text, true)}
+                    disabled={publishing}
+                  >
+                    <span>＋</span>{text}
+                  </button>
+                ))}
+              </div>
+            )}
+          </aside>
+        </div>
 
         {!isMultiple && (
           <>
