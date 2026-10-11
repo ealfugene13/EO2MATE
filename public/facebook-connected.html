@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>Facebook Connection | EO2MATE</title>
+<style>body{margin:0;background:#f3f6fb;color:#17243b;font:16px/1.6 system-ui,sans-serif;display:grid;place-items:center;min-height:100vh}.card{background:white;width:min(520px,calc(100% - 80px));padding:32px;border-radius:20px;box-shadow:0 12px 40px #17243b15}.brand{color:#3463db;font-weight:750;letter-spacing:2px}h1{font-size:26px;line-height:1.3}p{color:#526078}a{display:inline-block;background:#3463db;color:white;text-decoration:none;padding:12px 20px;border-radius:10px;margin-top:12px}small{display:block;margin-top:20px;color:#64748b}</style></head>
+<body><main class="card"><div class="brand">EO2MATE</div><h1 id="title">Check your Facebook connection</h1><p id="message">Return to EO2MATE and refresh your Facebook Page status.</p><a href="/">Return to EO2MATE</a><small>Open Facebook Page settings to verify the latest connection status.</small></main>
+<script>
+const result=new URLSearchParams(location.hash.slice(1)).get('result');
+const messages={success:['Facebook connected successfully','Your Facebook Page connection has been saved. Return to EO2MATE to view your connected Pages.'],partial:['Facebook connection needs attention','Page details were saved, but at least one Page token could not be validated. Check the connection status in EO2MATE before using automation.'],cancelled:['Facebook connection cancelled','Authorization was not completed. Return to EO2MATE to try again.'],error:['Facebook connection could not be completed','Return to EO2MATE, refresh the Page status, and try connecting again. Contact your administrator if this continues.']};
+if(messages[result]){document.getElementById('title').textContent=messages[result][0];document.getElementById('message').textContent=messages[result][1];}
+history.replaceState(null,'',location.pathname);
+</script></body></html>
