@@ -1,6 +1,7 @@
 import LiveMiningPage from "./LiveMiningPage";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../supabase";
+import { facebookPostUrl } from "../facebookPostUrl";
 
 
 function NavIcon({ type }) {
@@ -301,7 +302,7 @@ function SellingPostDetailPanel({ detail, loading, error, onClose }) {
         <div className="panel-header"><div><h3>References</h3><p>Use these IDs when tracing a post in Meta or EO2MATE logs.</p></div></div>
         <div className="preorder-summary-grid">
           <div><span>EO2MATE Post ID</span><strong title={post.post_id}>{post.post_id || "—"}</strong>{post.post_id&&<button className="table-action-button" type="button" onClick={()=>copyValue("post",post.post_id)}>{copied==="post"?"Copied":"Copy"}</button>}</div>
-          <div><span>Facebook Post ID</span><strong title={post.fb_post_id}>{post.fb_post_id || "—"}</strong>{post.fb_post_id&&<button className="table-action-button" type="button" onClick={()=>copyValue("fb",post.fb_post_id)}>{copied==="fb"?"Copied":"Copy"}</button>}</div>
+          <div><span>Facebook Post ID</span><strong title={post.fb_post_id}>{post.fb_post_id || "—"}</strong>{post.fb_post_id&&<><button className="table-action-button" type="button" onClick={()=>copyValue("fb",post.fb_post_id)}>{copied==="fb"?"Copied":"Copy"}</button><a className="table-link-button" style={{marginLeft:8}} href={facebookPostUrl(post.fb_post_id)} target="_blank" rel="noopener noreferrer">Open post</a></>}</div>
         </div>
       </section>}
 

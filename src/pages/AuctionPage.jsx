@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../supabase";
+import { facebookPostUrl } from "../facebookPostUrl";
 
 
 function NavIcon({ type }) {
@@ -444,7 +445,7 @@ export default function AuctionPage({ auctionWorkspaceTab, client, detailRequest
                   <div>
                     <p className="eyebrow">AUCTION DETAIL</p>
                     <h1>{auctionDetail.item_label}</h1>
-                    <p>Facebook post: {auctionDetail.fb_post_id}</p>
+                    <p>Facebook post: {auctionDetail.fb_post_id || "—"}{auctionDetail.fb_post_id && <> · <a className="table-link-button" href={facebookPostUrl(auctionDetail.fb_post_id)} target="_blank" rel="noopener noreferrer">Open post</a></>}</p>
                   </div>
                   <StatusBadge status={auctionDetail.ui_status} />
                 </header>
