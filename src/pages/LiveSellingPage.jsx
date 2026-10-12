@@ -194,54 +194,62 @@ function MetricCard({ title, value, subtitle, onClick }) {
   );
 }
 
-export default function LiveSellingPage({ liveSellingWorkspaceTab, metaConnected, page, setLiveSellingWorkspaceTab }) {
+import { useState } from "react";
+import LiveMiningPage from "./LiveMiningPage";
 
+const LIVE_MODES = [
+  { key: "SELLING", label: "Live Selling", icon: "sales", command: "+1 / +2", description: "Quantity-based claims during Facebook Live." },
+  { key: "MINING", label: "Live Mining", icon: "mining", command: "MINE / TAKE / LOCK", description: "Priority-based claims during Facebook Live." },
+  { key: "AUCTION", label: "Live Auction", icon: "auction", command: "Numeric bids", description: "Increment-validated bidding during Facebook Live." },
+];
 
-  return (<>
-    {metaConnected && page === "live-selling" && (
-          <>
-            <header className="dashboard-header">
-              <div>
-                <p className="eyebrow">FACEBOOK SELLING</p>
-                <h1>Live Selling</h1>
-                <p>Live-selling dashboard for sessions, claims, buyers and sales performance. Transaction processing will activate when the Live Selling module is enabled.</p>
-              </div>
-            </header>
-            <section className="selling-workspace-tabs" style={{ marginBottom: 18 }}>
-              <div role="tablist" aria-label="Live Selling sections" className="selling-workspace-tablist selling-workspace-nav">
-                {[
-                  { key: "DASHBOARD", label: "Dashboard", icon: "dashboard" },
-                  { key: "SUMMARY", label: "Summary", icon: "reports" },
-                  { key: "POSTS", label: "Posts", icon: "sales" },
-                ].map((tab) => (
-                  <button key={tab.key} type="button" role="tab" aria-selected={liveSellingWorkspaceTab === tab.key} className={`selling-workspace-tab${liveSellingWorkspaceTab === tab.key ? " active" : ""}`} onClick={() => setLiveSellingWorkspaceTab(tab.key)}>
-                    <span className="selling-nav-icon"><NavIcon type={tab.icon} /></span>
-                    <span>{tab.label}</span>
-                  </button>
-                ))}
-              </div>
-              <button type="button" className="secondary-button selling-workspace-tab-action" disabled title="Coming soon">
-                  <span className="selling-nav-icon"><NavIcon type="create" /></span>
-                  <span>Create Post · Soon</span>
-              </button>
-            </section>
-            {liveSellingWorkspaceTab === "DASHBOARD" && (
-              <>
-            <section className="metrics-grid">
-              <MetricCard title="Live sessions" value="0" subtitle="Sessions in selected period" />
-              <MetricCard title="Active session" value="0" subtitle="Currently live" />
-              <MetricCard title="Claims" value="0" subtitle="Live comment claims" />
-              <MetricCard title="Unique buyers" value="0" subtitle="Live customers" />
-              <MetricCard title="Items sold" value="0" subtitle="Allocated quantity" />
-              <MetricCard title="Sales value" value={formatCurrency(0)} subtitle="Gross live-selling value" />
-            </section>
-              </>
-            )}
-            <section className="dashboard-panel">
-              <div className="panel-header"><div><h2>{liveSellingWorkspaceTab === "POSTS" ? "Live Selling posts" : liveSellingWorkspaceTab === "SUMMARY" ? "Live Selling summary" : "Live Selling dashboard"}</h2><p>Ready for the Live Selling backend connection without exposing placeholder data as real activity.</p></div></div>
-              <div className="table-wrapper"><table><thead><tr><th>Session / Post</th><th>Status</th><th>Claims</th><th>Buyers</th><th>Items</th><th>Sales</th></tr></thead><tbody><tr><td colSpan="6">No Live Selling records yet.</td></tr></tbody></table></div>
-            </section>
-          </>
-        )}
-  </>);
+export default function LiveSellingPage({ metaConnected, page }) {
+  const [mode, setMode] = useState("SELLING");
+  const [section, setSection] = useState("SUMMARY");
+  if (page !== "live-selling") return null;
+  const current = LIVE_MODES.find((entry) => entry.key === mode);
+  return <>
+    <header className="dashboard-header">
+      <div>
+        <p className="eyebrow">FACEBOOK LIVE OPERATIONS</p>
+        <h1>Live Selling</h1>
+        <p>Manage Live Selling, Live Mining and Live Auction in one workspace.</p>
+      </div>
+    </header>
+    <section className="selling-workspace-tabs" style={{ marginBottom: 18 }}>
+      <div className="selling-workspace-tablist selling-workspace-nav" role="tablist" aria-label="Live selling modes">
+        {LIVE_MODES.map((entry) => <button key={entry.key} type="button" role="tab" aria-selected={mode === entry.key} className={`selling-workspace-tab${mode === entry.key ? " active" : ""}`} onClick={() => { setMode(entry.key); setSection("SUMMARY"); }}>
+          <span className="selling-nav-icon"><NavIcon type={entry.icon} /></span><span>{entry.label}</span>
+        </button>)}
+      </div>
+    </section>
+    <section className="dashboard-panel" style={{ marginBottom: 18 }}>
+      <div className="panel-header"><div><h2>{current.label}</h2><p>{current.description} Buyer command: <strong>{current.command}</strong>.</p></div></div>
+      <div className="selling-workspace-tablist selling-workspace-nav" role="tablist" aria-label={`${current.label} sections`} style={{ margin: 14 }}>
+        {[
+          { key: "SUMMARY", label: "Summary", icon: "dashboard" },
+          { key: "SESSIONS", label: "Sessions", icon: "reports" },
+          { key: "ACTIVITY", label: mode === "AUCTION" ? "Bids" : "Claims", icon: "orders" },
+          { key: "BUYERS", label: "Buyers", icon: "users" },
+          { key: "REPORTS", label: "Reports", icon: "reports" },
+        ].map((tab) => <button key={tab.key} type="button" role="tab" aria-selected={section === tab.key} className={`selling-workspace-tab${section === tab.key ? " active" : ""}`} onClick={() => setSection(tab.key)}><span className="selling-nav-icon"><NavIcon type={tab.icon} /></span><span>{tab.label}</span></button>)}
+      </div>
+    </section>
+    {mode === "MINING" && (section === "SUMMARY" || section === "SESSIONS") ? <LiveMiningPage /> : <>
+      {section === "SUMMARY" && <section className="metrics-grid">
+        <MetricCard title="Live sessions" value="—" subtitle="Awaiting live integration" />
+        <MetricCard title="Active sessions" value="—" subtitle="Awaiting live integration" />
+        <MetricCard title={mode === "AUCTION" ? "Bids" : "Claims"} value="—" subtitle="Awaiting live integration" />
+        <MetricCard title="Buyers" value="—" subtitle="Awaiting live integration" />
+        <MetricCard title="Sales value" value="—" subtitle="Awaiting live integration" />
+      </section>}
+      <section className="dashboard-panel">
+        <div className="panel-header"><div><h2>{current.label} — {section.toLowerCase()}</h2><p>Facebook Live session processing and live activity retrieval are not connected yet.</p></div>
+          {section === "SESSIONS" && <button type="button" className="secondary-button" disabled title="Requires live session backend and Meta permissions">Create Live Session · Soon</button>}
+        </div>
+        <div className="table-wrapper"><table><thead><tr><th>Session</th><th>Facebook Page</th><th>Status</th><th>{mode === "AUCTION" ? "Bids" : "Claims"}</th><th>Buyers</th><th>Sales</th></tr></thead><tbody><tr><td colSpan="6">No verified live session data available. Backend integration pending.</td></tr></tbody></table></div>
+      </section>
+    </>}
+    {!metaConnected && <section className="dashboard-panel"><div className="panel-header"><div><h2>Facebook Page required</h2><p>Connect an authorized Facebook Page before starting a real livestream. Simulated Pages cannot publish to Meta.</p></div></div></section>}
+  </>;
 }

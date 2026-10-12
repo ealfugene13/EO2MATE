@@ -1,4 +1,3 @@
-import LiveMiningPage from "./LiveMiningPage";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../supabase";
 import { facebookPostUrl } from "../facebookPostUrl";
@@ -494,7 +493,7 @@ export default function MiningPage({ client, metaConnected, miningWorkspaceTab, 
               <div>
                 <p className="eyebrow">FACEBOOK SELLING</p>
                 <h1>Post Mining</h1>
-                <p>Manage regular MINE posts and Live Mining activity from one workspace.</p>
+                <p>Manage regular Facebook Post Mining, claims and buyers.</p>
               </div>
             </header>
 
@@ -503,7 +502,6 @@ export default function MiningPage({ client, metaConnected, miningWorkspaceTab, 
                 {[
                   { key: "SUMMARY", label: "Summary", icon: "dashboard" },
                   { key: "POSTS", label: "Posts", icon: "mining" },
-                  { key: "LIVE MINING", label: "Live Mining", icon: "reports" },
                   { key: "CLAIMS", label: "Claims", icon: "orders" },
                   { key: "BUYERS", label: "Buyers", icon: "users" },
                 ].map((tab) => (
@@ -529,7 +527,6 @@ export default function MiningPage({ client, metaConnected, miningWorkspaceTab, 
                 <section className="metrics-grid">
                   <MetricCard title="Total posts" value={miningStats.total} subtitle="All mining posts" />
                   <MetricCard title="Active" value={miningStats.active} subtitle="Currently accepting MINE" />
-                  <MetricCard title="Live Mining" value="0" subtitle="Active live sessions" />
                   <MetricCard title="Completed" value={miningStats.completed} subtitle="Closed mining posts" />
                   <MetricCard title="Cancelled" value={miningStats.cancelled} subtitle="Cancelled posts" />
                   <MetricCard title="Total claims" value={miningStats.claims} subtitle="Recorded MINE claims" />
@@ -556,7 +553,7 @@ export default function MiningPage({ client, metaConnected, miningWorkspaceTab, 
                   <div className="panel-header">
                     <div>
                       <h2>Mining summary</h2>
-                      <p>Claims, conversion, buyers and selling value across regular and live mining.</p>
+                      <p>Claims, conversion, buyers and selling value from Post Mining.</p>
                     </div>
                   </div>
                   <div className="metrics-grid">
@@ -603,20 +600,16 @@ export default function MiningPage({ client, metaConnected, miningWorkspaceTab, 
               </section>
             )}
 
-            {miningWorkspaceTab === "LIVE MINING" && (
-              <LiveMiningPage />
-            )}
-
             {miningWorkspaceTab === "CLAIMS" && (
               <section className="dashboard-panel">
-                <div className="panel-header"><div><h2>Claims</h2><p>Buyer MINE claims from posts and live sessions.</p></div></div>
+                <div className="panel-header"><div><h2>Claims</h2><p>Buyer MINE claims from regular posts.</p></div></div>
                 <div className="table-wrapper"><table><thead><tr><th>Buyer</th><th>MINE Code</th><th>Item</th><th>Qty</th><th>Source</th><th>Status</th><th>Amount</th><th>Claimed</th></tr></thead><tbody><tr><td colSpan="8">No claims yet.</td></tr></tbody></table></div>
               </section>
             )}
 
             {miningWorkspaceTab === "BUYERS" && (
               <section className="dashboard-panel">
-                <div className="panel-header"><div><h2>Mining buyers</h2><p>Buyer activity across Post Mining and Live Mining.</p></div></div>
+                <div className="panel-header"><div><h2>Mining buyers</h2><p>Buyer activity from regular Post Mining.</p></div></div>
                 <div className="table-wrapper"><table><thead><tr><th>Buyer</th><th>Claims</th><th>Items</th><th>Total value</th><th>Paid</th><th>Pending</th><th>Last activity</th></tr></thead><tbody><tr><td colSpan="7">No mining buyers yet.</td></tr></tbody></table></div>
               </section>
             )}
