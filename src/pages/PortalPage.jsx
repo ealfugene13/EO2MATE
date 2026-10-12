@@ -489,6 +489,21 @@ export default function PortalPage({ session }) {
   
   const [errorMessage, setErrorMessage] = useState("");
 
+  // Selection is tenant-local UI state. Each server endpoint must independently enforce page scope.
+  const [selectedFbPageId, setSelectedFbPageId] = useState("");
+  useEffect(() => {
+    setSelectedFbPageId(client?.client_id ? (localStorage.getItem(`eo2mate-page-${client.client_id}`) || "") : "");
+  }, [client?.client_id]);
+  const availablePages = (facebookStatus?.pages || []).filter((p) => p.status === "ACTIVE" && p.token_present);
+  const effectivePageId = availablePages.some((p) => String(p.fb_page_id) === selectedFbPageId)
+    ? selectedFbPageId : (availablePages[0]?.fb_page_id || "");
+  function switchFacebookPage(id) {
+    if (!availablePages.some((p) => String(p.fb_page_id) === String(id))) return;
+    setSelectedFbPageId(String(id));
+    localStorage.setItem(`eo2mate-page-${client.client_id}`, String(id));
+    setDetailRequest(null);
+    setPage("dashboard");
+  }
   const [facebookStatus, setFacebookStatus] = useState(null);
   const [facebookLoading, setFacebookLoading] = useState(false);
   const [facebookMessage, setFacebookMessage] = useState("");
@@ -1013,6 +1028,15 @@ export default function PortalPage({ session }) {
           <span>{client?.name || "Portal"}</span>
         </div>
 
+        {client?.client_id && availablePages.length > 0 && (
+          <div className="dashboard-panel" style={{ padding: "10px 16px", marginBottom: 12, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <label htmlFor="eo2mate-active-page" style={{ fontWeight: 700 }}>Facebook Page</label>
+            <select id="eo2mate-active-page" value={effectivePageId} onChange={(event) => switchFacebookPage(event.target.value)}>
+              {availablePages.map((p) => <option key={p.fb_page_id} value={p.fb_page_id}>{p.page_name || p.fb_page_id}</option>)}
+            </select>
+            <small>Page selection applies to Mixed Live. Other modules require server-side Page filtering before multi-Page isolation can be enabled.</small>
+          </div>
+        )}
         {errorMessage && (
           <div className="dashboard-error global-error">
             {errorMessage}
@@ -1043,7 +1067,7 @@ export default function PortalPage({ session }) {
         )}
 
 
-        {(page === "live-selling") && <LiveSellingPage client={client} liveSellingWorkspaceTab={liveSellingWorkspaceTab} metaConnected={metaConnected} page={page} setLiveSellingWorkspaceTab={setLiveSellingWorkspaceTab} />}
+        {(page === "live-selling") && <LiveSellingPage selectedFbPageId={effectivePageId} client={client} liveSellingWorkspaceTab={liveSellingWorkspaceTab} metaConnected={metaConnected} page={page} setLiveSellingWorkspaceTab={setLiveSellingWorkspaceTab} />}
 
         {(page === "users-staff") && <StaffPage page={page} />}
 

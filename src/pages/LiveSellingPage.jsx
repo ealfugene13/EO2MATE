@@ -196,11 +196,11 @@ function MetricCard({ title, value, subtitle, onClick }) {
 
 import LiveMiningPage from "./LiveMiningPage";
 
-function MixedLiveManager({ client }) {
+function MixedLiveManager({ client, selectedFbPageId }) {
   const clientId = client?.client_id;
   const [sessions, setSessions] = useState([]);
   const [selected, setSelected] = useState("");
-  const [pageId, setPageId] = useState("");
+  const pageId = selectedFbPageId || "";
   const [videoId, setVideoId] = useState("");
   const [item, setItem] = useState({ item_code: "", title: "", mode: "SELLING", quantity: 1, unit_price: "", mine_price: "", take_price: "", lock_price: "", starting_bid: "", bid_increment: "" });
   const [busy, setBusy] = useState(false);
@@ -224,7 +224,7 @@ function MixedLiveManager({ client }) {
     <div className="panel-header"><div><h2>Mixed Live Control Center</h2><p>One Facebook Live video. Item-coded commands: <strong>A12 +2</strong>, <strong>B15 LOCK</strong>, <strong>C18 600</strong>.</p></div><button className="secondary-button" type="button" onClick={() => run("list")} disabled={busy}>↻ Refresh</button></div>
     <p>Connect a real Facebook Page and paste its Page ID and Live Video ID. This module records claims and bids; automatic order creation is not enabled in this phase.</p>
     <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
-      <input aria-label="Facebook Page ID" placeholder="Facebook Page ID" value={pageId} onChange={(e) => setPageId(e.target.value)} />
+      <input aria-label="Facebook Page ID" value={pageId} readOnly title="Use the global Facebook Page switcher to change Pages" />
       <input aria-label="Facebook Live Video ID" placeholder="Facebook Live Video ID" value={videoId} onChange={(e) => setVideoId(e.target.value)} />
       <button className="primary-button" type="button" disabled={busy || !pageId || !videoId} onClick={async () => { setBusy(true); try { const d = await request("create", { fb_page_id: pageId, fb_video_id: videoId }); await refresh(); setSelected(d.session.id); setMessage("Session created in DRAFT."); } catch (e) { setMessage(e.message); } finally { setBusy(false); } }}>＋ Create Session</button>
     </div>
@@ -257,7 +257,7 @@ const LIVE_MODES = [
   { key: "MIXED", label: "Mixed Live", icon: "sales", command: "A12 +2 / B15 LOCK / C18 600", description: "Multiple selling modes in one Facebook Live video using item codes." },
 ];
 
-export default function LiveSellingPage({ metaConnected, page, client }) {
+export default function LiveSellingPage({ metaConnected, page, client, selectedFbPageId }) {
   const [mode, setMode] = useState("SELLING");
   const [section, setSection] = useState("SUMMARY");
   if (page !== "live-selling") return null;
@@ -289,7 +289,7 @@ export default function LiveSellingPage({ metaConnected, page, client }) {
         ].map((tab) => <button key={tab.key} type="button" role="tab" aria-selected={section === tab.key} className={`selling-workspace-tab${section === tab.key ? " active" : ""}`} onClick={() => setSection(tab.key)}><span className="selling-nav-icon"><NavIcon type={tab.icon} /></span><span>{tab.label}</span></button>)}
       </div>
     </section>
-    {mode === "MIXED" ? <MixedLiveManager client={client} /> : mode === "MINING" && (section === "SUMMARY" || section === "SESSIONS") ? <LiveMiningPage /> : <>
+    {mode === "MIXED" ? <MixedLiveManager client={client} selectedFbPageId={selectedFbPageId} /> : mode === "MINING" && (section === "SUMMARY" || section === "SESSIONS") ? <LiveMiningPage /> : <>
       {section === "SUMMARY" && <section className="metrics-grid">
         <MetricCard title="Live sessions" value="—" subtitle="Awaiting live integration" />
         <MetricCard title="Active sessions" value="—" subtitle="Awaiting live integration" />

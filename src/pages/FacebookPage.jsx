@@ -48,15 +48,21 @@ export default function FacebookPage({ client, facebookLoading, facebookMessage,
   const connectedPages = facebookStatus?.pages || [];
   const [showAddPageGuide, setShowAddPageGuide] = useState(false);
 
-  function connectFacebook() {
-    if (!client?.client_id) {
-      setFacebookMessage("Client account is not ready yet. Refresh and try again.");
-      return;
-    }
-
-    const baseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const connectUrl = `${baseUrl}/functions/v1/meta?route=oauth-start&client_id=${encodeURIComponent(client.client_id)}`;
-    window.location.assign(connectUrl);
+  const [connecting, setConnecting] = useState(false);
+  async function connectFacebook() {
+    if (!client?.client_id || connecting) return;
+    setConnecting(true);
+    setFacebookMessage("");
+    try {
+      const { data, error } = await supabase.functions.invoke("meta", {
+        method: "POST", headers: { "x-eo2mate-meta-route": "oauth-start" },
+        body: { client_id: client.client_id },
+      });
+      if (error || !data?.success || !data?.authorization_url) throw new Error(data?.message || "Unable to initiate Facebook authorization.");
+      const destination = new URL(data.authorization_url);
+      if (destination.protocol !== "https:" || destination.hostname !== "www.facebook.com") throw new Error("Invalid Facebook authorization destination.");
+      window.location.assign(destination.toString());
+    } catch (error) { setFacebookMessage(error.message || "Facebook connection failed."); setConnecting(false); }
   }
 
   return (<>
@@ -134,7 +140,7 @@ export default function FacebookPage({ client, facebookLoading, facebookMessage,
                   <li>Configure automation and selling settings for that Page before publishing.</li>
                 </ol>
                 <p><strong>Important:</strong> Meta authorization does not guarantee that a new Page has been registered. If it does not appear below, do not start automation; contact support for provisioning verification.</p>
-                <button className="primary-button facebook-action-button" type="button" onClick={connectFacebook} disabled={!client?.client_id}>
+                <button className="primary-button facebook-action-button" type="button" onClick={connectFacebook} disabled={!client?.client_id || connecting}>
                   <span className="facebook-action-mark" aria-hidden="true">f</span>
                   <span>Continue to Facebook Authorization</span>
                 </button>
