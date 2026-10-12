@@ -196,13 +196,68 @@ function MetricCard({ title, value, subtitle, onClick }) {
 
 import LiveMiningPage from "./LiveMiningPage";
 
+function MixedLiveManager({ client }) {
+  const clientId = client?.client_id;
+  const [sessions, setSessions] = useState([]);
+  const [selected, setSelected] = useState("");
+  const [pageId, setPageId] = useState("");
+  const [videoId, setVideoId] = useState("");
+  const [item, setItem] = useState({ item_code: "", title: "", mode: "SELLING", quantity: 1, unit_price: "", mine_price: "", take_price: "", lock_price: "", starting_bid: "", bid_increment: "" });
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const current = sessions.find((s) => s.id === selected);
+  const request = async (action, extra = {}) => {
+    if (!clientId) throw new Error("Select a client workspace first.");
+    const { data, error } = await supabase.functions.invoke("eo2mate", { headers: { "x-eo2mate-route": "live-admin" }, body: { action, client_id: clientId, ...extra } });
+    if (error || data?.error) throw new Error(data?.detail || data?.error || error?.message || "Request failed");
+    return data;
+  };
+  const refresh = async () => { const result = await request("list"); setSessions(result.sessions || []); };
+  useEffect(() => { if (clientId) refresh().catch((e) => setMessage(e.message)); }, [clientId]);
+  const run = async (action, extra = {}) => {
+    setBusy(true); setMessage("");
+    try { await request(action, extra); await refresh(); setMessage(`${action} completed.`); }
+    catch (e) { setMessage(e.message); }
+    finally { setBusy(false); }
+  };
+  return <section className="dashboard-panel" style={{ padding: 20 }}>
+    <div className="panel-header"><div><h2>Mixed Live Control Center</h2><p>One Facebook Live video. Item-coded commands: <strong>A12 +2</strong>, <strong>B15 LOCK</strong>, <strong>C18 600</strong>.</p></div><button className="secondary-button" type="button" onClick={() => run("list")} disabled={busy}>↻ Refresh</button></div>
+    <p>Connect a real Facebook Page and paste its Page ID and Live Video ID. This module records claims and bids; automatic order creation is not enabled in this phase.</p>
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
+      <input aria-label="Facebook Page ID" placeholder="Facebook Page ID" value={pageId} onChange={(e) => setPageId(e.target.value)} />
+      <input aria-label="Facebook Live Video ID" placeholder="Facebook Live Video ID" value={videoId} onChange={(e) => setVideoId(e.target.value)} />
+      <button className="primary-button" type="button" disabled={busy || !pageId || !videoId} onClick={async () => { setBusy(true); try { const d = await request("create", { fb_page_id: pageId, fb_video_id: videoId }); await refresh(); setSelected(d.session.id); setMessage("Session created in DRAFT."); } catch (e) { setMessage(e.message); } finally { setBusy(false); } }}>＋ Create Session</button>
+    </div>
+    <label>Live session <select value={selected} onChange={(e) => setSelected(e.target.value)}><option value="">Select a session</option>{sessions.map((s) => <option key={s.id} value={s.id}>{s.fb_video_id} — {s.status}</option>)}</select></label>
+    {current && <>
+      <p><strong>Status:</strong> {current.status} · <strong>Video:</strong> {current.fb_video_id}</p>
+      {current.status === "DRAFT" && <>
+        <h3>Add queued product</h3>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+          <input placeholder="Item code e.g. A12" aria-label="Item code" value={item.item_code} onChange={(e) => setItem({ ...item, item_code: e.target.value.toUpperCase() })} />
+          <input placeholder="Product name" aria-label="Product name" value={item.title} onChange={(e) => setItem({ ...item, title: e.target.value })} />
+          <select aria-label="Selling mode" value={item.mode} onChange={(e) => setItem({ ...item, mode: e.target.value })}><option value="SELLING">Selling</option><option value="MINING">Mining</option><option value="AUCTION">Auction</option></select>
+          <input type="number" min="1" aria-label="Quantity" value={item.quantity} onChange={(e) => setItem({ ...item, quantity: e.target.value })} />
+          {(item.mode === "SELLING" ? ["unit_price"] : item.mode === "MINING" ? ["mine_price", "take_price", "lock_price"] : ["starting_bid", "bid_increment"]).map((field) => <input key={field} type="number" min="0" step="0.01" aria-label={field.replaceAll("_", " ")} placeholder={field.replaceAll("_", " ")} value={item[field]} onChange={(e) => setItem({ ...item, [field]: e.target.value })} />)}
+          <button type="button" className="secondary-button" disabled={busy || !item.title || !item.item_code} onClick={() => run("add-item", { session_id: selected, ...item })}>＋ Add Item</button>
+        </div>
+        <p><button className="primary-button" type="button" disabled={busy || !(current.eo2mate_live_items || []).length} onClick={() => run("start", { session_id: selected })}>▶ Start Session</button></p>
+      </>}
+      <div className="table-wrapper"><table><thead><tr><th>Code</th><th>Product</th><th>Mode</th><th>Status</th><th>Accepted / Stock</th><th>Action</th></tr></thead><tbody>{(current.eo2mate_live_items || []).map((it) => <tr key={it.id}><td>{it.item_code}</td><td>{it.title}</td><td>{it.mode}</td><td>{it.status}</td><td>{it.claimed} / {it.quantity}</td><td>{current.status === "ACTIVE" && it.status === "QUEUED" && <button className="secondary-button" type="button" disabled={busy} onClick={() => run("activate-item", { session_id: selected, item_id: it.id })}>▶ Activate</button>}</td></tr>)}</tbody></table></div>
+      {current.status === "ACTIVE" && <button type="button" className="secondary-button" disabled={busy} onClick={() => { if (window.confirm("Close this live session?")) run("close", { session_id: selected }); }}>■ Close Session</button>}
+    </>}
+    {message && <p role="status">{message}</p>}
+  </section>;
+}
+
 const LIVE_MODES = [
   { key: "SELLING", label: "Live Selling", icon: "sales", command: "+1 / +2", description: "Quantity-based claims during Facebook Live." },
   { key: "MINING", label: "Live Mining", icon: "mining", command: "MINE / TAKE / LOCK", description: "Priority-based claims during Facebook Live." },
   { key: "AUCTION", label: "Live Auction", icon: "auction", command: "Numeric bids", description: "Increment-validated bidding during Facebook Live." },
+  { key: "MIXED", label: "Mixed Live", icon: "sales", command: "A12 +2 / B15 LOCK / C18 600", description: "Multiple selling modes in one Facebook Live video using item codes." },
 ];
 
-export default function LiveSellingPage({ metaConnected, page }) {
+export default function LiveSellingPage({ metaConnected, page, client }) {
   const [mode, setMode] = useState("SELLING");
   const [section, setSection] = useState("SUMMARY");
   if (page !== "live-selling") return null;
@@ -234,7 +289,7 @@ export default function LiveSellingPage({ metaConnected, page }) {
         ].map((tab) => <button key={tab.key} type="button" role="tab" aria-selected={section === tab.key} className={`selling-workspace-tab${section === tab.key ? " active" : ""}`} onClick={() => setSection(tab.key)}><span className="selling-nav-icon"><NavIcon type={tab.icon} /></span><span>{tab.label}</span></button>)}
       </div>
     </section>
-    {mode === "MINING" && (section === "SUMMARY" || section === "SESSIONS") ? <LiveMiningPage /> : <>
+    {mode === "MIXED" ? <MixedLiveManager client={client} /> : mode === "MINING" && (section === "SUMMARY" || section === "SESSIONS") ? <LiveMiningPage /> : <>
       {section === "SUMMARY" && <section className="metrics-grid">
         <MetricCard title="Live sessions" value="—" subtitle="Awaiting live integration" />
         <MetricCard title="Active sessions" value="—" subtitle="Awaiting live integration" />

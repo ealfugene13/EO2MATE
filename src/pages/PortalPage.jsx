@@ -1043,7 +1043,7 @@ export default function PortalPage({ session }) {
         )}
 
 
-        {(page === "live-selling") && <LiveSellingPage liveSellingWorkspaceTab={liveSellingWorkspaceTab} metaConnected={metaConnected} page={page} setLiveSellingWorkspaceTab={setLiveSellingWorkspaceTab} />}
+        {(page === "live-selling") && <LiveSellingPage client={client} liveSellingWorkspaceTab={liveSellingWorkspaceTab} metaConnected={metaConnected} page={page} setLiveSellingWorkspaceTab={setLiveSellingWorkspaceTab} />}
 
         {(page === "users-staff") && <StaffPage page={page} />}
 
@@ -1108,7 +1108,7 @@ export default function PortalPage({ session }) {
             </nav>
             <div className="setup-workspace-content" role="tabpanel">
               {setupSection === "configuration" && <SetupPage client={client} />}
-              {setupSection === "automation" && <AutomationControlPage client={client} page="automation-control" onManageFacebook={() => { setAccountSecuritySection("facebook"); setPage("account-security"); loadFacebookStatus(); }} />}
+              {setupSection === "automation" && <AutomationControlPage client={client} page="automation-control" />}
               {setupSection === "messages" && <AutomatedMessagesPage client={client} />}
               {setupSection === "caption-templates" && <PostCaptionTemplatePage client={client} />}
             </div>
