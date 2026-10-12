@@ -8,6 +8,8 @@ function AuthIcon({ name }) {
     key: <><circle cx="8" cy="15" r="4"/><path d="m11 12 9-9 2 2-2 2 2 2-3 3-2-2-2 2"/></>,
     mail: <><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></>,
     user: <><circle cx="12" cy="8" r="4"/><path d="M5 21a7 7 0 0 1 14 0"/></>,
+    eye: <><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></>,
+    phone: <><path d="M22 16.9v3a2 2 0 0 1-2.2 2A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7l.5 3a2 2 0 0 1-.6 1.7L7 10a16 16 0 0 0 7 7l1.6-2a2 2 0 0 1 1.7-.6l3 .5a2 2 0 0 1 1.7 2Z"/></>,
     swap: <><path d="M7 7h13l-3-3"/><path d="m20 7-3 3"/><path d="M17 17H4l3 3"/><path d="m4 17 3-3"/></>,
   };
   return <svg className="auth-button-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name] || paths.arrow}</svg>;
@@ -16,22 +18,43 @@ function AuthIcon({ name }) {
 export default function LoginPage({ onBack }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
+  const [acceptedPolicies, setAcceptedPolicies] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [infoMessage, setInfoMessage] = useState("");
   const [mode, setMode] = useState("signin");
 
+  const signup = mode === "signup";
+  const normalizedEmail = email.trim().toLowerCase();
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(normalizedEmail) && normalizedEmail.length <= 254;
+  const passwordRules = [
+    { label: "At least 12 characters", ok: password.length >= 12 },
+    { label: "Uppercase and lowercase letters", ok: /[A-Z]/.test(password) && /[a-z]/.test(password) },
+    { label: "At least one number", ok: /\d/.test(password) },
+    { label: "At least one symbol", ok: /[^A-Za-z0-9]/.test(password) },
+  ];
+  const passwordScore = passwordRules.filter((rule) => rule.ok).length;
   function clearMessages() { setErrorMessage(""); setInfoMessage(""); }
 
   async function handleSubmit(event) {
     event.preventDefault(); clearMessages(); setLoading(true);
     try {
       if (mode === "signup") {
+        if (!emailValid) throw new Error("Enter a valid email address.");
+        if (fullName.trim().length < 2 || fullName.trim().length > 100) throw new Error("Enter your full name (2–100 characters).");
+        if (contactPhone.trim() && !/^\+?[0-9 ()-]{7,20}$/.test(contactPhone.trim())) throw new Error("Enter a valid contact number or leave it blank.");
+        if (passwordScore !== 4) throw new Error("Your password must meet all four security requirements.");
+        if (password !== confirmPassword) throw new Error("Passwords do not match.");
+        if (!acceptedPolicies) throw new Error("Please accept the Terms of Service and Privacy Policy.");
         const emailRedirectTo = new URL("./", window.location.href).href;
         const { data, error } = await supabase.auth.signUp({
-          email: email.trim(),
+          email: normalizedEmail,
           password,
-          options: { emailRedirectTo },
+          options: { emailRedirectTo, data: { full_name: fullName.trim(), contact_phone: contactPhone.trim() || null } },
         });
         if (error) throw error;
         if (!data?.session) {
@@ -39,6 +62,7 @@ export default function LoginPage({ onBack }) {
           setMode("signin");
         }
       } else {
+        if (!emailValid) throw new Error("Enter a valid email address.");
         const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
         if (error) throw error;
       }
@@ -49,7 +73,7 @@ export default function LoginPage({ onBack }) {
   async function sendRecovery(event) {
     event.preventDefault(); clearMessages();
     const address = email.trim();
-    if (!address) { setErrorMessage("Enter the email address for your EO2MATE account."); return; }
+    if (!emailValid) { setErrorMessage("Enter the email address for your EO2MATE account."); return; }
     setLoading(true);
     try {
       const redirectTo = new URL("./", window.location.href).href;
@@ -84,14 +108,30 @@ export default function LoginPage({ onBack }) {
             <button type="button" className="auth-mode-button" onClick={()=>{clearMessages();setMode("signin");}} disabled={loading}><AuthIcon name="back"/>Back to sign in</button>
           </form>
         ) : (
-          <form onSubmit={handleSubmit} className="login-form">
-            <label>Email<input type="email" value={email} onChange={(e)=>setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" required /></label>
-            <label>Password<input type="password" value={password} onChange={(e)=>setPassword(e.target.value)} placeholder="Enter password" autoComplete={mode === "signup" ? "new-password" : "current-password"} required /></label>
+          <form onSubmit={handleSubmit} className="login-form eo2-auth-form" noValidate>
+            {signup && <div className="eo2-signup-group">
+              <label>Full name <span className="eo2-required">*</span><input type="text" value={fullName} onChange={(e)=>setFullName(e.target.value)} placeholder="Your first and last name" autoComplete="name" maxLength={100} required /></label>
+              <label>Contact number <span className="eo2-optional">Optional</span><input type="tel" value={contactPhone} onChange={(e)=>setContactPhone(e.target.value)} placeholder="e.g. +63 917 123 4567" autoComplete="tel" maxLength={20}/></label>
+            </div>}
+            <label>Email address <span className="eo2-required">*</span><input type="email" value={email} onChange={(e)=>setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" maxLength={254} required aria-invalid={!!email && !emailValid}/></label>
+            {email && !emailValid && <small className="eo2-field-error">Enter a valid email address.</small>}
+            <label>Password <span className="eo2-required">*</span><span className="eo2-password-wrap"><input type={showPassword ? "text" : "password"} value={password} onChange={(e)=>setPassword(e.target.value)} placeholder={signup ? "Create a strong password" : "Enter password"} autoComplete={signup ? "new-password" : "current-password"} required/><button type="button" className="eo2-visibility" onClick={()=>setShowPassword(v=>!v)} aria-label={showPassword ? "Hide password" : "Show password"} title={showPassword ? "Hide password" : "Show password"}><AuthIcon name="eye"/></button></span></label>
+            {signup && <>
+              <div className="eo2-password-guidance" aria-live="polite">
+                <div className="eo2-strength-header"><strong>Password security</strong><span>{passwordScore === 4 ? "Requirements met" : `${passwordScore} of 4 requirements`}</span></div>
+                <div className="eo2-strength-track"><span style={{width:`${passwordScore * 25}%`, background:passwordScore===4 ? "#26805a" : "#cf8b32"}}/></div>
+                <div className="eo2-password-rules">{passwordRules.map((rule)=><small key={rule.label} className={rule.ok ? "met" : ""}>{rule.ok ? "✓" : "○"} {rule.label}</small>)}</div>
+              </div>
+              <label>Confirm password <span className="eo2-required">*</span><input type="password" value={confirmPassword} onChange={(e)=>setConfirmPassword(e.target.value)} placeholder="Re-enter your password" autoComplete="new-password" required/></label>
+              {confirmPassword && password !== confirmPassword && <small className="eo2-field-error">Passwords do not match.</small>}
+              <label className="eo2-policy"><input type="checkbox" checked={acceptedPolicies} onChange={e=>setAcceptedPolicies(e.target.checked)} required/><span>I agree to the <a href="/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a> and <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>.</span></label>
+              <p className="eo2-auth-hint">After registration, verify your email and complete your secure workspace setup.</p>
+            </>}
             {mode === "signin" && <button type="button" className="forgot-password-button" onClick={()=>{clearMessages();setMode("recovery");}}><AuthIcon name="key"/>Forgot password?</button>}
-            {infoMessage && <div className="success-message">{infoMessage}</div>}
-            {errorMessage && <div className="form-error">{errorMessage}</div>}
-            <button type="submit" className="primary-button" disabled={loading}><AuthIcon name={mode === "signup" ? "user" : "key"}/>{loading ? "Please wait..." : mode === "signup" ? "Create account" : "Sign in securely"}</button>
-            <button type="button" className="auth-mode-button" onClick={()=>{clearMessages();setMode(c=>c === "signin" ? "signup" : "signin");}} disabled={loading}><AuthIcon name="swap"/>{mode === "signup" ? "Already have an account? Sign in" : "New client? Create an account"}</button>
+            {infoMessage && <div className="success-message" role="status">{infoMessage}</div>}
+            {errorMessage && <div className="form-error" role="alert">{errorMessage}</div>}
+            <button type="submit" className="primary-button" disabled={loading}><AuthIcon name={signup ? "user" : "key"}/>{loading ? "Please wait..." : signup ? "Create secure account" : "Sign in securely"}</button>
+            <button type="button" className="auth-mode-button" onClick={()=>{clearMessages();setMode(c=>c === "signin" ? "signup" : "signin");}} disabled={loading}><AuthIcon name="swap"/>{signup ? "Already have an account? Sign in" : "New client? Create an account"}</button>
           </form>
         )}
       </main>
