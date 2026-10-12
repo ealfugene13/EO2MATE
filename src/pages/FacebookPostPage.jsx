@@ -1148,6 +1148,10 @@ export default function FacebookPostPage({
   const [miningParticipationCommands, setMiningParticipationCommands] = useState([]);
   const [regularSaleParticipationCommands, setRegularSaleParticipationCommands] = useState([]);
   const [regularSalePrice, setRegularSalePrice] = useState("");
+  const [regularSaleEndDate, setRegularSaleEndDate] = useState("");
+  const [regularSaleDiscountType, setRegularSaleDiscountType] = useState("NONE");
+  const [regularSaleDiscountValue, setRegularSaleDiscountValue] = useState("");
+  const regularSaleEffectivePrice = (price) => { const original = normalizeMoney(price); if (original === null) return null; const amount = Number(regularSaleDiscountValue); if (regularSaleDiscountType === "NONE" || !Number.isFinite(amount)) return original; return Math.round((regularSaleDiscountType === "PERCENTAGE" ? original * (1 - amount / 100) : original - amount) * 100) / 100; };
   const [regularSaleQuantity, setRegularSaleQuantity] = useState("");
   const [regularSaleMaxPerBuyer, setRegularSaleMaxPerBuyer] = useState("");
   const [miningMinePrice, setMiningMinePrice] = useState("");
@@ -1484,7 +1488,8 @@ export default function FacebookPostPage({
     if (postMode === "REGULAR_SALE") {
       if (!isMultiple && singleItem.trim()) details.push(`Item: ${singleItem.trim()}`);
       const price = normalizeMoney(regularSalePrice);
-      if (price !== null) details.push(`Price: ${formatMoneyForCaption(regularSalePrice)}`);
+      if (price !== null) details.push(regularSaleDiscountType === "NONE" ? `Price: ${formatMoneyForCaption(regularSalePrice)}` : `Original Price: ${formatMoneyForCaption(regularSalePrice)}\nPromo Price: ${formatMoneyForCaption(regularSaleEffectivePrice(regularSalePrice))}`);
+      if (regularSaleEndDate) details.push(`Sale Ends: ${formatFacebookAuctionDate(regularSaleEndDate)} (PH Time)`);
       if (regularSaleQuantity) details.push(`Available Qty: ${regularSaleQuantity}`);
       if (regularSaleMaxPerBuyer) details.push(`Max Qty / Buyer: ${regularSaleMaxPerBuyer}`);
       const command = regularSaleParticipationCommands.find((row) => row?.command_text === "+")?.command_text || "+";
@@ -1543,7 +1548,7 @@ export default function FacebookPostPage({
     preorderPaymentDeadline,
     preorderParticipationCommands,
     miningParticipationCommands, miningMinePrice, miningTakePrice, miningLockPrice, miningEndDate,
-    regularSaleParticipationCommands, regularSalePrice, regularSaleQuantity, regularSaleMaxPerBuyer,
+    regularSaleParticipationCommands, regularSalePrice, regularSaleQuantity, regularSaleMaxPerBuyer, regularSaleEndDate, regularSaleDiscountType, regularSaleDiscountValue,
   ]);
 
   const photoCaptions = useMemo(() => {
@@ -1558,7 +1563,7 @@ export default function FacebookPostPage({
         const price = item.regularSalePrice !== "" ? item.regularSalePrice : regularSalePrice;
         const qty = item.regularSaleQuantity !== "" ? item.regularSaleQuantity : regularSaleQuantity;
         const max = item.regularSaleMaxPerBuyer !== "" ? item.regularSaleMaxPerBuyer : regularSaleMaxPerBuyer;
-        return formatPhoto([`Item: ${item.item.trim()}`, `Price: ${formatMoneyForCaption(price)}`, `Available Qty: ${qty}`, ...(max ? [`Max Qty / Buyer: ${max}`] : [])].join("\n"), `To buy, comment ${command}<qty> on this photo. Example: ${command}1.`);
+        return formatPhoto([`Item: ${item.item.trim()}`, ...(regularSaleDiscountType === "NONE" ? [`Price: ${formatMoneyForCaption(price)}`] : [`Original Price: ${formatMoneyForCaption(price)}`, `Promo Price: ${formatMoneyForCaption(regularSaleEffectivePrice(price))}`]), ...(regularSaleEndDate ? [`Sale Ends: ${formatFacebookAuctionDate(regularSaleEndDate)} (PH Time)`] : []), `Available Qty: ${qty}`, ...(max ? [`Max Qty / Buyer: ${max}`] : [])].join("\n"), `To buy, comment ${command}<qty> on this photo. Example: ${command}1.`);
       });
     }
     if (postMode === "MINING") {
@@ -1860,6 +1865,13 @@ export default function FacebookPostPage({
     }
 
     if (postMode === "REGULAR_SALE") {
+      if (regularSaleEndDate && (!Number.isFinite(new Date(regularSaleEndDate).getTime()) || new Date(regularSaleEndDate).getTime() <= Date.now())) errors.regularSaleEndDate = "End date must be in the future.";
+      if (regularSaleDiscountType !== "NONE") {
+        const amount = Number(regularSaleDiscountValue);
+        if (!regularSaleDiscountValue || !Number.isFinite(amount) || amount <= 0 || (regularSaleDiscountType === "PERCENTAGE" && amount >= 100)) errors.regularSaleDiscountValue = "Enter a positive discount below 100% (for percentage discounts).";
+        const prices = isMultiple ? items.map(item => item.regularSalePrice !== "" ? item.regularSalePrice : regularSalePrice) : [regularSalePrice];
+        if (prices.some(price => !(regularSaleEffectivePrice(price) > 0))) errors.regularSaleDiscountValue = "Discount must leave every item with a price greater than zero.";
+      }
       const price = normalizeMoney(regularSalePrice);
       const qty = Number(regularSaleQuantity);
       if (price === null || price <= 0) errors.regularSalePrice = "Price must be greater than 0.";
@@ -2331,7 +2343,7 @@ export default function FacebookPostPage({
     setMiningTakePrice("");
     setMiningLockPrice("");
     setMiningEndDate("");
-    setRegularSalePrice(""); setRegularSaleQuantity(""); setRegularSaleMaxPerBuyer("");
+    setRegularSalePrice(""); setRegularSaleQuantity(""); setRegularSaleMaxPerBuyer(""); setRegularSaleEndDate(""); setRegularSaleDiscountType("NONE"); setRegularSaleDiscountValue("");
 
     setSharedRules({
       minBid: "",
@@ -2381,7 +2393,7 @@ export default function FacebookPostPage({
     if(!confirmed){setConfirmPopup({mode:"REGULAR_SALE",title:`Publish ${isMultiple?"Multiple":"Single"} Regular Sale?`,page:getPageLabel(selectedPage),type:isMultiple?"Multiple Regular Sale":"Single Regular Sale",images:items.length});return;}
     setPublishing(true); setErrorMessage(""); setFailurePopup(null);
     try {
-      const payload={client_id:client.client_id,fb_page_id:selectedPageId,post_type:isMultiple?"MULTIPLE":"SINGLE",main_caption:mainCaption,max_quantity_per_buyer:regularSaleMaxPerBuyer===""?null:Number(regularSaleMaxPerBuyer),...(isMultiple?{items:items.map((item)=>({item_label:item.item.trim(),item_source:item.itemSource||"MANUAL",inventory_item_id:(item.itemSource||"MANUAL")==="INVENTORY"?item.inventoryItemId:null,unit_price:normalizeMoney(item.regularSalePrice!==""?item.regularSalePrice:regularSalePrice),quantity_limit:Number(item.regularSaleQuantity!==""?item.regularSaleQuantity:regularSaleQuantity),max_quantity_per_buyer:item.regularSaleMaxPerBuyer===""?null:Number(item.regularSaleMaxPerBuyer)})),photo_captions:photoCaptions}:{item:{item_label:singleItem.trim(),item_source:singleItemSource,inventory_item_id:singleItemSource==="INVENTORY"?singleInventoryItemId:null,unit_price:normalizeMoney(regularSalePrice),quantity_limit:Number(regularSaleQuantity),max_quantity_per_buyer:regularSaleMaxPerBuyer===""?null:Number(regularSaleMaxPerBuyer)}})};
+      const payload={client_id:client.client_id,fb_page_id:selectedPageId,ends_at:regularSaleEndDate ? new Date(regularSaleEndDate).toISOString() : null,discount_type:regularSaleDiscountType,discount_value:regularSaleDiscountType === "NONE" ? null : Number(regularSaleDiscountValue),post_type:isMultiple?"MULTIPLE":"SINGLE",main_caption:mainCaption,max_quantity_per_buyer:regularSaleMaxPerBuyer===""?null:Number(regularSaleMaxPerBuyer),...(isMultiple?{items:items.map((item)=>({item_label:item.item.trim(),item_source:item.itemSource||"MANUAL",inventory_item_id:(item.itemSource||"MANUAL")==="INVENTORY"?item.inventoryItemId:null,original_unit_price:normalizeMoney(item.regularSalePrice!==""?item.regularSalePrice:regularSalePrice),unit_price:regularSaleEffectivePrice(item.regularSalePrice!==""?item.regularSalePrice:regularSalePrice),quantity_limit:Number(item.regularSaleQuantity!==""?item.regularSaleQuantity:regularSaleQuantity),max_quantity_per_buyer:item.regularSaleMaxPerBuyer===""?null:Number(item.regularSaleMaxPerBuyer)})),photo_captions:photoCaptions}:{item:{item_label:singleItem.trim(),item_source:singleItemSource,inventory_item_id:singleItemSource==="INVENTORY"?singleInventoryItemId:null,original_unit_price:normalizeMoney(regularSalePrice),unit_price:regularSaleEffectivePrice(regularSalePrice),quantity_limit:Number(regularSaleQuantity),max_quantity_per_buyer:regularSaleMaxPerBuyer===""?null:Number(regularSaleMaxPerBuyer)}})};
       const formData=new FormData(); formData.append("payload",JSON.stringify(payload)); await appendRenderedPostImages(formData, items);
       const {data,error}=await supabase.functions.invoke("meta",{headers:{"x-eo2mate-meta-route":"regular-sale-publish"},body:formData}); if(error)throw error; if(!data?.success)throw new Error(data?.message||data?.error||"Regular Sale publishing failed.");
       const successData={...data,page_name:getPageLabel(selectedPage),environment,post_type_display_name:isMultiple?"Multiple Regular Sale":"Single Regular Sale",mode_display_name:"Regular Sale"}; resetFormForNewPost({keepSuccessPopup:true}); setSuccessPopup(successData);
@@ -3796,6 +3808,12 @@ export default function FacebookPostPage({
               <label>{isMultiple ? "Default Available Quantity" : "Available Quantity"} <span className="eo2-required">*</span><input ref={registerField("regularSaleQuantity")} type="number" min="1" step="1" value={regularSaleQuantity} onChange={(e)=>{setRegularSaleQuantity(e.target.value);clearFieldError("regularSaleQuantity");}} disabled={publishing}/>{fieldErrors.regularSaleQuantity&&<small className="eo2-field-error-text">{fieldErrors.regularSaleQuantity}</small>}</label>
               <label>{isMultiple ? "Default Max Qty / Buyer" : "Max Qty / Buyer"}<input ref={registerField("regularSaleMaxPerBuyer")} type="number" min="1" step="1" value={regularSaleMaxPerBuyer} onChange={(e)=>{setRegularSaleMaxPerBuyer(e.target.value);clearFieldError("regularSaleMaxPerBuyer");}} disabled={publishing} placeholder="Optional"/>{fieldErrors.regularSaleMaxPerBuyer&&<small className="eo2-field-error-text">{fieldErrors.regularSaleMaxPerBuyer}</small>}</label>
             </div>
+            <div className="fb-post-setup-grid">
+              <label>Promotion Type<select value={regularSaleDiscountType} onChange={(e)=>setRegularSaleDiscountType(e.target.value)} disabled={publishing}><option value="NONE">No Discount</option><option value="PERCENTAGE">Percentage Discount (%)</option><option value="FIXED">Fixed Discount (₱)</option></select></label>
+              {regularSaleDiscountType !== "NONE" && <label>Discount Value <span className="eo2-required">*</span><input type="number" min="0.01" step="0.01" value={regularSaleDiscountValue} onChange={(e)=>setRegularSaleDiscountValue(e.target.value)} disabled={publishing}/>{fieldErrors.regularSaleDiscountValue && <small className="eo2-field-error-text">{fieldErrors.regularSaleDiscountValue}</small>}</label>}
+              <div className={`eo2-rule-datetime ${fieldClass(fieldErrors, "regularSaleEndDate")}`}><span className="eo2-rule-heading">Sale End Date (optional)</span><ScrollDateTimePicker inputRef={registerField("regularSaleEndDate")} value={regularSaleEndDate} onChange={(value)=>{setRegularSaleEndDate(value);clearFieldError("regularSaleEndDate");}} disabled={publishing} hasError={Boolean(fieldErrors.regularSaleEndDate)}/>{fieldErrors.regularSaleEndDate && <small className="eo2-field-error-text">{fieldErrors.regularSaleEndDate}</small>}</div>
+            </div>
+            <p>Without an end date, the sale remains active until sold out. Promo prices are fixed for orders accepted during the sale.</p>
           </>
         ) : postMode === "MINING" ? (
           <>
