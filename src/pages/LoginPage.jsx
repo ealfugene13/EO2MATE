@@ -28,6 +28,7 @@ export default function LoginPage({ onBack }) {
   const [errorMessage, setErrorMessage] = useState("");
   const [infoMessage, setInfoMessage] = useState("");
   const [mode, setMode] = useState("signin");
+  const [verificationEmail, setVerificationEmail] = useState("");
 
   const signup = mode === "signup";
   const normalizedEmail = email.trim().toLowerCase();
@@ -64,8 +65,16 @@ export default function LoginPage({ onBack }) {
         });
         if (error) throw error;
         if (!data?.session) {
-          setInfoMessage("Account created. Confirm your email, then sign in to continue onboarding.");
-          setMode("signin");
+          setVerificationEmail(normalizedEmail);
+          setInfoMessage("Registration received. Check your inbox for the verification link before signing in.");
+          setMode("verify");
+        } else {
+          // When confirmation is required, signUp should not return an active session.
+          // Guard against a misconfigured hosted Supabase project.
+          await supabase.auth.signOut();
+          setVerificationEmail(normalizedEmail);
+          setMode("verify");
+          setInfoMessage("Account created, but email verification is not enforced by the Supabase project. Ask an administrator to enable Confirm email before onboarding.");
         }
       } else {
         if (!emailValid) throw new Error("Enter a valid email address.");
@@ -73,6 +82,20 @@ export default function LoginPage({ onBack }) {
         if (error) throw error;
       }
     } catch (error) { setErrorMessage(error.message || "Unable to continue."); }
+    finally { setLoading(false); }
+  }
+
+  async function resendConfirmation(event) {
+    event.preventDefault(); clearMessages();
+    const address = (verificationEmail || email).trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(address)) { setErrorMessage("Enter a valid registration email."); return; }
+    setLoading(true);
+    try {
+      const emailRedirectTo = new URL("./", window.location.href).href;
+      const { error } = await supabase.auth.resend({ type: "signup", email: address, options: { emailRedirectTo } });
+      if (error) throw error;
+      setInfoMessage("If this account is awaiting verification, a new link has been requested. Check your inbox and spam folder.");
+    } catch (error) { setErrorMessage(error.message || "Unable to resend confirmation. Please try again later."); }
     finally { setLoading(false); }
   }
 
@@ -91,6 +114,7 @@ export default function LoginPage({ onBack }) {
   }
 
   const recovery = mode === "recovery";
+  const verifying = mode === "verify";
   return (
     <div className="auth-page auth-page-enhanced">
       <div className="auth-backdrop" aria-hidden="true"><span/><span/><span/></div>
@@ -101,11 +125,19 @@ export default function LoginPage({ onBack }) {
           <div><div className="brand-name">EO2MATE</div><div className="brand-subtitle">Social selling operations</div></div>
         </div>
         <div className="auth-heading">
-          <h1>{recovery ? "Reset your password" : mode === "signup" ? "Create your EO2MATE account" : "Welcome to EO2MATE"}</h1>
-          <p>{recovery ? "Enter your account email and we'll send you a secure password-reset link." : mode === "signup" ? "Create your account, then complete security and workspace setup." : "Sign in to your EO2MATE account."}</p>
+          <h1>{recovery ? "Reset your password" : verifying ? "Verify your email" : mode === "signup" ? "Create your EO2MATE account" : "Welcome to EO2MATE"}</h1>
+          <p>{recovery ? "Enter your account email and we'll send you a secure password-reset link." : verifying ? "Open the confirmation link sent to your email before continuing to onboarding." : mode === "signup" ? "Create your account, then complete security and workspace setup." : "Sign in to your EO2MATE account."}</p>
         </div>
 
-        {recovery ? (
+        {verifying ? (
+          <form onSubmit={resendConfirmation} className="login-form">
+            <label>Registration email<input type="email" value={verificationEmail} onChange={(e)=>setVerificationEmail(e.target.value)} autoComplete="email" required /></label>
+            {infoMessage && <div className="success-message" role="status">{infoMessage}</div>}
+            {errorMessage && <div className="form-error" role="alert">{errorMessage}</div>}
+            <button type="submit" className="primary-button" disabled={loading}><AuthIcon name="mail"/>{loading ? "Requesting..." : "Resend verification email"}</button>
+            <button type="button" className="auth-mode-button" disabled={loading} onClick={()=>{clearMessages();setMode("signin");}}><AuthIcon name="back"/>Back to sign in</button>
+          </form>
+        ) : recovery ? (
           <form onSubmit={sendRecovery} className="login-form">
             <label>Email<input type="email" value={email} onChange={(e)=>setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" required /></label>
             {infoMessage && <div className="success-message">{infoMessage}</div>}

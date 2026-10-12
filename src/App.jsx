@@ -23,6 +23,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
+  const [verifiedEmail, setVerifiedEmail] = useState(null);
 
   useEffect(() => {
     let mounted = true;
@@ -30,6 +31,7 @@ export default function App() {
     supabase.auth.getSession().then(({ data }) => {
       if (mounted) {
         setSession(data.session);
+        setVerifiedEmail(data.session?.user?.email_confirmed_at || data.session?.user?.confirmed_at || null);
         setLoading(false);
       }
     });
@@ -39,6 +41,7 @@ export default function App() {
         if (mounted) {
           if (event === "PASSWORD_RECOVERY") setPasswordRecovery(true);
           setSession(newSession);
+          setVerifiedEmail(newSession?.user?.email_confirmed_at || newSession?.user?.confirmed_at || null);
           setLoading(false);
         }
       }
@@ -53,6 +56,9 @@ export default function App() {
   if (loading) return <LoadingScreen />;
   if (passwordRecovery && session) return <PasswordResetPage onComplete={() => setPasswordRecovery(false)} />;
   if (!session) return showLogin ? <LoginPage onBack={() => setShowLogin(false)} /> : <PublicHomePage onLogin={() => setShowLogin(true)} />;
+  if (!verifiedEmail) return (
+    <div className="auth-page"><main className="auth-card"><h1>Verify your email</h1><p>Your account email must be confirmed before you can access EO2MATE.</p><p>Check your inbox for the confirmation link, then sign in again.</p><button className="primary-button" type="button" onClick={() => supabase.auth.signOut()}>Sign out</button></main></div>
+  );
   return (
     <MfaGate>
       <PortalPage session={session} />
