@@ -194,7 +194,6 @@ function MetricCard({ title, value, subtitle, onClick }) {
   );
 }
 
-import { useState } from "react";
 import LiveMiningPage from "./LiveMiningPage";
 
 const LIVE_MODES = [
