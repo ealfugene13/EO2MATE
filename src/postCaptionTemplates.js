@@ -13,6 +13,25 @@ export const POST_CAPTION_TEMPLATE_CONTEXTS = [
   { code: "PHOTO_MULTIPLE", label: "Multiple · Photo caption" },
 ];
 
+// Visual labels are applied only to generated content; custom seller text stays untouched.
+const CAPTION_LINE_ICONS = [
+  [/^Item:/i, "📦"], [/^Original Price:/i, "🏷️"], [/^Promo Price:/i, "🔥"],
+  [/^(Price|Minimum Bid|Increment|Buyout):/i, "💰"],
+  [/^(MINE|TAKE|LOCK):/i, "💎"],
+  [/^(Sale Ends|Mining Ends|Pre-Order Until|Auction Ends|Ends):/i, "⏰"],
+  [/^Payment Deadline:/i, "💳"], [/^(Available Qty|Quantity):/i, "📦"],
+  [/^Max Qty \/ Buyer:/i, "👤"], [/^Required Down Payment:/i, "💳"],
+  [/^Minimum Bidders:/i, "👥"], [/^Bid Cutoff:/i, "⏳"],
+  [/^Comment /i, "💬"], [/^(To buy|To order|To bid|For this item),/i, "💬"],
+];
+export function decorateGeneratedCaption(text) {
+  return String(text || "").split("\n").map(line => {
+    if (!line.trim() || /^[\p{Extended_Pictographic}]/u.test(line.trim())) return line;
+    const rule = CAPTION_LINE_ICONS.find(([pattern]) => pattern.test(line.trim()));
+    return rule ? `${rule[1]} ${line}` : line;
+  }).join("\n");
+}
+
 const DEFAULT_TEMPLATE = {
   MAIN_SINGLE: "{{seller_caption}}\n\n{{caption_marker}}\n{{details}}\n{{instructions}}\n\n{{follow_text}}",
   MAIN_MULTIPLE: "{{seller_caption}}\n\n{{caption_marker}}\n{{details}}\n{{instructions}}\n\n{{follow_text}}",

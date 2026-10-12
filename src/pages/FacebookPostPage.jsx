@@ -1,15 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../supabase";
-import { captionTemplateSettingKey, DEFAULT_POST_CAPTION_TEMPLATES, renderPostCaptionTemplate } from "../postCaptionTemplates";
+import { captionTemplateSettingKey, DEFAULT_POST_CAPTION_TEMPLATES, renderPostCaptionTemplate, decorateGeneratedCaption } from "../postCaptionTemplates";
 
 const MAX_IMAGES = 50;
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
-const CAPTION_EMOJIS = ["✨", "🔥", "🎉", "🛍️", "📣", "💖", "✅", "📦", "🏷️", "👇", "🛒", "😊", "🙏", "⭐", "💬", "📍"];
-const CAPTION_SYMBOLS = ["•", "✓", "→", "➜", "★", "♡", "♥", "|", "━", "—", "₱", "📌"];
+const CAPTION_EMOJIS = ["🔥","🎉","🎊","✨","💥","⚡","🚨","📣","📢","📌","📍","💙","❤️","💖","😍","🥳","🙏","😊","👍","👏","🙌","💯","⭐","🌟","🏆","🥇","🎯","🎁","🎀","🛍️","🛒","🏷️","💰","💸","💵","💳","🧾","📦","📬","🚚","🚛","🛵","📲","💬","🗨️","👀","👇","👉","👈","☝️","👤","👥","📸","🖼️","📷","🔨","💎","🔒","🔓","🔔","⏰","⏳","⌛","🕛","🗓️","📅","🕒","✅","☑️","❌","⚠️","🚫","🔴","🟢","🟡","🔵","🆕","🆓","🆒","🔝","➕","➖","💲","🔖"];
+const CAPTION_SYMBOLS = ["•","◦","▪","▫","✓","✔","✗","✘","☑","→","←","↗","↘","➜","➤","➔","➕","★","☆","✦","✧","♡","♥","♦","◆","◇","●","○","■","□","━","─","═","—","–","|","│","┃","┊","┈","┏","┓","┗","┛","╔","╗","╚","╝","₱","%","+","×","÷","≤","≥","≈","≠","∞","#","@","&","/","\u00b7","‼","⁉","※","™","®","©"];
 const CAPTION_QUICK_TEXT = [
-  "Follow our page for more updates!",
-  "Message us for inquiries.",
-  "Thank you for supporting our shop!",
+  "🔥 LIMITED-TIME SALE! 🔥", "🎉 NEW ARRIVALS! 🎉", "🏷️ SPECIAL PROMO PRICE!",
+  "⏰ Offer valid until the posted deadline.", "📦 Limited stocks available — first come, first served!",
+  "📸 Check each item photo for its price and details.",
+  "💬 Please comment under the correct item photo to claim.",
+  "⚠️ Claims on the main post do not count for Multiple posts.",
+  "💙 Follow our page for more great finds and new arrivals!",
+  "📲 Message us for inquiries.", "🙏 Thank you for supporting our shop!",
 ];
 let heicConverterPromise = null;
 
@@ -1493,7 +1497,7 @@ export default function FacebookPostPage({
       if (regularSaleQuantity) details.push(`Available Qty: ${regularSaleQuantity}`);
       if (regularSaleMaxPerBuyer) details.push(`Max Qty / Buyer: ${regularSaleMaxPerBuyer}`);
       const command = regularSaleParticipationCommands.find((row) => row?.command_text === "+")?.command_text || "+";
-      instructions = `To buy, comment ${command}<qty> ${isMultiple ? "on the item photo" : "below"}. Example: ${command}1.`;
+      instructions = isMultiple ? `📢 HOW TO CLAIM\n🖼️ Choose an item photo, then comment ${command}1 (or ${command}2 for two pieces) directly under THAT PHOTO.\n⚠️ Claims on the main post are not counted.` : `📢 HOW TO CLAIM\n💬 Comment ${command}1 (or ${command}2 for two pieces) directly on THIS MAIN POST.`;
     } else if (postMode === "MINING") {
       if (!isMultiple && singleItem.trim()) details.push(`Item: ${singleItem.trim()}`);
       const mine = normalizeMoney(miningMinePrice), take = normalizeMoney(miningTakePrice), lock = normalizeMoney(miningLockPrice);
@@ -1501,7 +1505,7 @@ export default function FacebookPostPage({
       if (take !== null) details.push(`${cmd(miningParticipationCommands, "TAKE", "TAKE")}: ${formatMoneyForCaption(miningTakePrice)}`);
       if (lock !== null) details.push(`${cmd(miningParticipationCommands, "LOCK", "LOCK")}: ${formatMoneyForCaption(miningLockPrice)}`);
       if (miningEndDate) details.push(`Mining Ends: ${formatFacebookAuctionDate(miningEndDate)}`);
-      instructions = `For this item, comment ${cmd(miningParticipationCommands, "MINE", "MINE")}, ${cmd(miningParticipationCommands, "TAKE", "TAKE")}, or ${cmd(miningParticipationCommands, "LOCK", "LOCK")} ${isMultiple ? "on its photo" : "below"}.`;
+      instructions = `📢 HOW TO CLAIM\n💬 Comment ${cmd(miningParticipationCommands, "MINE", "MINE")}, ${cmd(miningParticipationCommands, "TAKE", "TAKE")}, or ${cmd(miningParticipationCommands, "LOCK", "LOCK")} ${isMultiple ? "under the PHOTO of your chosen item.\n⚠️ Main-post comments do not count as item claims." : "directly on THIS MAIN POST."}\n🔒 An accepted LOCK closes that item.`;
     } else if (postMode === "PREORDER") {
       if (!isMultiple && singleItem.trim()) details.push(`Item: ${singleItem.trim()}`);
       const price = normalizeMoney(preorderPrice);
@@ -1513,10 +1517,10 @@ export default function FacebookPostPage({
       if (preorderDeadline) details.push(`Pre-Order Until: ${formatFacebookAuctionDate(preorderDeadline)}`);
       if (preorderPaymentDeadline) details.push(`Payment Deadline: ${formatFacebookAuctionDate(preorderPaymentDeadline)}`);
       const command = preorderParticipationCommands.find((row) => row?.command_text === "+")?.command_text || preorderParticipationCommands[0]?.command_text || "+";
-      instructions = `To order, comment ${command}<qty> ${isMultiple ? "on the item photo" : "below"}. Example: ${command}1.`;
+      instructions = `📢 HOW TO PRE-ORDER\n💬 Comment ${command}1 for one piece, ${command}2 for two pieces ${isMultiple ? "under the PHOTO of your chosen item.\n⚠️ Main-post comments do not count as item orders." : "directly on THIS MAIN POST."}\n⚠️ Use whole positive quantities only.`;
     } else {
       details.push(...buildRuleLines(sharedRules, isMultiple ? {} : { includeItem: true, item: singleItem }));
-      instructions = isMultiple ? "To bid, comment your amount on the photo of the item." : "To bid, comment your bid amount below.";
+      instructions = isMultiple ? "📢 HOW TO BID\n🖼️ Choose your item photo and comment your bid amount directly under THAT PHOTO.\n⚠️ Bids on the main post are not counted for individual items." : "📢 HOW TO BID\n🔨 Comment your bid amount directly on THIS MAIN POST.\n💰 Follow the minimum bid and increment shown above.";
     }
 
     const context = isMultiple ? "MAIN_MULTIPLE" : "MAIN_SINGLE";
@@ -1525,9 +1529,9 @@ export default function FacebookPostPage({
       seller_caption: sellerCaption.trim(),
       // Auction labels are internal registration metadata, never public caption text.
       caption_marker: postMode !== "AUCTION" ? selectedPostType?.caption_marker || "" : "",
-      details: details.join("\n"),
-      instructions,
-      follow_text: "Follow this page for more great finds and new arrivals!",
+      details: decorateGeneratedCaption(details.join("\n")),
+      instructions: decorateGeneratedCaption(instructions),
+      follow_text: "💙 Follow this page for more great finds and new arrivals!",
     });
   }, [
     sellerCaption,
@@ -1555,7 +1559,7 @@ export default function FacebookPostPage({
     if (!isMultiple) return [];
     const formatPhoto = (details, instructions) => {
       const template = captionTemplates[captionTemplateSettingKey(postMode, "PHOTO_MULTIPLE")] ?? DEFAULT_POST_CAPTION_TEMPLATES[postMode]?.PHOTO_MULTIPLE;
-      return renderPostCaptionTemplate(template, { details, instructions });
+      return renderPostCaptionTemplate(template, { details: decorateGeneratedCaption(details), instructions: decorateGeneratedCaption(instructions) });
     };
     if (postMode === "REGULAR_SALE") {
       const command = regularSaleParticipationCommands.find((row) => row?.command_text === "+")?.command_text || "+";
@@ -1563,7 +1567,7 @@ export default function FacebookPostPage({
         const price = item.regularSalePrice !== "" ? item.regularSalePrice : regularSalePrice;
         const qty = item.regularSaleQuantity !== "" ? item.regularSaleQuantity : regularSaleQuantity;
         const max = item.regularSaleMaxPerBuyer !== "" ? item.regularSaleMaxPerBuyer : regularSaleMaxPerBuyer;
-        return formatPhoto([`Item: ${item.item.trim()}`, ...(regularSaleDiscountType === "NONE" ? [`Price: ${formatMoneyForCaption(price)}`] : [`Original Price: ${formatMoneyForCaption(price)}`, `Promo Price: ${formatMoneyForCaption(regularSaleEffectivePrice(price))}`]), ...(regularSaleEndDate ? [`Sale Ends: ${formatFacebookAuctionDate(regularSaleEndDate)} (PH Time)`] : []), `Available Qty: ${qty}`, ...(max ? [`Max Qty / Buyer: ${max}`] : [])].join("\n"), `To buy, comment ${command}<qty> on this photo. Example: ${command}1.`);
+        return formatPhoto([`Item: ${item.item.trim()}`, ...(regularSaleDiscountType === "NONE" ? [`Price: ${formatMoneyForCaption(price)}`] : [`Original Price: ${formatMoneyForCaption(price)}`, `Promo Price: ${formatMoneyForCaption(regularSaleEffectivePrice(price))}`]), ...(regularSaleEndDate ? [`Sale Ends: ${formatFacebookAuctionDate(regularSaleEndDate)} (PH Time)`] : []), `Available Qty: ${qty}`, ...(max ? [`Max Qty / Buyer: ${max}`] : [])].join("\n"), `💬 Comment ${command}1 (or ${command}2 for two pieces) directly under THIS PHOTO to claim. Main-post comments do not count.`);
       });
     }
     if (postMode === "MINING") {
@@ -1573,7 +1577,7 @@ export default function FacebookPostPage({
         const take = item.miningTakePrice !== "" ? item.miningTakePrice : miningTakePrice;
         const lock = item.miningLockPrice !== "" ? item.miningLockPrice : miningLockPrice;
         const endDate = item.miningEndDate || miningEndDate;
-        return formatPhoto([`Item: ${item.item.trim()}`, `${cmd("MINE","MINE")}: ${formatMoneyForCaption(mine)}`, `${cmd("TAKE","TAKE")}: ${formatMoneyForCaption(take)}`, `${cmd("LOCK","LOCK")}: ${formatMoneyForCaption(lock)}`, `Mining Ends: ${formatFacebookAuctionDate(endDate)}`].join("\n"), `For this item, comment ${cmd("MINE","MINE")}, ${cmd("TAKE","TAKE")}, or ${cmd("LOCK","LOCK")} on this photo.`);
+        return formatPhoto([`Item: ${item.item.trim()}`, `${cmd("MINE","MINE")}: ${formatMoneyForCaption(mine)}`, `${cmd("TAKE","TAKE")}: ${formatMoneyForCaption(take)}`, `${cmd("LOCK","LOCK")}: ${formatMoneyForCaption(lock)}`, `Mining Ends: ${formatFacebookAuctionDate(endDate)}`].join("\n"), `💬 Comment ${cmd("MINE","MINE")}, ${cmd("TAKE","TAKE")}, or ${cmd("LOCK","LOCK")} under THIS PHOTO. Main-post comments do not count.`);
       });
     }
     if (postMode === "PREORDER") {
