@@ -217,7 +217,17 @@ function StatusBadge({ status }) {
   return <span className={className}>{statusLabel(normalized)}</span>;
 }
 
-export default function DashboardPage({ client, facebookStatus, goToAuctions, goToDeliveries, goToOrders, goToPayments, navigateTo, onboardingChecked, openDelivery, openFacebookSetup, page, paymentAccountLoading, paymentAccountMessage, paymentAccountStatus, setErrorMessage, setPage }) {
+
+// Defense-in-depth only: SQL views and server actions must also enforce Page ownership.
+// Rows with missing or ambiguous Page attribution are never displayed.
+function onlySelectedPage(rows, pageId) {
+  if (!pageId) return [];
+  return (rows || []).filter((row) =>
+    String(row.fb_page_id || row.page_fb_id || "") === String(pageId)
+  );
+}
+
+export default function DashboardPage({ client, facebookStatus, goToAuctions, goToDeliveries, goToOrders, goToPayments, navigateTo, onboardingChecked, openDelivery, openFacebookSetup, page, paymentAccountLoading, paymentAccountMessage, paymentAccountStatus, setErrorMessage, setPage , selectedFbPageId }) {
   const [auctions, setAuctions] = useState([]);
 
   const [orders, setOrders] = useState([]);
@@ -276,17 +286,17 @@ export default function DashboardPage({ client, facebookStatus, goToAuctions, go
       ]);
       if (version !== pageLoadVersion.current) return;
       for (const result of results) if (result.error) throw result.error;
-      setAuctions(results[0].data || []);
-      setOrders(results[1].data || []);
-      setPayments(results[2].data || []);
-      setDeliveries(results[3].data || []);
+      setAuctions(onlySelectedPage(results[0].data, selectedFbPageId));
+      setOrders(onlySelectedPage(results[1].data, selectedFbPageId));
+      setPayments(onlySelectedPage(results[2].data, selectedFbPageId));
+      setDeliveries(onlySelectedPage(results[3].data, selectedFbPageId));
     } catch (error) {
       if (version === pageLoadVersion.current) setErrorMessage(error.message || "Unable to load this page.");
     } finally {
       if (version === pageLoadVersion.current) setPageDataLoading(false);
     }
   }
-  useEffect(() => { loadPortal(); return () => { pageLoadVersion.current++; }; }, [client?.client_id]);
+  useEffect(() => { loadPortal(); return () => { pageLoadVersion.current++; }; }, [client?.client_id, selectedFbPageId]);
   if (pageDataLoading) return <div className="loading-card"><h2>Loading page</h2></div>;
   return (<>
     {page === "dashboard" && (

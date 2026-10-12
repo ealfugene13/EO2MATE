@@ -95,7 +95,17 @@ function DetailRow({ label, value }) {
   );
 }
 
-export default function OrdersPage({ client, detailRequest, page, setErrorMessage, setPage, navigationFilter }) {
+
+// Defense-in-depth only: SQL views and server actions must also enforce Page ownership.
+// Rows with missing or ambiguous Page attribution are never displayed.
+function onlySelectedPage(rows, pageId) {
+  if (!pageId) return [];
+  return (rows || []).filter((row) =>
+    String(row.fb_page_id || row.page_fb_id || "") === String(pageId)
+  );
+}
+
+export default function OrdersPage({ client, detailRequest, page, setErrorMessage, setPage, navigationFilter , selectedFbPageId }) {
   const [orderSearch, setOrderSearch] = useState("");
   const [orderStatusFilter, setOrderStatusFilter] = useState("ALL");
   const [channel,setChannel]=useState("ALL"),[from,setFrom]=useState(""),[to,setTo]=useState("");
@@ -290,15 +300,15 @@ export default function OrdersPage({ client, detailRequest, page, setErrorMessag
       ]);
       if (version !== pageLoadVersion.current) return;
       for (const result of results) if (result.error) throw result.error;
-      setOrders(results[0].data || []);
-      setOrderGroups(results[1].data || []);
+      setOrders(onlySelectedPage(results[0].data, selectedFbPageId));
+      setOrderGroups(onlySelectedPage(results[1].data, selectedFbPageId));
     } catch (error) {
       if (version === pageLoadVersion.current) setErrorMessage(error.message || "Unable to load this page.");
     } finally {
       if (version === pageLoadVersion.current) setPageDataLoading(false);
     }
   }
-  useEffect(() => { loadPortal(); return () => { pageLoadVersion.current++; }; }, [client?.client_id]);
+  useEffect(() => { loadPortal(); return () => { pageLoadVersion.current++; }; }, [client?.client_id, selectedFbPageId]);
 
   useEffect(() => { if (detailRequest?.kind === "order" && page === "order-detail") openOrder(detailRequest.id); }, [detailRequest]);
   if (pageDataLoading) return <div className="loading-card"><h2>Loading page</h2></div>;

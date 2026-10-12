@@ -1071,13 +1071,13 @@ export default function PortalPage({ session }) {
 
         {(page === "users-staff") && <StaffPage page={page} />}
 
-        {(page === "reports") && <ReportsPage client={client} page={page} setErrorMessage={setErrorMessage} />}
+        {(page === "reports") && <ReportsPage selectedFbPageId={effectivePageId} client={client} page={page} setErrorMessage={setErrorMessage} />}
 
         {(page === "post-mining") && <MiningPage client={client} metaConnected={metaConnected} miningWorkspaceTab={miningWorkspaceTab} navigateTo={navigateTo} page={page} setMiningWorkspaceTab={setMiningWorkspaceTab} />}
 
-        {(page === "dashboard") && <DashboardPage client={client} facebookStatus={facebookStatus} goToAuctions={goToAuctions} goToDeliveries={goToDeliveries} goToOrders={goToOrders} goToPayments={goToPayments} navigateTo={navigateTo} onboardingChecked={onboardingChecked} openDelivery={openDelivery} openFacebookSetup={openFacebookSetup} page={page} paymentAccountLoading={paymentAccountLoading} paymentAccountMessage={paymentAccountMessage} paymentAccountStatus={paymentAccountStatus} setErrorMessage={setErrorMessage} setPage={setPage} />}
+        {(page === "dashboard") && <DashboardPage selectedFbPageId={effectivePageId} client={client} facebookStatus={facebookStatus} goToAuctions={goToAuctions} goToDeliveries={goToDeliveries} goToOrders={goToOrders} goToPayments={goToPayments} navigateTo={navigateTo} onboardingChecked={onboardingChecked} openDelivery={openDelivery} openFacebookSetup={openFacebookSetup} page={page} paymentAccountLoading={paymentAccountLoading} paymentAccountMessage={paymentAccountMessage} paymentAccountStatus={paymentAccountStatus} setErrorMessage={setErrorMessage} setPage={setPage} />}
 
-        {(page === "auctions" || page === "auction-detail") && <AuctionPage navigationFilter={navigationFilter} auctionWorkspaceTab={auctionWorkspaceTab} client={client} detailRequest={detailRequest} navigateTo={navigateTo} page={page} setAuctionWorkspaceTab={setAuctionWorkspaceTab} setErrorMessage={setErrorMessage} setPage={setPage} />}
+        {(page === "auctions" || page === "auction-detail") && <AuctionPage selectedFbPageId={effectivePageId} navigationFilter={navigationFilter} auctionWorkspaceTab={auctionWorkspaceTab} client={client} detailRequest={detailRequest} navigateTo={navigateTo} page={page} setAuctionWorkspaceTab={setAuctionWorkspaceTab} setErrorMessage={setErrorMessage} setPage={setPage} />}
 
         {page === "inventory" && (
           <InventoryPage client={client} />
@@ -1089,9 +1089,9 @@ export default function PortalPage({ session }) {
 
         {(page === "purchases") && <PurchasesPage client={client} />}
 
-        {(page === "orders" || page === "order-detail") && <OrdersPage navigationFilter={navigationFilter} client={client} detailRequest={detailRequest} page={page} setErrorMessage={setErrorMessage} setPage={(next) => setPage(next)} />}
+        {(page === "orders" || page === "order-detail") && <OrdersPage selectedFbPageId={effectivePageId} navigationFilter={navigationFilter} client={client} detailRequest={detailRequest} page={page} setErrorMessage={setErrorMessage} setPage={(next) => setPage(next)} />}
 
-        {(page === "payments" || page === "payment-detail") && <PaymentsPage navigationFilter={navigationFilter} client={client} detailRequest={detailRequest} page={page} paymentAccountStatus={paymentAccountStatus} setErrorMessage={setErrorMessage} setPage={setPage} />}
+        {(page === "payments" || page === "payment-detail") && <PaymentsPage selectedFbPageId={effectivePageId} navigationFilter={navigationFilter} client={client} detailRequest={detailRequest} page={page} paymentAccountStatus={paymentAccountStatus} setErrorMessage={setErrorMessage} setPage={setPage} />}
 
         {page === "account-security" && (
           <div className="account-security-workspace">
@@ -1139,7 +1139,7 @@ export default function PortalPage({ session }) {
           </div>
         )}
 
-        {(page === "deliveries" || page === "delivery-detail") && <DeliveriesPage navigationFilter={navigationFilter} client={client} detailRequest={detailRequest} goToDeliveries={goToDeliveries} page={page} setErrorMessage={setErrorMessage} setPage={setPage} />}
+        {(page === "deliveries" || page === "delivery-detail") && <DeliveriesPage selectedFbPageId={effectivePageId} navigationFilter={navigationFilter} client={client} detailRequest={detailRequest} goToDeliveries={goToDeliveries} page={page} setErrorMessage={setErrorMessage} setPage={setPage} />}
         </PortalPageContent>
 
       </main>

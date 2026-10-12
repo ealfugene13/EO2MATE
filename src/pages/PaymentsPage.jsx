@@ -87,7 +87,17 @@ function DetailRow({ label, value }) {
   );
 }
 
-export default function PaymentsPage({ client, detailRequest, page, paymentAccountStatus, setErrorMessage, setPage, navigationFilter }) {
+
+// Defense-in-depth only: SQL views and server actions must also enforce Page ownership.
+// Rows with missing or ambiguous Page attribution are never displayed.
+function onlySelectedPage(rows, pageId) {
+  if (!pageId) return [];
+  return (rows || []).filter((row) =>
+    String(row.fb_page_id || row.page_fb_id || "") === String(pageId)
+  );
+}
+
+export default function PaymentsPage({ client, detailRequest, page, paymentAccountStatus, setErrorMessage, setPage, navigationFilter , selectedFbPageId }) {
   const [paymentSearch, setPaymentSearch] = useState("");
   const [paymentStatusFilter, setPaymentStatusFilter] = useState("ALL");
   useEffect(() => { if (navigationFilter?.page === "payments") { setPaymentStatusFilter(navigationFilter.value); setPaymentSearch(""); } }, [navigationFilter]);
@@ -250,7 +260,7 @@ export default function PaymentsPage({ client, detailRequest, page, paymentAccou
       ]);
       if (version !== pageLoadVersion.current) return;
       for (const result of results) if (result.error) throw result.error;
-      setPayments(results[0].data || []);
+      setPayments(onlySelectedPage(results[0].data, selectedFbPageId));
       setPaymentGroups(results[1].data || []);
     } catch (error) {
       if (version === pageLoadVersion.current) setErrorMessage(error.message || "Unable to load this page.");
@@ -258,7 +268,7 @@ export default function PaymentsPage({ client, detailRequest, page, paymentAccou
       if (version === pageLoadVersion.current) setPageDataLoading(false);
     }
   }
-  useEffect(() => { loadPortal(); return () => { pageLoadVersion.current++; }; }, [client?.client_id]);
+  useEffect(() => { loadPortal(); return () => { pageLoadVersion.current++; }; }, [client?.client_id, selectedFbPageId]);
 
   useEffect(() => { if (detailRequest?.kind === "payment" && page === "payment-detail") openPayment(detailRequest.id); }, [detailRequest]);
   if (pageDataLoading) return <div className="loading-card"><h2>Loading page</h2></div>;

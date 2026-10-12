@@ -246,7 +246,17 @@ function DetailRow({ label, value }) {
   );
 }
 
-export default function AuctionPage({ auctionWorkspaceTab, client, detailRequest, navigateTo, page, setAuctionWorkspaceTab, setErrorMessage, setPage, navigationFilter }) {
+
+// Defense-in-depth only: SQL views and server actions must also enforce Page ownership.
+// Rows with missing or ambiguous Page attribution are never displayed.
+function onlySelectedPage(rows, pageId) {
+  if (!pageId) return [];
+  return (rows || []).filter((row) =>
+    String(row.fb_page_id || row.page_fb_id || "") === String(pageId)
+  );
+}
+
+export default function AuctionPage({ auctionWorkspaceTab, client, detailRequest, navigateTo, page, setAuctionWorkspaceTab, setErrorMessage, setPage, navigationFilter , selectedFbPageId }) {
   const [auctionSearch, setAuctionSearch] = useState("");
   const [auctionStatusFilter, setAuctionStatusFilter] = useState("ALL");
   useEffect(() => { if (navigationFilter?.page === "auctions") { setAuctionStatusFilter(navigationFilter.value); setAuctionSearch(""); } }, [navigationFilter]);
@@ -336,7 +346,7 @@ export default function AuctionPage({ auctionWorkspaceTab, client, detailRequest
       ]);
       if (version !== pageLoadVersion.current) return;
       for (const result of results) if (result.error) throw result.error;
-      setAuctions(results[0].data || []);
+      setAuctions(onlySelectedPage(results[0].data, selectedFbPageId));
       setAuctionBids(results[1].data || []);
     } catch (error) {
       if (version === pageLoadVersion.current) setErrorMessage(error.message || "Unable to load this page.");
@@ -344,7 +354,7 @@ export default function AuctionPage({ auctionWorkspaceTab, client, detailRequest
       if (version === pageLoadVersion.current) setPageDataLoading(false);
     }
   }
-  useEffect(() => { loadPortal(); return () => { pageLoadVersion.current++; }; }, [client?.client_id]);
+  useEffect(() => { loadPortal(); return () => { pageLoadVersion.current++; }; }, [client?.client_id, selectedFbPageId]);
 
   useEffect(() => { if (detailRequest?.kind === "auction" && page === "auction-detail") openAuction(detailRequest.id); }, [detailRequest]);
   if (pageDataLoading) return <div className="loading-card"><h2>Loading page</h2></div>;

@@ -72,7 +72,17 @@ function DetailRow({ label, value }) {
   );
 }
 
-export default function DeliveriesPage({ client, detailRequest, goToDeliveries, page, setErrorMessage, setPage, navigationFilter }) {
+
+// Defense-in-depth only: SQL views and server actions must also enforce Page ownership.
+// Rows with missing or ambiguous Page attribution are never displayed.
+function onlySelectedPage(rows, pageId) {
+  if (!pageId) return [];
+  return (rows || []).filter((row) =>
+    String(row.fb_page_id || row.page_fb_id || "") === String(pageId)
+  );
+}
+
+export default function DeliveriesPage({ client, detailRequest, goToDeliveries, page, setErrorMessage, setPage, navigationFilter , selectedFbPageId }) {
   const [deliverySearch, setDeliverySearch] = useState("");
   const [deliveryStatusFilter, setDeliveryStatusFilter] = useState("ALL");
   useEffect(() => { if (navigationFilter?.page === "deliveries") { setDeliveryStatusFilter(navigationFilter.value); setDeliverySearch(""); } }, [navigationFilter]);
@@ -402,14 +412,14 @@ export default function DeliveriesPage({ client, detailRequest, goToDeliveries, 
       ]);
       if (version !== pageLoadVersion.current) return;
       for (const result of results) if (result.error) throw result.error;
-      setDeliveries(results[0].data || []);
+      setDeliveries(onlySelectedPage(results[0].data, selectedFbPageId));
     } catch (error) {
       if (version === pageLoadVersion.current) setErrorMessage(error.message || "Unable to load this page.");
     } finally {
       if (version === pageLoadVersion.current) setPageDataLoading(false);
     }
   }
-  useEffect(() => { loadPortal(); return () => { pageLoadVersion.current++; }; }, [client?.client_id]);
+  useEffect(() => { loadPortal(); return () => { pageLoadVersion.current++; }; }, [client?.client_id, selectedFbPageId]);
 
   useEffect(() => { if (detailRequest?.kind === "delivery" && page === "delivery-detail") openDelivery(detailRequest.id); }, [detailRequest]);
   if (pageDataLoading) return <div className="loading-card"><h2>Loading page</h2></div>;
