@@ -6,6 +6,7 @@ export default function OnboardingPage({ session, initialStatus = null, onComple
   const [businessName, setBusinessName] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingStep, setLoadingStep] = useState("");
   const [message, setMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -26,6 +27,7 @@ export default function OnboardingPage({ session, initialStatus = null, onComple
 
   async function loadStatus() {
     setLoading(true);
+    setLoadingStep("Checking your existing workspace and setup progress...");
     setErrorMessage("");
     try { setStatus(await invoke({ action: "STATUS" })); }
     catch (error) { setErrorMessage(error.message || "Unable to load onboarding."); }
@@ -34,7 +36,7 @@ export default function OnboardingPage({ session, initialStatus = null, onComple
 
   async function createClient(event) {
     event.preventDefault();
-    setLoading(true); setMessage(""); setErrorMessage("");
+    setLoading(true); setLoadingStep("Creating or resuming your business setup..."); setMessage(""); setErrorMessage("");
     try {
       const data = await invoke({
         action: "CREATE_CLIENT",
@@ -70,7 +72,7 @@ export default function OnboardingPage({ session, initialStatus = null, onComple
   }
 
   async function finishOnboarding() {
-    setLoading(true); setMessage(""); setErrorMessage("");
+    setLoading(true); setLoadingStep("Activating your workspace..."); setMessage(""); setErrorMessage("");
     try {
       const data = await invoke({ action: "COMPLETE" });
       setStatus(data);
@@ -106,8 +108,20 @@ export default function OnboardingPage({ session, initialStatus = null, onComple
           <div className={`wizard-step ${status?.onboarding_complete ? "done" : client ? "current" : ""}`}><span>4</span><div><strong>Workspace</strong><small>{status?.onboarding_complete ? "Ready" : "Activate"}</small></div></div>
         </div>
 
+        {loading && <div role="status" aria-live="polite" className="onboarding-provision-progress" style={{padding:"14px 18px",marginBottom:16,border:"1px solid #cbd5e1",borderRadius:12,background:"#f8fafc",display:"flex",alignItems:"center",gap:12}}><span aria-hidden="true" style={{fontSize:22}}>⏳</span><div><strong>Setting up EO2MATE</strong><div>{loadingStep || "Checking setup..."}</div><small>Completed operations are preserved when you retry.</small></div></div>}
+        {Array.isArray(status?.provisioning_steps) && status.provisioning_steps.length > 0 && (
+          <section className="onboarding-stage-card" aria-label="Database provisioning status">
+            <strong>Database Setup Progress</strong>
+            {status.provisioning_steps.map((step) => (
+              <div key={`${step.scope_type}:${step.scope_key}:${step.step_code}`} className="wizard-summary-row">
+                <span>{step.step_code.replaceAll("_", " ")}</span>
+                <strong>{step.status === "COMPLETED" ? "✓ Completed" : step.status === "FAILED" ? "⚠ Retry needed" : step.status === "IN_PROGRESS" ? "⏳ Processing" : "Pending"}</strong>
+              </div>
+            ))}
+          </section>
+        )}
         {message && <div className="success-message">{message}</div>}
-        {errorMessage && <div className="form-error">{errorMessage}</div>}
+        {errorMessage && <div className="form-error">{errorMessage} {status?.client && <button type="button" disabled={loading} onClick={async () => { setLoading(true); setLoadingStep("Resuming incomplete setup..."); try { setStatus(await invoke({action:"RESUME"})); setErrorMessage(""); setMessage("Existing setup verified. You can continue."); } catch (e) {setErrorMessage(e.message || "Unable to resume setup.");} finally {setLoading(false);} }}>↻ Resume Setup</button>}</div>}
 
         {!client ? (
           <section className="onboarding-stage-card">
