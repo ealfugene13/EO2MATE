@@ -40,7 +40,7 @@ export default function LoginPage({ onBack }) {
     { label: "Uppercase and lowercase letters", ok: /[A-Z]/.test(password) && /[a-z]/.test(password) },
     { label: "At least one number", ok: /\d/.test(password) },
     { label: `At least one allowed symbol (${allowedSymbols})`, ok: /[!@#$%^&*()_\-+=?]/.test(password) },
-    { label: "Only supported letters, numbers and symbols", ok: /^[A-Za-z0-9!@#$%^&*()_\-+=?]*$/.test(password) },
+    { label: "Only supported letters, numbers and symbols", ok: password.length > 0 && /^[A-Za-z0-9!@#$%^&*()_\-+=?]+$/.test(password) },
   ];
   const passwordScore = passwordRules.filter((rule) => rule.ok).length;
   function clearMessages() { setErrorMessage(""); setInfoMessage(""); }
@@ -120,8 +120,7 @@ export default function LoginPage({ onBack }) {
                 <label>First name <span className="eo2-required">*</span><input type="text" value={firstName} onChange={(e)=>setFirstName(e.target.value)} placeholder="First name" autoComplete="given-name" maxLength={100} required /></label>
                 <label>Last name <span className="eo2-required">*</span><input type="text" value={lastName} onChange={(e)=>setLastName(e.target.value)} placeholder="Last name" autoComplete="family-name" maxLength={100} required /></label>
               </div>
-              <label>Contact number <span className="eo2-required">*</span><input type="tel" inputMode="numeric" value={contactPhone} onChange={(e)=>setContactPhone(e.target.value.replace(/\D/g, "").slice(0,11))} placeholder="09XXXXXXXXX" autoComplete="tel-national" maxLength={11} pattern="09[0-9]{9}" required /></label>
-              <small className={contactPhone && !phoneValid ? "eo2-field-error" : "eo2-auth-hint"}>11 digits, starting with 09 (e.g. 09171234567).</small>
+              <div className="eo2-phone-field"><label htmlFor="eo2-contact-phone">Contact number <span className="eo2-required">*</span></label><div className="eo2-phone-input"><span className="eo2-phone-icon" aria-hidden="true"><AuthIcon name="phone"/></span><input id="eo2-contact-phone" type="tel" inputMode="numeric" value={contactPhone} onChange={(e)=>setContactPhone(e.target.value.replace(/\D/g, "").slice(0,11))} placeholder="09XXXXXXXXX" autoComplete="tel-national" maxLength={11} pattern="09[0-9]{9}" aria-describedby="eo2-phone-help" aria-invalid={!!contactPhone && !phoneValid} required /></div><div className="eo2-phone-meta"><small id="eo2-phone-help" className={contactPhone && !phoneValid ? "eo2-field-error" : "eo2-auth-hint"}>{contactPhone && !phoneValid ? "Enter exactly 11 digits starting with 09." : "Philippine mobile number · e.g. 09171234567"}</small><small className="eo2-phone-count">{contactPhone.length}/11</small></div></div>
             </div>}
             <label>Email address <span className="eo2-required">*</span><input type="email" value={email} onChange={(e)=>setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" maxLength={254} required aria-invalid={!!email && !emailValid}/></label>
             {email && !emailValid && <small className="eo2-field-error">Enter a valid email address.</small>}
@@ -130,7 +129,7 @@ export default function LoginPage({ onBack }) {
               <div className="eo2-password-guidance" aria-live="polite">
                 <div className="eo2-strength-header"><strong>Password security</strong><span>{passwordScore === passwordRules.length ? "Requirements met" : `${passwordScore} of ${passwordRules.length} requirements`}</span></div>
                 <div className="eo2-strength-track"><span style={{width:`${passwordScore / passwordRules.length * 100}%`, background:passwordScore===passwordRules.length ? "#26805a" : "#cf8b32"}}/></div>
-                <div className="eo2-password-rules">{passwordRules.map((rule)=><small key={rule.label} className={rule.ok ? "met" : ""}>{rule.ok ? "✓" : "○"} {rule.label}</small>)}</div>
+                <div className="eo2-password-rules">{passwordRules.map((rule, index)=><small key={rule.label} className={rule.ok ? "met" : ""}>{rule.ok ? "✓" : "○"} {rule.label}</small>)}</div>
               </div>
               <label>Confirm password <span className="eo2-required">*</span><input type="password" value={confirmPassword} onChange={(e)=>setConfirmPassword(e.target.value)} placeholder="Re-enter your password" autoComplete="new-password" required/></label>
               {confirmPassword && password !== confirmPassword && <small className="eo2-field-error">Passwords do not match.</small>}
