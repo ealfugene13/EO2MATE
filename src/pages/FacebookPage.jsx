@@ -61,9 +61,9 @@ export default function FacebookPage({ client, facebookLoading, facebookMessage,
           <>
             <header className="dashboard-header">
               <div>
-                <p className="eyebrow">ONBOARDING · FACEBOOK</p>
+                <p className="eyebrow">ACCOUNT & SECURITY · FACEBOOK</p>
                 <h1>Connect Facebook Page</h1>
-                <p>Authorize your Facebook account and connect the Page that will run auctions.</p>
+                <p>Connect or reconnect a Facebook Page for your workspace. Existing Pages remain associated with your client.</p>
               </div>
 
               <button className="icon-button refresh-icon-button" type="button" onClick={loadFacebookStatus} disabled={facebookLoading} title="Refresh Facebook status" aria-label="Refresh Facebook status">
@@ -106,7 +106,7 @@ export default function FacebookPage({ client, facebookLoading, facebookMessage,
               <div className="facebook-connect-actions">
                 <button className="primary-button facebook-action-button" onClick={connectFacebook}>
                   <span className="facebook-action-mark" aria-hidden="true">f</span>
-                  <span>{facebookStatus?.connected ? "Reconnect Facebook" : "Connect Facebook"}</span>
+                  <span>{facebookStatus?.connected ? "Add / Reconnect Facebook Page" : "Connect Facebook Page"}</span>
                 </button>
 
                 <button
@@ -115,7 +115,7 @@ export default function FacebookPage({ client, facebookLoading, facebookMessage,
                   onClick={() => setPage("dashboard")}
                 >
                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-                  <span>{facebookStatus?.connected ? "Continue to Dashboard" : "Skip for Now"}</span>
+                  <span>Back to Dashboard</span>
                 </button>
               </div>
             </section>

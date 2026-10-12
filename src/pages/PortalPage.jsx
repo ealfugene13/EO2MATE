@@ -1108,7 +1108,7 @@ export default function PortalPage({ session }) {
             </nav>
             <div className="setup-workspace-content" role="tabpanel">
               {setupSection === "configuration" && <SetupPage client={client} />}
-              {setupSection === "automation" && <AutomationControlPage client={client} page="automation-control" />}
+              {setupSection === "automation" && <AutomationControlPage client={client} page="automation-control" onManageFacebook={() => { setAccountSecuritySection("facebook"); setPage("account-security"); loadFacebookStatus(); }} />}
               {setupSection === "messages" && <AutomatedMessagesPage client={client} />}
               {setupSection === "caption-templates" && <PostCaptionTemplatePage client={client} />}
             </div>

@@ -31,7 +31,7 @@ function StatusBadge({ status }) {
   return <span className={className}>{statusLabel(normalized)}</span>;
 }
 
-export default function AutomationControlPage({ client, page }) {
+export default function AutomationControlPage({ client, page, onManageFacebook }) {
   const [automationControls, setAutomationControls] = useState([]);
 
   const [automationPages, setAutomationPages] = useState([]);
@@ -370,6 +370,9 @@ export default function AutomationControlPage({ client, page }) {
                   <h2>Facebook Page automation</h2>
                   <p>Pause one Page while leaving the client's other connected Pages running.</p>
                 </div>
+                <button type="button" className="primary-button" onClick={onManageFacebook} disabled={!client?.client_id}>
+                  <span aria-hidden="true" style={{ marginRight: 8 }}>＋</span>{automationPages.length ? "Add / Reconnect Page" : "Connect Facebook Page"}
+                </button>
               </div>
 
               <div className="automation-page-list">
@@ -425,7 +428,8 @@ export default function AutomationControlPage({ client, page }) {
 
                 {!automationControlLoading && !(automationPages || []).length && (
                   <div className="empty-control-state">
-                    No connected Facebook Pages found for this client.
+                    <div>No connected Facebook Pages found for this client.</div>
+                    <button type="button" className="secondary-button" style={{ marginTop: 12 }} onClick={onManageFacebook} disabled={!client?.client_id}>Connect your first Facebook Page →</button>
                   </div>
                 )}
               </div>
