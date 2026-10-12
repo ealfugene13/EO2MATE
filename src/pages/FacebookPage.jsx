@@ -45,6 +45,9 @@ function StatusBadge({ status }) {
 }
 
 export default function FacebookPage({ client, facebookLoading, facebookMessage, facebookStatus, loadFacebookStatus, page, setFacebookMessage, setPage }) {
+  const connectedPages = facebookStatus?.pages || [];
+  const [showAddPageGuide, setShowAddPageGuide] = useState(false);
+
   function connectFacebook() {
     if (!client?.client_id) {
       setFacebookMessage("Client account is not ready yet. Refresh and try again.");
@@ -104,9 +107,9 @@ export default function FacebookPage({ client, facebookLoading, facebookMessage,
               </div>
 
               <div className="facebook-connect-actions">
-                <button className="primary-button facebook-action-button" onClick={connectFacebook}>
+                <button className="primary-button facebook-action-button" type="button" onClick={() => setShowAddPageGuide((open) => !open)}>
                   <span className="facebook-action-mark" aria-hidden="true">f</span>
-                  <span>{facebookStatus?.connected ? "Add / Reconnect Facebook Page" : "Connect Facebook Page"}</span>
+                  <span>{facebookStatus?.connected ? "Add Another Facebook Page" : "Connect Facebook Page"}</span>
                 </button>
 
                 <button
@@ -120,11 +123,29 @@ export default function FacebookPage({ client, facebookLoading, facebookMessage,
               </div>
             </section>
 
+            {showAddPageGuide && (
+              <section className="dashboard-panel" aria-label="Add Facebook Page instructions">
+                <div className="panel-header"><div><h2>Add a Facebook Page</h2><p>Your existing connected Pages will remain registered. Authorization may ask you to select or grant access to additional Pages.</p></div></div>
+                <ol style={{ paddingLeft: "1.5rem", lineHeight: 1.9 }}>
+                  <li>Sign in with a Facebook account that has sufficient access to the new business Page.</li>
+                  <li>Select the new Page during Meta authorization, and retain access to existing Pages when prompted.</li>
+                  <li>Review the permissions requested by EO2MATE and complete authorization.</li>
+                  <li>Return to EO2MATE and refresh Connected Pages to confirm that the new Page appears.</li>
+                  <li>Configure automation and selling settings for that Page before publishing.</li>
+                </ol>
+                <p><strong>Important:</strong> Meta authorization does not guarantee that a new Page has been registered. If it does not appear below, do not start automation; contact support for provisioning verification.</p>
+                <button className="primary-button facebook-action-button" type="button" onClick={connectFacebook} disabled={!client?.client_id}>
+                  <span className="facebook-action-mark" aria-hidden="true">f</span>
+                  <span>Continue to Facebook Authorization</span>
+                </button>
+              </section>
+            )}
+
             <section className="dashboard-panel">
               <div className="panel-header">
                 <div>
                   <h2>Connected Pages</h2>
-                  <p>Pages registered to this client. Access tokens are never shown in the browser.</p>
+                  <p>Pages registered to this client ({connectedPages.length}). Access tokens are never shown in the browser.</p>
                 </div>
                 <StatusBadge status={facebookStatus?.connected ? "CONNECTED" : "NOT_CONNECTED"} />
               </div>
