@@ -7,6 +7,8 @@ export default function OnboardingPage({ session, initialStatus = null, onComple
   const [contactPhone, setContactPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState("");
+  const [showSkipDialog, setShowSkipDialog] = useState(false);
+  const [skipCode, setSkipCode] = useState("");
   const [message, setMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -56,6 +58,18 @@ export default function OnboardingPage({ session, initialStatus = null, onComple
     if (!clientId) return;
     const baseUrl = import.meta.env.VITE_SUPABASE_URL;
     window.location.assign(`${baseUrl}/functions/v1/meta?route=oauth-start&client_id=${encodeURIComponent(clientId)}`);
+  }
+
+  async function authorizeTestSkip(event) {
+    event.preventDefault();
+    setLoading(true); setLoadingStep("Creating or recovering the simulated test Page..."); setErrorMessage("");
+    try {
+      const data = await invoke({action:"META_SKIP_TEST", authorization_code:skipCode});
+      setStatus(data);
+      setMessage(`Simulated Page ${data.simulated_page_id} is ready for internal setup testing. Meta operations remain disabled.`);
+      setSkipCode(""); setShowSkipDialog(false);
+    } catch (error) { setErrorMessage(error.message || "Unable to authorize test Page."); }
+    finally { setLoading(false); }
   }
 
   async function cancelOnboarding() {
@@ -108,6 +122,17 @@ export default function OnboardingPage({ session, initialStatus = null, onComple
           <div className={`wizard-step ${status?.onboarding_complete ? "done" : client ? "current" : ""}`}><span>4</span><div><strong>Workspace</strong><small>{status?.onboarding_complete ? "Ready" : "Activate"}</small></div></div>
         </div>
 
+        {showSkipDialog && <div role="dialog" aria-modal="true" aria-label="Authorize simulated test Page" style={{position:"fixed",inset:0,background:"rgba(15,23,42,.65)",zIndex:9999,display:"grid",placeItems:"center",padding:16}}>
+          <form onSubmit={authorizeTestSkip} style={{background:"white",color:"#172033",padding:24,borderRadius:14,width:"min(440px,100%)",boxShadow:"0 12px 40px #0003"}}>
+            <h3>🔒 Skip Meta Connection — TEST</h3>
+            <p>Enter the administrator-configured authorization code. A simulated Page will be created for internal testing only. No Facebook API access will be enabled.</p>
+            <label>Authorization code<input type="password" autoComplete="off" required value={skipCode} onChange={e=>setSkipCode(e.target.value)} style={{display:"block",width:"100%",marginTop:8}} /></label>
+            <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:20}}>
+              <button type="button" className="secondary-button" disabled={loading} onClick={()=>{setShowSkipDialog(false);setSkipCode("");}}>Cancel</button>
+              <button type="submit" className="primary-button" disabled={loading || !skipCode}>{loading ? "Verifying..." : "Verify & Create Test Page"}</button>
+            </div>
+          </form>
+        </div>}
         {loading && <div role="status" aria-live="polite" className="onboarding-provision-progress" style={{padding:"14px 18px",marginBottom:16,border:"1px solid #cbd5e1",borderRadius:12,background:"#f8fafc",display:"flex",alignItems:"center",gap:12}}><span aria-hidden="true" style={{fontSize:22}}>⏳</span><div><strong>Setting up EO2MATE</strong><div>{loadingStep || "Checking setup..."}</div><small>Completed operations are preserved when you retry.</small></div></div>}
         {Array.isArray(status?.provisioning_steps) && status.provisioning_steps.length > 0 && (
           <section className="onboarding-stage-card" aria-label="Database provisioning status">
@@ -153,6 +178,7 @@ export default function OnboardingPage({ session, initialStatus = null, onComple
                 <>
                   <div className="onboarding-permission-note">Facebook is not required to activate EO2MATE. Connect a Page now only if you want to start using Facebook selling automation immediately.</div>
                   <button className="secondary-button" type="button" onClick={connectFacebook} disabled={loading}>Connect Facebook Page Now</button>
+                  {status?.meta_skip_enabled && <button className="secondary-button" type="button" disabled={loading} onClick={() => setShowSkipDialog(true)} style={{marginLeft:8}}>🔒 Skip Meta (TEST)</button>}
                 </>
               )}
             </section>
