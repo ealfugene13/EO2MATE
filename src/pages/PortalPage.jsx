@@ -489,6 +489,7 @@ export default function PortalPage({ session }) {
   
   const [errorMessage, setErrorMessage] = useState("");
 
+  const [facebookStatus, setFacebookStatus] = useState(null);
   // Selection is tenant-local UI state. Each server endpoint must independently enforce page scope.
   const [selectedFbPageId, setSelectedFbPageId] = useState("");
   useEffect(() => {
@@ -504,7 +505,6 @@ export default function PortalPage({ session }) {
     setDetailRequest(null);
     setPage("dashboard");
   }
-  const [facebookStatus, setFacebookStatus] = useState(null);
   const [facebookLoading, setFacebookLoading] = useState(false);
   const [facebookMessage, setFacebookMessage] = useState("");
   const [onboardingChecked, setOnboardingChecked] = useState(false);
