@@ -1137,6 +1137,19 @@ export default function FacebookPostPage({
   const [postType, setPostType] = useState("");
   const [sellerCaption, setSellerCaption] = useState("");
   const [captionHelperTab, setCaptionHelperTab] = useState("emoji");
+  const [recentCaptionCharacters, setRecentCaptionCharacters] = useState(() => {
+    try {
+      const stored = JSON.parse(window.localStorage.getItem("eo2mate.caption.recentSymbols.v1") || "[]");
+      return Array.isArray(stored) ? stored.filter((item) => typeof item === "string" && [...item].length <= 8).slice(0, 12) : [];
+    } catch { return []; }
+  });
+  const rememberCaptionCharacter = (character) => {
+    setRecentCaptionCharacters((current) => {
+      const next = [character, ...current.filter((item) => item !== character)].slice(0, 12);
+      try { window.localStorage.setItem("eo2mate.caption.recentSymbols.v1", JSON.stringify(next)); } catch { /* Private browsing may disallow storage. */ }
+      return next;
+    });
+  };
   const [singleItem, setSingleItem] = useState("");
   const [singleItemSource, setSingleItemSource] = useState("MANUAL");
   const [singleInventoryItemId, setSingleInventoryItemId] = useState("");
@@ -3723,6 +3736,20 @@ export default function FacebookPostPage({
               ))}
             </div>
 
+            {(captionHelperTab === "emoji" || captionHelperTab === "symbols") && recentCaptionCharacters.length > 0 && (
+              <div className="fb-caption-recent" aria-label="Recently used emojis and symbols">
+                <div className="fb-caption-recent-title">Recently used</div>
+                <div className="fb-caption-helper-grid">
+                  {recentCaptionCharacters.map((character) => (
+                    <button key={character} type="button" className="fb-caption-insert-button"
+                      aria-label={`Insert recently used ${character}`} title={`Insert ${character}`}
+                      onClick={() => { insertCaptionText(character); rememberCaptionCharacter(character); }} disabled={publishing}>
+                      {character}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             {captionHelperTab === "emoji" && (
               <div className="fb-caption-helper-grid" role="tabpanel" aria-label="Emojis">
                 {CAPTION_EMOJIS.map((emoji) => (
@@ -3732,7 +3759,7 @@ export default function FacebookPostPage({
                     className="fb-caption-insert-button fb-caption-emoji"
                     aria-label={`Insert ${emoji}`}
                     title={`Insert ${emoji}`}
-                    onClick={() => insertCaptionText(emoji)}
+                    onClick={() => { insertCaptionText(emoji); rememberCaptionCharacter(emoji); }}
                     disabled={publishing}
                   >
                     {emoji}
@@ -3750,7 +3777,7 @@ export default function FacebookPostPage({
                     className="fb-caption-insert-button"
                     aria-label={`Insert ${symbol}`}
                     title={`Insert ${symbol}`}
-                    onClick={() => insertCaptionText(symbol)}
+                    onClick={() => { insertCaptionText(symbol); rememberCaptionCharacter(symbol); }}
                     disabled={publishing}
                   >
                     {symbol}
