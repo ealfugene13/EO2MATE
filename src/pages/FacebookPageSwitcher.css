@@ -1,0 +1,13 @@
+/* Compact active-Page context, consistent with EO2MATE dashboard cards */
+.eo2mate-page-switcher{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 18px;margin-bottom:18px;background:linear-gradient(110deg,#ffffff,#f5f9fc);border:1px solid #dbe6ee;border-radius:15px;box-shadow:0 5px 18px rgba(15,39,60,.055)}
+.eo2mate-page-switcher-icon{display:grid;place-items:center;width:42px;height:42px;flex:0 0 42px;background:#e8f2fd;color:#2363a4;border-radius:12px}
+.eo2mate-page-switcher-icon svg{width:23px;height:23px}
+.eo2mate-page-switcher-copy{display:flex;flex-direction:column;gap:3px;min-width:170px}
+.eo2mate-page-switcher-copy label{font-size:14px;font-weight:750;color:#17354c}
+.eo2mate-page-switcher-copy span{font-size:12px;color:#64748b}
+.eo2mate-page-switcher-select{min-width:210px;max-width:360px;flex:1}
+.eo2mate-page-switcher-select select{width:100%;min-height:42px;padding:9px 35px 9px 13px;border:1px solid #cbd9e6;border-radius:10px;background:#fff;color:#15344f;font-weight:650;font-size:14px}
+.eo2mate-page-switcher-select select:focus-visible{outline:3px solid #9bc7f1;outline-offset:2px}
+.eo2mate-page-switcher-status{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:#23785b;margin-left:auto}
+.eo2mate-page-switcher-dot{width:8px;height:8px;border-radius:50%;background:#25a776}
+@media(max-width:680px){.eo2mate-page-switcher{gap:10px;padding:12px}.eo2mate-page-switcher-select{flex:1 1 100%;max-width:none}.eo2mate-page-switcher-status{margin-left:0}}

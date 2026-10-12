@@ -172,9 +172,9 @@ function NavIcon({ type }) {
 }
 
 import PreorderAdminPage from "./PreorderAdminPage";
-export default function PreorderPage({ client, navigateTo }) {
+export default function PreorderPage({ client, navigateTo, selectedFbPageId }) {
   return (<>
 
-            <PreorderAdminPage client={client} onCreatePost={() => navigateTo("pre-order-create")} />
+            <PreorderAdminPage selectedFbPageId={selectedFbPageId} client={client} onCreatePost={() => navigateTo("pre-order-create")} />
           </>);
 }

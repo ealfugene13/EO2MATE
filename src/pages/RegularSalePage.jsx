@@ -324,7 +324,7 @@ function SellingPostDetailPanel({ detail, loading, error, onClose }) {
   );
 }
 
-export default function RegularSalePage({ client, metaConnected, page, regularSaleWorkspaceTab, setRegularSaleWorkspaceTab }) {
+export default function RegularSalePage({ selectedFbPageId, client, metaConnected, page, regularSaleWorkspaceTab, setRegularSaleWorkspaceTab }) {
   const [sellingPostRows, setSellingPostRows] = useState({ REGULAR_SALE: [], MINING: [] });
 
   const [sellingPostLoading, setSellingPostLoading] = useState(false);
@@ -338,7 +338,7 @@ export default function RegularSalePage({ client, metaConnected, page, regularSa
   const [sellingPostDetailError, setSellingPostDetailError] = useState("");
 
   async function openSellingPostDetail(row) {
-    if (!row?.post_id) return;
+    if (!row?.post_id || !selectedFbPageId || row.fb_page_id !== selectedFbPageId) return;
     setSellingPostDetailLoading(true);
     setSellingPostDetailError("");
     setSellingPostDetail(null);
@@ -352,6 +352,7 @@ export default function RegularSalePage({ client, metaConnected, page, regularSa
       ]);
       const firstError = postResult.error || itemsResult.error || activityResult.error;
       if (firstError) throw firstError;
+      if (postResult.data?.page_id !== row.page_id) throw new Error("PAGE_MISMATCH");
       setSellingPostDetail({ ...row, post: postResult.data, items: itemsResult.data || [], activity: activityResult.data || [] });
     } catch (error) {
       console.error("Failed to load selling post detail", error);
@@ -374,7 +375,7 @@ export default function RegularSalePage({ client, metaConnected, page, regularSa
     };
   }, [sellingPostRows.REGULAR_SALE]);
   useEffect(() => {
-    if (!client?.client_id) return;
+    if (!client?.client_id || !selectedFbPageId) { setSellingPostRows({ REGULAR_SALE: [], MINING: [] }); return; }
 
     let cancelled = false;
 
@@ -383,10 +384,15 @@ export default function RegularSalePage({ client, metaConnected, page, regularSa
       setSellingPostError("");
 
       try {
+        const { data: activePage, error: activePageError } = await supabase.from("fb_pages")
+          .select("page_id").eq("client_id", client.client_id).eq("fb_page_id", selectedFbPageId).maybeSingle();
+        if (activePageError) throw activePageError;
+        if (!activePage?.page_id) throw new Error("Selected Facebook Page is not registered for this client.");
         const { data: posts, error: postsError } = await supabase
           .from("eo2mate_posts")
           .select("post_id, client_id, page_id, mode_code, post_type_code, fb_post_id, status, created_at")
           .eq("client_id", client.client_id)
+          .eq("page_id", activePage.page_id)
           .in("mode_code", ["REGULAR_SALE", "MINING"])
           .order("created_at", { ascending: false });
 
@@ -433,6 +439,7 @@ export default function RegularSalePage({ client, metaConnected, page, regularSa
 
             return {
               ...post,
+              fb_page_id: selectedFbPageId,
               facebook_page: pageNames.get(post.page_id) || "—",
               items: postItems.length,
               transactions: validClaims.length,
@@ -480,7 +487,7 @@ export default function RegularSalePage({ client, metaConnected, page, regularSa
 
     loadSellingPostRows();
     return () => { cancelled = true; };
-  }, [client?.client_id]);
+  }, [client?.client_id, selectedFbPageId]);
   return (<>
     {metaConnected && page === "regular-sale" && (
           (sellingPostDetailLoading || sellingPostDetailError || sellingPostDetail?.mode_code === "REGULAR_SALE") ? (

@@ -8,16 +8,16 @@ function Badge({ value }) { const v=String(value||"—").toUpperCase(); const cl
 const pretty = (v) => String(v||"").replaceAll("_"," ").replace(/\b\w/g,c=>c.toUpperCase());
 function BackIcon(){return <svg className="inline-button-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>}
 
-export default function PreorderAdminPage({ client, onCreatePost }) {
+export default function PreorderAdminPage({ client, onCreatePost, selectedFbPageId }) {
   const [workspaceTab,setWorkspaceTab]=useState("DASHBOARD");
   const [postSearch,setPostSearch]=useState(""), [postFilter,setPostFilter]=useState("ALL"), [postSort,setPostSort]=useState("NEWEST");
   const [posts,setPosts]=useState([]), [entries,setEntries]=useState([]);
   const [selected,setSelected]=useState(null), [notice,setNotice]=useState(""), [error,setError]=useState(""), [loading,setLoading]=useState(false);
   const [detailTab,setDetailTab]=useState("OVERVIEW"), [copied,setCopied]=useState("");
 
-  async function call(action,extra={}) { const {data,error}=await supabase.functions.invoke("eo2mate",{headers:{"x-eo2mate-route":"preorder-admin"},body:{action,client_id:client.client_id,...extra}}); if(error)throw error; if(!data?.success)throw new Error(data?.error||"Request failed"); return data; }
+  async function call(action,extra={}) { const {data,error}=await supabase.functions.invoke("eo2mate",{headers:{"x-eo2mate-route":"preorder-admin"},body:{action,client_id:client.client_id,fb_page_id:selectedFbPageId,...extra}}); if(error)throw error; if(!data?.success)throw new Error(data?.error||"Request failed"); return data; }
   async function load(){ setLoading(true); setError(""); try { const p=await call("LIST"); setPosts(p.posts||[]); } catch(e){setError(e.message)} finally{setLoading(false)} }
-  useEffect(()=>{if(client?.client_id)load()},[client?.client_id]);
+  useEffect(()=>{setPosts([]);setEntries([]);setSelected(null);if(client?.client_id && selectedFbPageId)load()},[client?.client_id,selectedFbPageId]);
   async function open(post){ setSelected(post); setDetailTab("OVERVIEW"); setCopied(""); setError(""); try{const d=await call("ENTRIES",{post_id:post.post_id});setEntries(d.entries||[])}catch(e){setError(e.message)} }
   async function cancel(entry){const reason=window.prompt("Cancellation reason code (BUYER_REQUESTED, NO_PAYMENT, DUMMY_FAKE_SUSPECTED, NUISANCE_FAKE_ACTIVITY, OTHER):","BUYER_REQUESTED");if(!reason)return;try{await call("CANCEL_ENTRY",{post_entry_id:entry.post_entry_id,reason_code:reason});await open(selected);setNotice("Reservation cancelled and quantity released.")}catch(e){setError(e.message)}}
 

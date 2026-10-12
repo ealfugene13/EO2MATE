@@ -27,6 +27,7 @@ import PostCaptionTemplatePage from "./PostCaptionTemplatePage";
 import AccountSecurityPage from "./AccountSecurityPage";
 import PaymentMethodsSettings from "../components/PaymentMethodsSettings";
 import "./SetupWorkspace.css";
+import "./FacebookPageSwitcher.css";
 import "./AccountSecurityWorkspace.css";
 
 function PortalPageContent({ page, homePage = "dashboard", backLabel = "Back to dashboard", onBack, children }) {
@@ -1029,13 +1030,12 @@ export default function PortalPage({ session }) {
         </div>
 
         {client?.client_id && availablePages.length > 0 && (
-          <div className="dashboard-panel" style={{ padding: "10px 16px", marginBottom: 12, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-            <label htmlFor="eo2mate-active-page" style={{ fontWeight: 700 }}>Facebook Page</label>
-            <select id="eo2mate-active-page" value={effectivePageId} onChange={(event) => switchFacebookPage(event.target.value)}>
-              {availablePages.map((p) => <option key={p.fb_page_id} value={p.fb_page_id}>{p.page_name || p.fb_page_id}</option>)}
-            </select>
-            <small>Page selection applies to Mixed Live. Other modules require server-side Page filtering before multi-Page isolation can be enabled.</small>
-          </div>
+          <section className="eo2mate-page-switcher" aria-label="Active Facebook Page">
+            <div className="eo2mate-page-switcher-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="5"/><path d="M14 21v-8h3l.5-3H14V8.5c0-1 .5-1.5 1.5-1.5H18V4h-2.5C12.5 4 11 5.7 11 8.5V10H8v3h3v8"/></svg></div>
+            <div className="eo2mate-page-switcher-copy"><label htmlFor="eo2mate-active-page">Active Facebook Page</label><span>View and manage selling activity for this Page</span></div>
+            <div className="eo2mate-page-switcher-select"><select id="eo2mate-active-page" value={effectivePageId} onChange={(event) => switchFacebookPage(event.target.value)}>{availablePages.map((p) => <option key={p.fb_page_id} value={p.fb_page_id}>{p.page_name || p.fb_page_id}</option>)}</select></div>
+            <span className="eo2mate-page-switcher-status"><span className="eo2mate-page-switcher-dot"/>Connected</span>
+          </section>
         )}
         {errorMessage && (
           <div className="dashboard-error global-error">
@@ -1050,9 +1050,9 @@ export default function PortalPage({ session }) {
 
         {(page === "posts") && <PostsPage metaConnected={metaConnected} navigateTo={navigateTo} page={page} setRegularSaleWorkspaceTab={setRegularSaleWorkspaceTab} />}
 
-        {(page === "regular-sale") && <RegularSalePage client={client} metaConnected={metaConnected} page={page} regularSaleWorkspaceTab={regularSaleWorkspaceTab} setRegularSaleWorkspaceTab={setRegularSaleWorkspaceTab} />}
+        {(page === "regular-sale") && <RegularSalePage key={`regular-${effectivePageId}`} selectedFbPageId={effectivePageId} client={client} metaConnected={metaConnected} page={page} regularSaleWorkspaceTab={regularSaleWorkspaceTab} setRegularSaleWorkspaceTab={setRegularSaleWorkspaceTab} />}
 
-        {metaConnected && page === "pre-order" && <PreorderPage client={client} navigateTo={navigateTo} />}
+        {metaConnected && page === "pre-order" && <PreorderPage key={`preorder-${effectivePageId}`} selectedFbPageId={effectivePageId} client={client} navigateTo={navigateTo} />}
 
         {metaConnected && page === "facebook-post" && (
           <FacebookPostPage client={client} initialPostMode="AUCTION" />
@@ -1073,7 +1073,7 @@ export default function PortalPage({ session }) {
 
         {(page === "reports") && <ReportsPage selectedFbPageId={effectivePageId} client={client} page={page} setErrorMessage={setErrorMessage} />}
 
-        {(page === "post-mining") && <MiningPage client={client} metaConnected={metaConnected} miningWorkspaceTab={miningWorkspaceTab} navigateTo={navigateTo} page={page} setMiningWorkspaceTab={setMiningWorkspaceTab} />}
+        {(page === "post-mining") && <MiningPage key={`mining-${effectivePageId}`} selectedFbPageId={effectivePageId} client={client} metaConnected={metaConnected} miningWorkspaceTab={miningWorkspaceTab} navigateTo={navigateTo} page={page} setMiningWorkspaceTab={setMiningWorkspaceTab} />}
 
         {(page === "dashboard") && <DashboardPage selectedFbPageId={effectivePageId} client={client} facebookStatus={facebookStatus} goToAuctions={goToAuctions} goToDeliveries={goToDeliveries} goToOrders={goToOrders} goToPayments={goToPayments} navigateTo={navigateTo} onboardingChecked={onboardingChecked} openDelivery={openDelivery} openFacebookSetup={openFacebookSetup} page={page} paymentAccountLoading={paymentAccountLoading} paymentAccountMessage={paymentAccountMessage} paymentAccountStatus={paymentAccountStatus} setErrorMessage={setErrorMessage} setPage={setPage} />}
 
