@@ -3797,3 +3797,8 @@ button.post-type-card:hover { transform: translateY(-2px); border-color: #bcdcc3
 .eo2-policy a{color:#176c55;text-decoration:underline}
 .eo2-auth-hint{font-size:12px;color:#64748b;margin:0}
 @media(max-width:480px){.eo2-signup-group,.eo2-password-rules{grid-template-columns:1fr}}
+
+/* EO2MATE registration: separate first and last name fields */
+.eo2-name-row { display:grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap:12px; }
+.eo2-name-row > label { min-width:0; }
+@media (max-width: 480px) { .eo2-name-row { grid-template-columns:1fr; } }

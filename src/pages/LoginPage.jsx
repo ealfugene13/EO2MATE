@@ -19,7 +19,8 @@ export default function LoginPage({ onBack }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [fullName, setFullName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [acceptedPolicies, setAcceptedPolicies] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -31,11 +32,15 @@ export default function LoginPage({ onBack }) {
   const signup = mode === "signup";
   const normalizedEmail = email.trim().toLowerCase();
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(normalizedEmail) && normalizedEmail.length <= 254;
+  const allowedSymbols = "!@#$%^&*()_-+=?";
+  const phoneValid = /^09[0-9]{9}$/.test(contactPhone);
+  const nameValid = (value) => /^[\p{L}][\p{L}\p{M} .\x27-]{0,98}[\p{L}\p{M}.]$/u.test(value.trim()) && value.trim().length >= 2 && value.trim().length <= 100;
   const passwordRules = [
-    { label: "At least 12 characters", ok: password.length >= 12 },
+    { label: "At least 10 characters", ok: password.length >= 10 },
     { label: "Uppercase and lowercase letters", ok: /[A-Z]/.test(password) && /[a-z]/.test(password) },
     { label: "At least one number", ok: /\d/.test(password) },
-    { label: "At least one symbol", ok: /[^A-Za-z0-9]/.test(password) },
+    { label: `At least one allowed symbol (${allowedSymbols})`, ok: /[!@#$%^&*()_\-+=?]/.test(password) },
+    { label: "Only supported letters, numbers and symbols", ok: /^[A-Za-z0-9!@#$%^&*()_\-+=?]*$/.test(password) },
   ];
   const passwordScore = passwordRules.filter((rule) => rule.ok).length;
   function clearMessages() { setErrorMessage(""); setInfoMessage(""); }
@@ -45,16 +50,17 @@ export default function LoginPage({ onBack }) {
     try {
       if (mode === "signup") {
         if (!emailValid) throw new Error("Enter a valid email address.");
-        if (fullName.trim().length < 2 || fullName.trim().length > 100) throw new Error("Enter your full name (2–100 characters).");
-        if (contactPhone.trim() && !/^\+?[0-9 ()-]{7,20}$/.test(contactPhone.trim())) throw new Error("Enter a valid contact number or leave it blank.");
-        if (passwordScore !== 4) throw new Error("Your password must meet all four security requirements.");
+        if (!nameValid(firstName)) throw new Error("Enter a valid first name (2–100 characters).");
+        if (!nameValid(lastName)) throw new Error("Enter a valid last name (2–100 characters).");
+        if (!phoneValid) throw new Error("Contact number must be exactly 11 digits starting with 09.");
+        if (passwordScore !== passwordRules.length) throw new Error("Your password must meet all security requirements. Use only the symbols shown.");
         if (password !== confirmPassword) throw new Error("Passwords do not match.");
         if (!acceptedPolicies) throw new Error("Please accept the Terms of Service and Privacy Policy.");
         const emailRedirectTo = new URL("./", window.location.href).href;
         const { data, error } = await supabase.auth.signUp({
           email: normalizedEmail,
           password,
-          options: { emailRedirectTo, data: { full_name: fullName.trim(), contact_phone: contactPhone.trim() || null } },
+          options: { emailRedirectTo, data: { first_name: firstName.trim(), last_name: lastName.trim(), full_name: `${firstName.trim()} ${lastName.trim()}`, contact_phone: contactPhone } },
         });
         if (error) throw error;
         if (!data?.session) {
@@ -110,16 +116,20 @@ export default function LoginPage({ onBack }) {
         ) : (
           <form onSubmit={handleSubmit} className="login-form eo2-auth-form" noValidate>
             {signup && <div className="eo2-signup-group">
-              <label>Full name <span className="eo2-required">*</span><input type="text" value={fullName} onChange={(e)=>setFullName(e.target.value)} placeholder="Your first and last name" autoComplete="name" maxLength={100} required /></label>
-              <label>Contact number <span className="eo2-optional">Optional</span><input type="tel" value={contactPhone} onChange={(e)=>setContactPhone(e.target.value)} placeholder="e.g. +63 917 123 4567" autoComplete="tel" maxLength={20}/></label>
+              <div className="eo2-name-row">
+                <label>First name <span className="eo2-required">*</span><input type="text" value={firstName} onChange={(e)=>setFirstName(e.target.value)} placeholder="First name" autoComplete="given-name" maxLength={100} required /></label>
+                <label>Last name <span className="eo2-required">*</span><input type="text" value={lastName} onChange={(e)=>setLastName(e.target.value)} placeholder="Last name" autoComplete="family-name" maxLength={100} required /></label>
+              </div>
+              <label>Contact number <span className="eo2-required">*</span><input type="tel" inputMode="numeric" value={contactPhone} onChange={(e)=>setContactPhone(e.target.value.replace(/\D/g, "").slice(0,11))} placeholder="09XXXXXXXXX" autoComplete="tel-national" maxLength={11} pattern="09[0-9]{9}" required /></label>
+              <small className={contactPhone && !phoneValid ? "eo2-field-error" : "eo2-auth-hint"}>11 digits, starting with 09 (e.g. 09171234567).</small>
             </div>}
             <label>Email address <span className="eo2-required">*</span><input type="email" value={email} onChange={(e)=>setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" maxLength={254} required aria-invalid={!!email && !emailValid}/></label>
             {email && !emailValid && <small className="eo2-field-error">Enter a valid email address.</small>}
             <label>Password <span className="eo2-required">*</span><span className="eo2-password-wrap"><input type={showPassword ? "text" : "password"} value={password} onChange={(e)=>setPassword(e.target.value)} placeholder={signup ? "Create a strong password" : "Enter password"} autoComplete={signup ? "new-password" : "current-password"} required/><button type="button" className="eo2-visibility" onClick={()=>setShowPassword(v=>!v)} aria-label={showPassword ? "Hide password" : "Show password"} title={showPassword ? "Hide password" : "Show password"}><AuthIcon name="eye"/></button></span></label>
             {signup && <>
               <div className="eo2-password-guidance" aria-live="polite">
-                <div className="eo2-strength-header"><strong>Password security</strong><span>{passwordScore === 4 ? "Requirements met" : `${passwordScore} of 4 requirements`}</span></div>
-                <div className="eo2-strength-track"><span style={{width:`${passwordScore * 25}%`, background:passwordScore===4 ? "#26805a" : "#cf8b32"}}/></div>
+                <div className="eo2-strength-header"><strong>Password security</strong><span>{passwordScore === passwordRules.length ? "Requirements met" : `${passwordScore} of ${passwordRules.length} requirements`}</span></div>
+                <div className="eo2-strength-track"><span style={{width:`${passwordScore / passwordRules.length * 100}%`, background:passwordScore===passwordRules.length ? "#26805a" : "#cf8b32"}}/></div>
                 <div className="eo2-password-rules">{passwordRules.map((rule)=><small key={rule.label} className={rule.ok ? "met" : ""}>{rule.ok ? "✓" : "○"} {rule.label}</small>)}</div>
               </div>
               <label>Confirm password <span className="eo2-required">*</span><input type="password" value={confirmPassword} onChange={(e)=>setConfirmPassword(e.target.value)} placeholder="Re-enter your password" autoComplete="new-password" required/></label>
