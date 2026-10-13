@@ -259,10 +259,12 @@ function onlySelectedPage(rows, pageId) {
 export default function AuctionPage({ auctionWorkspaceTab, client, detailRequest, navigateTo, page, setAuctionWorkspaceTab, setErrorMessage, setPage, navigationFilter , selectedFbPageId }) {
   const [auctionSearch, setAuctionSearch] = useState("");
   const [auctionStatusFilter, setAuctionStatusFilter] = useState("ALL");
+  const [auctionDateFilter, setAuctionDateFilter] = useState("ALL");
   useEffect(() => { if (navigationFilter?.page === "auctions") { setAuctionStatusFilter(navigationFilter.value); setAuctionSearch(""); } }, [navigationFilter]);
   const [auctions, setAuctions] = useState([]);
 
   const [auctionBids, setAuctionBids] = useState([]);
+  const [auctionLoadError, setAuctionLoadError] = useState("");
 
   const [detailLoading, setDetailLoading] = useState(false);
 
@@ -307,11 +309,24 @@ export default function AuctionPage({ auctionWorkspaceTab, client, detailRequest
     }
   }
 
-  const filteredAuctions = useMemo(() => {
+  const periodAuctions = useMemo(() => {
+    const now = new Date();
     return auctions.filter((auction) => {
+      if (auctionDateFilter === "ALL") return true;
+      const created = new Date(auction.post_created_at);
+      if (!Number.isFinite(created.getTime())) return false;
+      if (auctionDateFilter === "MONTH") return created.getFullYear() === now.getFullYear() && created.getMonth() === now.getMonth();
+      const days = auctionDateFilter === "TODAY" ? 1 : auctionDateFilter === "7D" ? 7 : 30;
+      if (auctionDateFilter === "TODAY") return created.toDateString() === now.toDateString();
+      return created >= new Date(now.getTime() - days * 86400000) && created <= now;
+    });
+  }, [auctions, auctionDateFilter]);
+
+  const filteredAuctions = useMemo(() => {
+    return periodAuctions.filter((auction) => {
       const matchesStatus =
         auctionStatusFilter === "ALL" ||
-        auction.ui_status === auctionStatusFilter;
+        (auction.ui_status === auctionStatusFilter || auction.post_status === auctionStatusFilter);
 
       const haystack = [
         auction.item_label,
@@ -329,27 +344,39 @@ export default function AuctionPage({ auctionWorkspaceTab, client, detailRequest
 
       return matchesStatus && matchesSearch;
     });
-  }, [auctions, auctionStatusFilter, auctionSearch]);
+  }, [periodAuctions, auctionStatusFilter, auctionSearch]);
 
 
   const [pageDataLoading, setPageDataLoading] = useState(true);
   const pageLoadVersion = useRef(0);
   async function loadPortal() {
-    if (!client?.client_id) return;
+    if (!client?.client_id || !selectedFbPageId) return;
     const version = ++pageLoadVersion.current;
     setPageDataLoading(true);
     setErrorMessage("");
     try {
-      const results = await Promise.all([
+      // Legacy auction views omit fb_page_id. Resolve Page attribution from
+      // auction_posts, never from an assumed column or a client-wide fallback.
+      const [postsResult, listResult, bidsResult] = await Promise.all([
+        supabase.from("auction_posts").select("post_id,fb_page_id,client_id").eq("client_id", client.client_id).eq("fb_page_id", selectedFbPageId),
         supabase.from("client_auction_list").select("*").eq("client_id", client.client_id).order("post_created_at", { ascending: false }),
         supabase.from("client_auction_bid_history").select("*").eq("client_id", client.client_id).order("commented_at", { ascending: false })
       ]);
       if (version !== pageLoadVersion.current) return;
-      for (const result of results) if (result.error) throw result.error;
-      setAuctions(onlySelectedPage(results[0].data, selectedFbPageId));
-      setAuctionBids(results[1].data || []);
+      for (const result of [postsResult, listResult, bidsResult]) if (result.error) throw result.error;
+      const permittedPostIds = new Set((postsResult.data || []).map((p) => String(p.post_id)));
+      const pageAuctions = (listResult.data || []).filter((a) => permittedPostIds.has(String(a.post_id)));
+      const pageItemIds = new Set(pageAuctions.map((a) => String(a.auction_item_id)));
+      setAuctions(pageAuctions);
+      setAuctionBids((bidsResult.data || []).filter((b) => pageItemIds.has(String(b.auction_item_id))));
+      setAuctionLoadError("");
     } catch (error) {
-      if (version === pageLoadVersion.current) setErrorMessage(error.message || "Unable to load this page.");
+      if (version === pageLoadVersion.current) {
+        setAuctions([]);
+        setAuctionBids([]);
+        setAuctionLoadError(error.message || "Unable to load auctions.");
+        setErrorMessage(error.message || "Unable to load this page.");
+      }
     } finally {
       if (version === pageLoadVersion.current) setPageDataLoading(false);
     }
@@ -372,6 +399,7 @@ export default function AuctionPage({ auctionWorkspaceTab, client, detailRequest
               </button>
             </header>
 
+            {auctionLoadError && <div role="alert" className="loading-card" style={{ color: "#b42318" }}>Unable to load auctions: {auctionLoadError}</div>}
             <section className="selling-workspace-tabs selling-workspace-tabs-with-action">
               <div className="selling-workspace-tablist selling-workspace-nav" role="tablist" aria-label="Auction sections">
                 {[
@@ -392,18 +420,18 @@ export default function AuctionPage({ auctionWorkspaceTab, client, detailRequest
             {auctionWorkspaceTab === "SUMMARY" && (
               <>
                 <section className="metrics-grid">
-                  <MetricCard title="Total auctions" value={auctions.length} subtitle="All auction items" onClick={() => { setAuctionWorkspaceTab("AUCTIONS"); setAuctionStatusFilter("ALL"); }} />
-                  <MetricCard title="Active" value={auctions.filter((a) => a.ui_status === "ACTIVE").length} subtitle="Currently open" onClick={() => { setAuctionWorkspaceTab("AUCTIONS"); setAuctionStatusFilter("ACTIVE"); }} />
-                  <MetricCard title="Completed" value={auctions.filter((a) => ["COMPLETED", "COMPLETED_WITH_WINNER", "CLOSED_NO_WINNER"].includes(a.ui_status)).length} subtitle="Closed auctions" />
-                  <MetricCard title="Cancelled" value={auctions.filter((a) => a.ui_status === "CANCELLED").length} subtitle="Cancelled auctions" />
-                  <MetricCard title="Total bids" value={auctions.reduce((sum, a) => sum + Number(a.valid_bid_count || a.bid_count || 0), 0)} subtitle="Recorded valid bids" />
-                  <MetricCard title="Winning value" value={formatCurrency(auctions.reduce((sum, a) => sum + Number(a.highest_bid || 0), 0))} subtitle="Current / final highest bids" />
+                  <MetricCard title="Total auctions" value={periodAuctions.length} subtitle="Selected date range" onClick={() => { setAuctionWorkspaceTab("AUCTIONS"); setAuctionStatusFilter("ALL"); }} />
+                  <MetricCard title="Active" value={periodAuctions.filter((a) => a.ui_status === "ACTIVE").length} subtitle="Currently open" onClick={() => { setAuctionWorkspaceTab("AUCTIONS"); setAuctionStatusFilter("ACTIVE"); }} />
+                  <MetricCard title="Completed" value={periodAuctions.filter((a) => ["CLOSED", "COMPLETED", "COMPLETED_WITH_WINNER", "CLOSED_NO_WINNER"].includes(a.ui_status) || a.post_status === "CLOSED").length} subtitle="Closed auctions" />
+                  <MetricCard title="Cancelled" value={periodAuctions.filter((a) => a.ui_status === "CANCELLED" || a.post_status === "CANCELLED").length} subtitle="Cancelled auctions" />
+                  <MetricCard title="Total bids" value={periodAuctions.reduce((sum, a) => sum + Number(a.valid_bid_count || a.bid_count || 0), 0)} subtitle="Recorded valid bids" />
+                  <MetricCard title="Winning value" value={formatCurrency(periodAuctions.reduce((sum, a) => sum + Number(a.highest_bid || 0), 0))} subtitle="Current / final highest bids" />
                 </section>
                 <section className="toolbar-card">
                   <select className="filter-select" value={auctionStatusFilter} onChange={(e) => setAuctionStatusFilter(e.target.value)}>
                     <option value="ALL">All statuses</option><option value="ACTIVE">Active</option><option value="DRAFT">Scheduled / Draft</option><option value="COMPLETED_WITH_WINNER">Completed</option><option value="CANCELLED">Cancelled</option>
                   </select>
-                  <select className="filter-select" defaultValue="30D"><option value="TODAY">Today</option><option value="7D">Last 7 days</option><option value="30D">Last 30 days</option><option value="MONTH">This month</option></select>
+                  <select className="filter-select" value={auctionDateFilter} onChange={(e) => setAuctionDateFilter(e.target.value)}><option value="ALL">All time</option><option value="TODAY">Today</option><option value="7D">Last 7 days</option><option value="30D">Last 30 days</option><option value="MONTH">This month</option></select>
                 </section>
                 <section className="dashboard-panel">
                   <div className="panel-header"><div><h2>Auction summary</h2><p>Quick operational and financial view of auction performance.</p></div></div>
@@ -424,7 +452,7 @@ export default function AuctionPage({ auctionWorkspaceTab, client, detailRequest
                 <section className="toolbar-card">
                   <input className="search-input" value={auctionSearch} onChange={(e) => setAuctionSearch(e.target.value)} placeholder="Search auctions..." />
                   <select className="filter-select" value={auctionStatusFilter} onChange={(e) => setAuctionStatusFilter(e.target.value)}>
-                    <option value="ALL">All statuses</option><option value="ACTIVE">Active</option><option value="COMPLETED_WITH_WINNER">Completed with winner</option><option value="CLOSED_NO_WINNER">Closed no winner</option><option value="AWAITING_FINALIZER">Awaiting finalizer</option><option value="CANCELLED">Cancelled</option>
+                    <option value="ALL">All statuses</option><option value="ACTIVE">Active</option><option value="CLOSED">Closed</option><option value="COMPLETED_WITH_WINNER">Completed with winner</option><option value="CLOSED_NO_WINNER">Closed no winner</option><option value="AWAITING_FINALIZER">Awaiting finalizer</option><option value="CANCELLED">Cancelled</option>
                   </select>
                 </section>
                 <section className="dashboard-panel">
