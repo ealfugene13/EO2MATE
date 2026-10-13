@@ -2550,7 +2550,10 @@ export default function FacebookPostPage({
         main_caption:
           mainCaption,
 
-        auction_item_label: isMultiple ? null : singleItem.trim(),
+        auction_item_label: postType === "SINGLE" ? singleItem.trim() : null,
+
+        // Structured identity; never infer an auction item from the public caption.
+        auction_item: postType === "SINGLE" ? { item_label: singleItem.trim() } : null,
 
         inventory_items:
           isMultiple
