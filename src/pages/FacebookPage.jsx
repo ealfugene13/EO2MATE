@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../supabase";
+import "./FacebookPageRepair.css";
 
 
 function formatDateTime(value) {
@@ -105,21 +106,46 @@ export default function FacebookPage({ client, facebookLoading, facebookMessage,
               </button>
             </header>
 
-            <section className="dashboard-panel setup-panel" style={{marginBottom:16}}>
-              <div className="panel-header"><div><h2>Page connection health</h2><p>Verify and repair incomplete setup without changing existing automation preferences.</p></div></div>
-              {repairMessage&&<p role="status">{repairMessage}</p>}
-              {connectedPages.map(p=>{const id=p.fb_page_id;const h=repairHealth[id];return <div key={id} style={{padding:"12px 0",borderBottom:"1px solid var(--border-color,#ddd)"}}>
-                <strong>{p.page_name||p.page_nm||id}</strong> <small>({id})</small>
-                <div style={{margin:"6px 0"}}>{h?`Provisioning: ${(h.steps||[]).map(s=>`${s.step_key}: ${s.status}`).join(" · ")||"Not initialized"} · Automation: ${h.automation_control_exists?(h.automation_enabled?"Enabled":"Disabled"):"Missing"}`:"Not yet inspected"}</div>
-                <button type="button" className="secondary-button" onClick={()=>inspectPage(id).catch(e=>setRepairMessage(e.message))}>Inspect</button>{" "}
-                <button type="button" className="primary-button" onClick={()=>{setRepairPage(p);setRepairPassword("");setRepairMessage("")}}>🔧 Repair Connection</button>
-              </div>})}
-              {repairPage&&<div className="setup-modal-backdrop"><div className="setup-modal setup-password-modal" role="dialog" aria-modal="true" aria-label="Repair Page connection">
-                <h3>Repair {repairPage.page_name||repairPage.page_nm||repairPage.fb_page_id}</h3>
-                <p>Check Meta feed subscription and restore missing Page controls. Existing automation settings will not be enabled or overwritten.</p>
-                <label className="setup-password-field">Current password<input type="password" autoComplete="current-password" value={repairPassword} onChange={e=>setRepairPassword(e.target.value)}/></label>
-                <div className="setup-modal-actions"><button type="button" className="secondary-button" disabled={repairBusy} onClick={()=>{setRepairPage(null);setRepairPassword("")}}>Cancel</button><button type="button" className="primary-button" disabled={repairBusy||!repairPassword} onClick={runRepair}>{repairBusy?"Repairing…":"Verify & Repair"}</button></div>
-              </div></div>}
+            <section className="dashboard-panel setup-panel eo-page-health" aria-label="Facebook Page connection health">
+              <div className="panel-header eo-page-health-heading">
+                <div><h2>Page connection health</h2><p>Inspect or repair Page setup without changing existing automation preferences.</p></div>
+                <span className="eo-page-health-count">{connectedPages.length} connected {connectedPages.length === 1 ? "Page" : "Pages"}</span>
+              </div>
+              {repairMessage && <div className="eo-page-repair-notice" role="status">{repairMessage}</div>}
+              <div className="eo-page-health-grid">
+                {connectedPages.map(p => {
+                  const id = p.fb_page_id;
+                  const h = repairHealth[id];
+                  const steps = h?.steps || [];
+                  const allComplete = steps.length >= 4 && ["PAGE_TOKEN", "FEED_SUBSCRIPTION", "PAGE_AUTOMATION_CONTROL", "PAGE_PAYMENT_CONTROL"].every(key => steps.some(s => s.step_key === key && s.status === "COMPLETED"));
+                  const automation = !h ? "Not inspected" : !h.automation_control_exists ? "Missing" : h.automation_enabled ? "Enabled" : "Disabled";
+                  return <article key={id} className="eo-page-health-card">
+                    <div className="eo-page-health-card-top">
+                      <div className="eo-page-health-identity"><span className="eo-page-health-facebook" aria-hidden="true">f</span><div><h3>{p.page_name || p.page_nm || id}</h3><p>Page ID: {id}</p></div></div>
+                      <span className={`eo-page-health-badge ${!h ? "is-neutral" : allComplete ? "is-success" : "is-warning"}`}>{!h ? "Not inspected" : allComplete ? "Setup verified" : "Needs attention"}</span>
+                    </div>
+                    <div className="eo-page-health-meta">
+                      <div><span>Provisioning</span><strong>{!h ? "Not inspected" : steps.length === 0 ? "Not initialized" : `${steps.filter(s => s.status === "COMPLETED").length}/${steps.length} completed`}</strong></div>
+                      <div><span>Automation</span><strong>{automation}</strong></div>
+                    </div>
+                    {h && steps.length > 0 && <div className="eo-page-health-steps" aria-label="Provisioning checks">{steps.map(s => <span key={s.step_key} className={`eo-page-step ${s.status === "COMPLETED" ? "is-complete" : "is-pending"}`} title={s.last_error || s.step_key}>{s.status === "COMPLETED" ? "✓" : "!"} {s.step_key.replaceAll("_", " ")}</span>)}</div>}
+                    <div className="eo-page-health-actions">
+                      <button type="button" className="secondary-button" disabled={repairBusy} onClick={() => inspectPage(id).catch(e => setRepairMessage(e.message))}>↻ Inspect</button>
+                      <button type="button" className="primary-button" disabled={repairBusy} onClick={() => {setRepairPage(p);setRepairPassword("");setRepairMessage("");}}>⚙ Repair Connection</button>
+                    </div>
+                  </article>;
+                })}
+                {connectedPages.length === 0 && <p className="eo-page-health-empty">No connected Facebook Pages yet.</p>}
+              </div>
+              {repairPage && <div className="setup-modal-backdrop eo-repair-backdrop" onMouseDown={e => {if(e.target === e.currentTarget && !repairBusy){setRepairPage(null);setRepairPassword("");}}}>
+                <div className="eo-repair-dialog" role="dialog" aria-modal="true" aria-labelledby="eo-repair-title" aria-describedby="eo-repair-description">
+                  <div className="eo-repair-dialog-header"><span className="eo-repair-dialog-icon" aria-hidden="true">⚙</span><div><h3 id="eo-repair-title">Repair Page connection</h3><p className="eo-repair-page-name">{repairPage.page_name || repairPage.page_nm || repairPage.fb_page_id}</p></div></div>
+                  <p id="eo-repair-description" className="eo-repair-description">Verify the Meta feed subscription and restore missing Page controls. Existing automation settings will not be enabled or overwritten.</p>
+                  <label className="eo-repair-password-label" htmlFor="eo-repair-password">Current password</label>
+                  <input id="eo-repair-password" className="eo-repair-password" type="password" autoComplete="current-password" autoFocus value={repairPassword} onChange={e => setRepairPassword(e.target.value)} onKeyDown={e => {if(e.key === "Enter" && repairPassword && !repairBusy)runRepair();}} />
+                  <div className="eo-repair-dialog-actions"><button type="button" className="secondary-button" disabled={repairBusy} onClick={() => {setRepairPage(null);setRepairPassword("");}}>Cancel</button><button type="button" className="primary-button" disabled={repairBusy || !repairPassword} onClick={runRepair}>{repairBusy ? "Repairing…" : "Verify & Repair"}</button></div>
+                </div>
+              </div>}
             </section>
             {facebookMessage && (
               <div className="success-message global-error">{facebookMessage}</div>

@@ -1,0 +1,43 @@
+/* Scoped Page Connection Health and Repair dialog; no changes to shared Setup modals. */
+.eo-page-health{margin-bottom:16px;overflow:visible}
+.eo-page-health-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.eo-page-health-heading h2{margin:0 0 5px}
+.eo-page-health-heading p{margin:0;color:#64748b;line-height:1.5}
+.eo-page-health-count{padding:6px 11px;border-radius:999px;background:#eff6ff;color:#1d4ed8;font-size:12px;font-weight:700;white-space:nowrap}
+.eo-page-health-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:16px;padding:16px}
+.eo-page-health-card{min-width:0;padding:18px;border:1px solid #dfe7f0;border-radius:14px;background:#fff;box-shadow:0 2px 10px rgba(15,23,42,.035)}
+.eo-page-health-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.eo-page-health-identity{display:flex;align-items:center;gap:12px;min-width:0}
+.eo-page-health-facebook{display:grid;place-items:center;width:38px;height:38px;flex:0 0 38px;background:#eaf2ff;color:#1877f2;border-radius:11px;font-size:25px;font-weight:800;font-family:Arial,sans-serif}
+.eo-page-health-identity h3{font-size:16px;line-height:1.35;margin:0 0 4px;overflow-wrap:anywhere}
+.eo-page-health-identity p{font-size:12px;margin:0;color:#64748b;overflow-wrap:anywhere}
+.eo-page-health-badge{display:inline-flex;align-items:center;border-radius:999px;padding:6px 10px;font-size:11px;font-weight:800;white-space:nowrap}
+.eo-page-health-badge.is-neutral{background:#f1f5f9;color:#475569}
+.eo-page-health-badge.is-success{background:#dcfce7;color:#166534}
+.eo-page-health-badge.is-warning{background:#fef3c7;color:#92400e}
+.eo-page-health-meta{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0;padding:12px;background:#f8fafc;border-radius:10px}
+.eo-page-health-meta>div{display:flex;flex-direction:column;gap:5px;min-width:0}
+.eo-page-health-meta span{color:#64748b;font-size:12px}
+.eo-page-health-meta strong{font-size:13px;overflow-wrap:anywhere}
+.eo-page-health-steps{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 16px}
+.eo-page-step{font-size:10px;font-weight:700;letter-spacing:.015em;padding:6px 8px;border-radius:7px;overflow-wrap:anywhere}
+.eo-page-step.is-complete{background:#f0fdf4;color:#166534}
+.eo-page-step.is-pending{background:#fff7ed;color:#9a3412}
+.eo-page-health-actions{display:flex;flex-wrap:wrap;gap:10px}
+.eo-page-health-actions button{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:39px;padding:9px 13px;border-radius:9px;font-size:13px;white-space:normal}
+.eo-page-health-empty{padding:16px;color:#64748b}
+.eo-page-repair-notice{margin:14px 16px 0;padding:12px 14px;border:1px solid #cbd5e1;background:#f8fafc;border-radius:10px;color:#334155;font-size:13px;line-height:1.5}
+.eo-repair-backdrop{z-index:10050}
+.eo-repair-dialog{box-sizing:border-box;display:flex;flex-direction:column;gap:0;width:min(460px,100%);max-height:calc(100dvh - 40px);overflow-y:auto;padding:24px;border-radius:18px;border:1px solid #e2e8f0;background:white;box-shadow:0 24px 65px rgba(15,23,42,.24);color:#0f172a}
+.eo-repair-dialog-header{display:flex;align-items:flex-start;gap:13px;min-width:0}
+.eo-repair-dialog-icon{display:grid;place-items:center;width:42px;height:42px;flex:0 0 42px;border-radius:12px;background:#eaf5ee;color:#16803b;font-size:23px}
+.eo-repair-dialog-header>div{min-width:0}
+.eo-repair-dialog h3{margin:0 0 5px;font-size:19px;line-height:1.35;color:#0f172a;overflow-wrap:anywhere}
+.eo-repair-page-name{margin:0;color:#475569;font-size:13px;font-weight:700;overflow-wrap:anywhere}
+.eo-repair-description{margin:18px 0 20px;color:#475569;font-size:13px;line-height:1.6;overflow-wrap:anywhere}
+.eo-repair-password-label{font-size:12px;font-weight:800;color:#334155;margin:0 0 8px}
+.eo-repair-password{box-sizing:border-box;width:100%;min-height:43px;padding:10px 12px;border:1px solid #cbd5e1;border-radius:9px;background:white;font:inherit;color:#0f172a}
+.eo-repair-password:focus{outline:2px solid #2563eb;outline-offset:1px}
+.eo-repair-dialog-actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:10px;margin-top:24px;padding-top:16px;border-top:1px solid #e2e8f0}
+.eo-repair-dialog-actions button{min-height:40px;border-radius:9px;padding:9px 14px}
+@media(max-width:600px){.eo-page-health-grid{padding:12px;gap:12px}.eo-page-health-card{padding:14px}.eo-page-health-meta{grid-template-columns:1fr 1fr}.eo-repair-dialog{padding:20px}.eo-repair-dialog-actions button{flex:1}}
