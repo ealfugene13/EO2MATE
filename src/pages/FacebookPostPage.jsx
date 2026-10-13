@@ -2550,6 +2550,8 @@ export default function FacebookPostPage({
         main_caption:
           mainCaption,
 
+        auction_item_label: isMultiple ? null : singleItem.trim(),
+
         inventory_items:
           isMultiple
             ? items.map(
