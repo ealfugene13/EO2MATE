@@ -49,6 +49,31 @@ export default function FacebookPage({ client, facebookLoading, facebookMessage,
   const [showAddPageGuide, setShowAddPageGuide] = useState(false);
 
   const [connecting, setConnecting] = useState(false);
+  const [repairPage,setRepairPage]=useState(null);
+  const [repairPassword,setRepairPassword]=useState("");
+  const [repairBusy,setRepairBusy]=useState(false);
+  const [repairMessage,setRepairMessage]=useState("");
+  const [repairHealth,setRepairHealth]=useState({});
+  async function inspectPage(pageId){
+    if(!client?.client_id)return;
+    const {data,error}=await supabase.functions.invoke(`meta?route=page-repair&client_id=${encodeURIComponent(client.client_id)}&fb_page_id=${encodeURIComponent(pageId)}`,{method:"GET"});
+    if(error||!data?.success)throw new Error(data?.message||data?.error||error?.message||"Unable to inspect Page");
+    setRepairHealth(old=>({...old,[pageId]:data}));
+  }
+  async function runRepair(){
+    if(!repairPage||!repairPassword||repairBusy)return;
+    setRepairBusy(true);setRepairMessage("");
+    try{
+      const {data,error}=await supabase.functions.invoke("meta",{method:"POST",headers:{"x-eo2mate-meta-route":"page-repair"},body:{client_id:client.client_id,fb_page_id:repairPage.fb_page_id,password:repairPassword}});
+      if(error)throw new Error(data?.message||data?.error||error.message);
+      if(!data?.success){setRepairMessage(`Repair incomplete: ${JSON.stringify(data?.results||data?.error)}`)}
+      else setRepairMessage("Page verification and repair completed. Automation remains subject to administrator settings.");
+      await inspectPage(repairPage.fb_page_id);
+      await loadFacebookStatus?.();
+      setRepairPage(null);
+    }catch(e){setRepairMessage(e.message||"Repair failed");}
+    finally{setRepairBusy(false);setRepairPassword("");}
+  }
   async function connectFacebook() {
     if (!client?.client_id || connecting) return;
     setConnecting(true);
@@ -80,6 +105,22 @@ export default function FacebookPage({ client, facebookLoading, facebookMessage,
               </button>
             </header>
 
+            <section className="dashboard-panel setup-panel" style={{marginBottom:16}}>
+              <div className="panel-header"><div><h2>Page connection health</h2><p>Verify and repair incomplete setup without changing existing automation preferences.</p></div></div>
+              {repairMessage&&<p role="status">{repairMessage}</p>}
+              {connectedPages.map(p=>{const id=p.fb_page_id;const h=repairHealth[id];return <div key={id} style={{padding:"12px 0",borderBottom:"1px solid var(--border-color,#ddd)"}}>
+                <strong>{p.page_name||p.page_nm||id}</strong> <small>({id})</small>
+                <div style={{margin:"6px 0"}}>{h?`Provisioning: ${(h.steps||[]).map(s=>`${s.step_key}: ${s.status}`).join(" · ")||"Not initialized"} · Automation: ${h.automation_control_exists?(h.automation_enabled?"Enabled":"Disabled"):"Missing"}`:"Not yet inspected"}</div>
+                <button type="button" className="secondary-button" onClick={()=>inspectPage(id).catch(e=>setRepairMessage(e.message))}>Inspect</button>{" "}
+                <button type="button" className="primary-button" onClick={()=>{setRepairPage(p);setRepairPassword("");setRepairMessage("")}}>🔧 Repair Connection</button>
+              </div>})}
+              {repairPage&&<div className="setup-modal-backdrop"><div className="setup-modal setup-password-modal" role="dialog" aria-modal="true" aria-label="Repair Page connection">
+                <h3>Repair {repairPage.page_name||repairPage.page_nm||repairPage.fb_page_id}</h3>
+                <p>Check Meta feed subscription and restore missing Page controls. Existing automation settings will not be enabled or overwritten.</p>
+                <label className="setup-password-field">Current password<input type="password" autoComplete="current-password" value={repairPassword} onChange={e=>setRepairPassword(e.target.value)}/></label>
+                <div className="setup-modal-actions"><button type="button" className="secondary-button" disabled={repairBusy} onClick={()=>{setRepairPage(null);setRepairPassword("")}}>Cancel</button><button type="button" className="primary-button" disabled={repairBusy||!repairPassword} onClick={runRepair}>{repairBusy?"Repairing…":"Verify & Repair"}</button></div>
+              </div></div>}
+            </section>
             {facebookMessage && (
               <div className="success-message global-error">{facebookMessage}</div>
             )}
