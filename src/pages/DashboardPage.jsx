@@ -227,7 +227,10 @@ function onlySelectedPage(rows, pageId) {
   );
 }
 
-export default function DashboardPage({ client, facebookStatus, goToAuctions, goToDeliveries, goToOrders, goToPayments, navigateTo, onboardingChecked, openDelivery, openFacebookSetup, page, paymentAccountLoading, paymentAccountMessage, paymentAccountStatus, setErrorMessage, setPage , selectedFbPageId }) {
+export default function DashboardPage({ client, facebookStatus, goToAuctions, goToDeliveries, goToOrders, goToPayments, navigateTo, onboardingChecked, openDelivery, openFacebookSetup, page, paymentAccountLoading, paymentAccountMessage, paymentAccountStatus, setErrorMessage, setPage , selectedFbPageId, selectedFbPageName }) {
+  const activePageLabel = String(selectedFbPageName || "").trim();
+  const welcomeName = activePageLabel || client?.name || "Business overview";
+  const pageChangedLabel = activePageLabel ? `Active Facebook Page: ${activePageLabel}` : "Client workspace overview";
   const [auctions, setAuctions] = useState([]);
 
   const [orders, setOrders] = useState([]);
@@ -304,7 +307,8 @@ export default function DashboardPage({ client, facebookStatus, goToAuctions, go
             <section className="eo2-dashboard-welcome">
               <div className="eo2-dashboard-welcome-copy">
                 <div className="eo2-dashboard-kicker"><span className="eo2-dashboard-kicker-dot" /> YOUR EO2MATE WORKSPACE</div>
-                <h1>{client?.name ? `Welcome, ${client.name}` : "Business overview"}</h1>
+                <h1>{`Welcome, ${welcomeName}`}</h1>
+                <p>{pageChangedLabel}{activePageLabel && client?.name ? ` · Managed by ${client.name}` : ""}</p>
                 <p>See your sales, orders, payments, inventory and deliveries in one place.</p>
               </div>
               <div className="eo2-dashboard-welcome-actions">
