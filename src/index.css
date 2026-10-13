@@ -3819,3 +3819,22 @@ button.post-type-card:hover { transform: translateY(-2px); border-color: #bcdcc3
 .eo2-phone-count{flex:0 0 auto;color:#81909d;font-size:11px;font-variant-numeric:tabular-nums}
 .eo2-password-rules small{overflow-wrap:anywhere}
 @media(max-width:480px){.eo2-signup-group .eo2-name-row{grid-template-columns:1fr}}
+
+/* EO2MATE caption helper: fixed-height scrollable selector (2026-10-13) */
+.fb-caption-tools-layout { align-items: start; }
+.fb-caption-helpers {
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 0;
+  max-height: 320px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+.fb-caption-helper-grid { min-width: 0; }
+.fb-caption-insert-button { box-sizing: border-box; width: 100%; }
+@media (max-width: 900px) {
+  .fb-caption-helpers { width: 100%; max-height: 260px; }
+}
