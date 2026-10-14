@@ -192,13 +192,13 @@ export default function OnboardingPage({ session, initialStatus = null, onComple
                     })}
                   </div>
                   <div className="onboarding-permission-note">
-                    After activation, choose the Active Facebook Page at the top of EO2MATE. Inventory, sales and purchases, reports, setup, and Page automation then follow that selection. The client-wide automation switch applies to every connected Page; each Page also has its own automation control under Setup → Automation Control. Newly connected Pages can remain paused until an administrator enables them.
+                    After activation, choose the Active Facebook Page at the top of EO2MATE. Page-specific automation status and controls follow that selection, along with the connected Page's activity. Client-wide automation is a separate suspension that applies to every connected Page. Newly connected Pages can remain paused until an administrator enables them.
                   </div>
                   <button className="secondary-button" type="button" onClick={connectFacebook} disabled={loading}>Connect another Facebook Page</button>
                 </>
               ) : (
                 <>
-                  <div className="onboarding-permission-note">Facebook is not required to activate EO2MATE. Connect one or more Pages now only if you want to start using Facebook selling automation immediately. After activation, each Page has its own data and automation settings, selected from the Active Facebook Page control.</div>
+                  <div className="onboarding-permission-note">Facebook is not required to activate EO2MATE. Connect one or more Pages now only if you want to start using Facebook selling automation immediately. After activation, choose the Active Facebook Page to view its Page-specific automation status and controls. Client-wide automation remains a separate suspension that applies to every connected Page.</div>
                   <button className="secondary-button" type="button" onClick={connectFacebook} disabled={loading}>Connect Facebook Page Now</button>
                   {status?.meta_skip_enabled && <button className="secondary-button" type="button" disabled={loading} onClick={() => setShowSkipDialog(true)} style={{marginLeft:8}}>🔒 Skip Meta (TEST)</button>}
                 </>

@@ -317,158 +317,84 @@ export default function AutomationControlPage({ client, page, onManageFacebook, 
             <section className="dashboard-panel automation-control-panel">
               <div className="panel-header">
                 <div>
-                  <h2>Client-wide automation</h2>
-                  <p>This account-wide switch applies to every connected Facebook Page, including when you change the selected Page.</p>
+                  <h2>{selectedAutomationPages[0] ? `Selected Page automation — ${selectedAutomationPages[0].page_name || selectedAutomationPages[0].fb_page_id}` : "Selected Page automation"}</h2>
+                  <p>This control follows the Active Facebook Page selected at the top of EO2MATE.</p>
                 </div>
               </div>
 
-              <div className="automation-control-row client-scope">
-                <div className={`automation-switch-orb ${automationScopeEnabled("CLIENT", client?.client_id) ? "enabled" : "disabled"}`}>
-                  <span />
-                </div>
-
-                <div className="automation-control-copy">
-                  <strong>{client?.name || "Current client"}</strong>
-                  <span>
-                    Auction, Messenger and payment automation for all Pages
-                  </span>
-                  {!automationScopeEnabled("CLIENT", client?.client_id) && (
-                    <small>
-                      Reason: {automationScopeReason("CLIENT", client?.client_id) || "No reason recorded"}
-                    </small>
-                  )}
-                </div>
-
-                <StatusBadge
-                  status={
-                    automationScopeEnabled("CLIENT", client?.client_id)
-                      ? "ACTIVE"
-                      : "SUSPENDED"
-                  }
-                />
-
-                <button
-                  type="button"
-                  className={
-                    automationScopeEnabled("CLIENT", client?.client_id)
-                      ? "control-off-button"
-                      : "control-on-button"
-                  }
-                  disabled={
-                    automationControlLoading ||
-                    String(client?.role || "").toUpperCase() !== "SUPER_ADMIN"
-                  }
-                  title={
-                    String(client?.role || "").toUpperCase() === "SUPER_ADMIN"
-                      ? "Change client automation"
-                      : "Client-level suspension requires SUPER_ADMIN"
-                  }
-                  onClick={() =>
-                    requestAutomationChange({
-                      scopeType: "CLIENT",
-                      scopeId: client?.client_id,
-                      label: client?.name || "Current client",
-                      enabled: !automationScopeEnabled("CLIENT", client?.client_id),
-                    })
-                  }
-                >
-                  {automationScopeEnabled("CLIENT", client?.client_id) ? "Turn Off" : "Turn On"}
-                </button>
-              </div>
-
-              {String(client?.role || "").toUpperCase() !== "SUPER_ADMIN" && (
-                <div className="automation-permission-note">
-                  Client-level ON/OFF is locked to SUPER_ADMIN so a subscription-suspended client cannot reactivate itself.
-                </div>
-              )}
-
-              {selectedAutomationPages[0] && (() => {
+              {selectedAutomationPages[0] ? (() => {
                 const selectedPage = selectedAutomationPages[0];
-                const enabled = automationScopeEnabled("CLIENT", client?.client_id)
-                  && automationScopeEnabled("PAGE", selectedPage.fb_page_id);
+                const pageEnabled = automationScopeEnabled("PAGE", selectedPage.fb_page_id);
+                const clientEnabled = automationScopeEnabled("CLIENT", client?.client_id);
+                const effectiveEnabled = clientEnabled && pageEnabled;
                 return (
-                  <div className="automation-permission-note" aria-live="polite">
-                    <strong>Selected Page status — {selectedPage.page_name || selectedPage.fb_page_id}: </strong>
-                    {enabled ? "Active" : "Suspended"}
-                    {!automationScopeEnabled("CLIENT", client?.client_id)
-                      ? " (blocked by the client-wide switch)"
-                      : !automationScopeEnabled("PAGE", selectedPage.fb_page_id)
-                        ? " (paused for this Page)"
-                        : ""}
-                  </div>
+                  <>
+                    <div className="automation-control-row">
+                      <div className={`automation-switch-orb ${effectiveEnabled ? "enabled" : "disabled"}`}><span /></div>
+                      <div className="automation-control-copy">
+                        <strong>{selectedPage.page_name || selectedPage.fb_page_id}</strong>
+                        <span>{selectedPage.fb_page_id}</span>
+                        {!pageEnabled && <small>Paused for this Page{automationScopeReason("PAGE", selectedPage.fb_page_id) ? `: ${automationScopeReason("PAGE", selectedPage.fb_page_id)}` : ""}</small>}
+                        {pageEnabled && !clientEnabled && <small>Blocked by the client-wide suspension.</small>}
+                      </div>
+                      <StatusBadge status={effectiveEnabled ? "ACTIVE" : "SUSPENDED"} />
+                      <button
+                        type="button"
+                        className={pageEnabled ? "control-off-button" : "control-on-button"}
+                        disabled={automationControlLoading || !["ADMIN", "OWNER", "SUPER_ADMIN"].includes(String(client?.role || "").toUpperCase())}
+                        title={`${pageEnabled ? "Pause" : "Resume"} automation for ${selectedPage.page_name || selectedPage.fb_page_id}`}
+                        onClick={() => requestAutomationChange({
+                          scopeType: "PAGE",
+                          scopeId: selectedPage.fb_page_id,
+                          label: selectedPage.page_name || selectedPage.fb_page_id,
+                          enabled: !pageEnabled,
+                        })}
+                      >
+                        {pageEnabled ? "Turn Off" : "Turn On"}
+                      </button>
+                    </div>
+                    {!clientEnabled && (
+                      <div className="automation-permission-note">Client-wide automation is suspended, so this Page remains inactive until a Super Admin resumes the client.</div>
+                    )}
+                  </>
                 );
-              })()}
+              })() : (
+                <div className="empty-control-state">Choose a connected Facebook Page from the selector above to view its automation status.</div>
+              )}
             </section>
 
             <section className="dashboard-panel automation-control-panel">
               <div className="panel-header">
                 <div>
-                  <h2>Facebook Page automation</h2>
-                  <p>Pause one Page while leaving the client's other connected Pages running.</p>
+                  <h2>Client-wide automation</h2>
+                  <p>This account-level suspension applies to every connected Facebook Page.</p>
                 </div>
-                <button type="button" className="primary-button" onClick={onManageFacebook} disabled={!client?.client_id}>
-                  <span aria-hidden="true" style={{ marginRight: 8 }}>＋</span>{automationPages.length ? "Add / Reconnect Page" : "Connect Facebook Page"}
+              </div>
+
+              <div className="automation-control-row client-scope">
+                <div className={`automation-switch-orb ${automationScopeEnabled("CLIENT", client?.client_id) ? "enabled" : "disabled"}`}><span /></div>
+                <div className="automation-control-copy">
+                  <strong>{client?.name || "Current client"}</strong>
+                  <span>Auction, Messenger and payment automation for all Pages</span>
+                  {!automationScopeEnabled("CLIENT", client?.client_id) && <small>Reason: {automationScopeReason("CLIENT", client?.client_id) || "No reason recorded"}</small>}
+                </div>
+                <StatusBadge status={automationScopeEnabled("CLIENT", client?.client_id) ? "ACTIVE" : "SUSPENDED"} />
+                <button
+                  type="button"
+                  className={automationScopeEnabled("CLIENT", client?.client_id) ? "control-off-button" : "control-on-button"}
+                  disabled={automationControlLoading || String(client?.role || "").toUpperCase() !== "SUPER_ADMIN"}
+                  title={String(client?.role || "").toUpperCase() === "SUPER_ADMIN" ? "Change client-wide automation" : "Client-wide suspension requires SUPER_ADMIN"}
+                  onClick={() => requestAutomationChange({
+                    scopeType: "CLIENT",
+                    scopeId: client?.client_id,
+                    label: client?.name || "Current client",
+                    enabled: !automationScopeEnabled("CLIENT", client?.client_id),
+                  })}
+                >
+                  {automationScopeEnabled("CLIENT", client?.client_id) ? "Turn Off" : "Turn On"}
                 </button>
               </div>
-
-              <div className="automation-page-list">
-                {(selectedAutomationPages || []).map((fbPage) => {
-                  const pageEnabled = automationScopeEnabled("PAGE", fbPage.fb_page_id);
-                  const clientEnabled = automationScopeEnabled("CLIENT", client?.client_id);
-                  const effectiveEnabled = clientEnabled && pageEnabled;
-
-                  return (
-                    <div className="automation-control-row" key={fbPage.fb_page_id}>
-                      <div className={`automation-switch-orb ${effectiveEnabled ? "enabled" : "disabled"}`}>
-                        <span />
-                      </div>
-
-                      <div className="automation-control-copy">
-                        <strong>{fbPage.page_name || "Facebook Page"}</strong>
-                        <span>{fbPage.fb_page_id}</span>
-                        {!pageEnabled && (
-                          <small>
-                            Reason: {automationScopeReason("PAGE", fbPage.fb_page_id) || "No reason recorded"}
-                          </small>
-                        )}
-                        {pageEnabled && !clientEnabled && (
-                          <small>Blocked by client-level suspension.</small>
-                        )}
-                      </div>
-
-                      <StatusBadge status={effectiveEnabled ? "ACTIVE" : "SUSPENDED"} />
-
-                      <button
-                        type="button"
-                        className={pageEnabled ? "control-off-button" : "control-on-button"}
-                        disabled={
-                          automationControlLoading ||
-                          !["ADMIN", "OWNER", "SUPER_ADMIN"].includes(
-                            String(client?.role || "").toUpperCase()
-                          )
-                        }
-                        onClick={() =>
-                          requestAutomationChange({
-                            scopeType: "PAGE",
-                            scopeId: fbPage.fb_page_id,
-                            label: fbPage.page_name || fbPage.fb_page_id,
-                            enabled: !pageEnabled,
-                          })
-                        }
-                      >
-                        {pageEnabled ? "Turn Off" : "Turn On"}
-                      </button>
-                    </div>
-                  );
-                })}
-
-                {!automationControlLoading && !(selectedAutomationPages || []).length && (
-                  <div className="empty-control-state">
-                    <div>No connected Facebook Pages found for this client.</div>
-                    <button type="button" className="secondary-button" style={{ marginTop: 12 }} onClick={onManageFacebook} disabled={!client?.client_id}>Connect your first Facebook Page →</button>
-                  </div>
-                )}
-              </div>
+              {String(client?.role || "").toUpperCase() !== "SUPER_ADMIN" && <div className="automation-permission-note">Client-wide ON/OFF is restricted to SUPER_ADMIN for subscription suspension.</div>}
             </section>
 
             <section className="dashboard-panel automation-control-panel">
