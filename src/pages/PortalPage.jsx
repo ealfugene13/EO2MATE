@@ -504,7 +504,16 @@ export default function PortalPage({ session }) {
     setSelectedFbPageId(String(id));
     localStorage.setItem(`eo2mate-page-${client.client_id}`, String(id));
     setDetailRequest(null);
-    setPage("dashboard");
+    // Keep the current workspace open so it refreshes for the newly selected
+    // Page. Return detail views to their parent list to avoid showing a record
+    // from the Page we just left.
+    const detailFallback = {
+      "auction-detail": "auctions",
+      "order-detail": "orders",
+      "payment-detail": "payments",
+      "delivery-detail": "deliveries",
+    };
+    if (detailFallback[page]) setPage(detailFallback[page]);
   }
   const [facebookLoading, setFacebookLoading] = useState(false);
   const [facebookMessage, setFacebookMessage] = useState("");
@@ -1080,11 +1089,11 @@ export default function PortalPage({ session }) {
         {(page === "auctions" || page === "auction-detail") && <AuctionPage selectedFbPageId={effectivePageId} navigationFilter={navigationFilter} auctionWorkspaceTab={auctionWorkspaceTab} client={client} detailRequest={detailRequest} navigateTo={navigateTo} page={page} setAuctionWorkspaceTab={setAuctionWorkspaceTab} setErrorMessage={setErrorMessage} setPage={setPage} />}
 
         {page === "inventory" && (
-          <InventoryPage client={client} />
+          <InventoryPage key={`inventory-${effectivePageId}`} client={client} selectedFbPageId={effectivePageId} onSelectPage={switchFacebookPage} />
         )}
 
         {page === "sales" && (
-          <SalesPage client={client} navigationFilter={navigationFilter} navigatePage={setPage} />
+          <SalesPage key={`sales-${effectivePageId}`} client={client} selectedFbPageId={effectivePageId} navigationFilter={navigationFilter} navigatePage={setPage} />
         )}
 
         {(page === "purchases") && <PurchasesPage client={client} />}
@@ -1132,7 +1141,7 @@ export default function PortalPage({ session }) {
             </nav>
             <div className="setup-workspace-content" role="tabpanel">
               {setupSection === "configuration" && <SetupPage client={client} />}
-              {setupSection === "automation" && <AutomationControlPage client={client} page="automation-control" />}
+              {setupSection === "automation" && <AutomationControlPage key={`automation-${effectivePageId}`} client={client} page="automation-control" selectedFbPageId={effectivePageId} />}
               {setupSection === "messages" && <AutomatedMessagesPage client={client} />}
               {setupSection === "caption-templates" && <PostCaptionTemplatePage client={client} />}
             </div>

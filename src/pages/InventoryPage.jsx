@@ -186,6 +186,8 @@ function statusClass(
 
 export default function InventoryPage({
   client,
+  selectedFbPageId,
+  onSelectPage,
 }) {
   const imageInputRef =
     useRef(
@@ -224,7 +226,7 @@ export default function InventoryPage({
   ] = useState([]);
 
   const [pages, setPages] = useState([]);
-  const [pageFilter, setPageFilter] = useState("ALL");
+  const [pageFilter, setPageFilter] = useState(selectedFbPageId || "ALL");
 
   const [
     items,
@@ -2613,6 +2615,10 @@ export default function InventoryPage({
                 value={pageFilter}
                 onChange={async (event) => {
                   const next = event.target.value;
+                  if (next !== "ALL" && next !== selectedFbPageId) {
+                    onSelectPage?.(next);
+                    return;
+                  }
                   setPageFilter(next);
                   setProcessing(true);
                   try { await loadItems({ page: next }); }

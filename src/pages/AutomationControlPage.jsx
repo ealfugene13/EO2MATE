@@ -31,10 +31,16 @@ function StatusBadge({ status }) {
   return <span className={className}>{statusLabel(normalized)}</span>;
 }
 
-export default function AutomationControlPage({ client, page, onManageFacebook }) {
+export default function AutomationControlPage({ client, page, onManageFacebook, selectedFbPageId }) {
   const [automationControls, setAutomationControls] = useState([]);
 
   const [automationPages, setAutomationPages] = useState([]);
+  const selectedAutomationPages = useMemo(
+    () => selectedFbPageId
+      ? automationPages.filter((fbPage) => String(fbPage.fb_page_id) === String(selectedFbPageId))
+      : automationPages,
+    [automationPages, selectedFbPageId],
+  );
 
   const [automationControlLoading, setAutomationControlLoading] = useState(false);
 
@@ -376,7 +382,7 @@ export default function AutomationControlPage({ client, page, onManageFacebook }
               </div>
 
               <div className="automation-page-list">
-                {(automationPages || []).map((fbPage) => {
+                {(selectedAutomationPages || []).map((fbPage) => {
                   const pageEnabled = automationScopeEnabled("PAGE", fbPage.fb_page_id);
                   const clientEnabled = automationScopeEnabled("CLIENT", client?.client_id);
                   const effectiveEnabled = clientEnabled && pageEnabled;
@@ -426,7 +432,7 @@ export default function AutomationControlPage({ client, page, onManageFacebook }
                   );
                 })}
 
-                {!automationControlLoading && !(automationPages || []).length && (
+                {!automationControlLoading && !(selectedAutomationPages || []).length && (
                   <div className="empty-control-state">
                     <div>No connected Facebook Pages found for this client.</div>
                     <button type="button" className="secondary-button" style={{ marginTop: 12 }} onClick={onManageFacebook} disabled={!client?.client_id}>Connect your first Facebook Page →</button>
@@ -444,7 +450,7 @@ export default function AutomationControlPage({ client, page, onManageFacebook }
               </div>
 
               <div className="automation-page-list">
-                {(automationPages || []).map((fbPage) => {
+                {(selectedAutomationPages || []).map((fbPage) => {
                   const enabled = fbPage.payment_automation_enabled !== false;
                   return (
                     <div className="automation-control-row" key={`payment-${fbPage.fb_page_id}`}>
@@ -473,7 +479,7 @@ export default function AutomationControlPage({ client, page, onManageFacebook }
                     </div>
                   );
                 })}
-                {!automationControlLoading && !(automationPages || []).length && (
+                {!automationControlLoading && !(selectedAutomationPages || []).length && (
                   <div className="empty-control-state">Connect a Facebook Page to configure its payment automation.</div>
                 )}
               </div>

@@ -886,7 +886,8 @@ export default function PurchasesPage({ client }) {
           <h1>Purchases</h1>
           <p>
             Create purchase orders, manage suppliers and receive stock into
-            Inventory.
+            Inventory. Supplier purchases and stock are shared across this
+            client account's connected Facebook Pages.
           </p>
         </div>
         <div className="purchase-actions">

@@ -199,6 +199,12 @@ export default function ReportsPage({ client, page, setErrorMessage , selectedFb
 
   const [sellingPostError, setSellingPostError] = useState("");
 
+  useEffect(() => {
+    setReportPageFilter(selectedFbPageId || "ALL");
+    setGeneratedReport(null);
+    setReportMessage("");
+  }, [selectedFbPageId]);
+
   const reportData = useMemo(() => {
     const now = new Date();
     let start = new Date(now);
