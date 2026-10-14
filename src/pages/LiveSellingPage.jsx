@@ -196,16 +196,46 @@ function MetricCard({ title, value, subtitle, onClick }) {
 
 import LiveMiningPage from "./LiveMiningPage";
 
+function parseFacebookLiveVideoId(value) {
+  const input = String(value || "").trim();
+  if (!input) return { id: "", message: "Paste the Facebook Live link or its numeric video ID." };
+  if (/^\d+$/.test(input)) return { id: input, message: "Video ID detected." };
+
+  let url;
+  try {
+    url = new URL(/^https?:\/\//i.test(input) ? input : `https://${input}`);
+  } catch {
+    return { id: "", message: "That does not look like a Facebook Live link or video ID." };
+  }
+
+  const host = url.hostname.toLowerCase().replace(/^www\./, "");
+  if (!(host === "facebook.com" || host.endsWith(".facebook.com") || host === "fb.watch")) {
+    return { id: "", message: "Paste a link from Facebook, or enter the numeric video ID." };
+  }
+
+  const queryId = url.searchParams.get("v") || url.searchParams.get("video_id");
+  if (queryId && /^\d+$/.test(queryId)) return { id: queryId, message: "Video ID detected from the link." };
+
+  const path = decodeURIComponent(url.pathname);
+  const match = path.match(/\/(?:videos?|live)\/(\d+)(?:\/|$)/i);
+  if (match) return { id: match[1], message: "Video ID detected from the link." };
+
+  return { id: "", message: host === "fb.watch"
+    ? "This is a shortened link. Open it in Facebook, copy the full video link, and paste that here."
+    : "Could not find a video ID in that link. Open the Live video itself and copy its full Facebook URL." };
+}
+
 function MixedLiveManager({ client, selectedFbPageId }) {
   const clientId = client?.client_id;
   const [sessions, setSessions] = useState([]);
   const [selected, setSelected] = useState("");
   const pageId = selectedFbPageId || "";
-  const [videoId, setVideoId] = useState("");
+  const [videoInput, setVideoInput] = useState("");
   const [item, setItem] = useState({ item_code: "", title: "", mode: "SELLING", quantity: 1, unit_price: "", mine_price: "", take_price: "", lock_price: "", starting_bid: "", bid_increment: "" });
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const current = sessions.find((s) => s.id === selected);
+  const parsedVideo = useMemo(() => parseFacebookLiveVideoId(videoInput), [videoInput]);
   const request = async (action, extra = {}) => {
     if (!clientId) throw new Error("Select a client workspace first.");
     const { data, error } = await supabase.functions.invoke("eo2mate", { headers: { "x-eo2mate-route": "live-admin" }, body: { action, client_id: clientId, ...extra } });
@@ -222,30 +252,39 @@ function MixedLiveManager({ client, selectedFbPageId }) {
   };
   return <section className="dashboard-panel" style={{ padding: 20 }}>
     <div className="panel-header"><div><h2>Mixed Live Control Center</h2><p>One Facebook Live video. Item-coded commands: <strong>A12 +2</strong>, <strong>B15 LOCK</strong>, <strong>C18 600</strong>.</p></div><button className="secondary-button" type="button" onClick={() => run("list")} disabled={busy}>↻ Refresh</button></div>
-    <p>Connect a real Facebook Page and paste its Page ID and Live Video ID. This module records claims and bids; automatic order creation is not enabled in this phase.</p>
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
-      <input aria-label="Facebook Page ID" value={pageId} readOnly title="Use the global Facebook Page switcher to change Pages" />
-      <input aria-label="Facebook Live Video ID" placeholder="Facebook Live Video ID" value={videoId} onChange={(e) => setVideoId(e.target.value)} />
-      <button className="primary-button" type="button" disabled={busy || !pageId || !videoId} onClick={async () => { setBusy(true); try { const d = await request("create", { fb_page_id: pageId, fb_video_id: videoId }); await refresh(); setSelected(d.session.id); setMessage("Session created in DRAFT."); } catch (e) { setMessage(e.message); } finally { setBusy(false); } }}>＋ Create Session</button>
-    </div>
-    <label>Live session <select value={selected} onChange={(e) => setSelected(e.target.value)}><option value="">Select a session</option>{sessions.map((s) => <option key={s.id} value={s.id}>{s.fb_video_id} — {s.status}</option>)}</select></label>
-    {current && <>
-      <p><strong>Status:</strong> {current.status} · <strong>Video:</strong> {current.fb_video_id}</p>
-      {current.status === "DRAFT" && <>
-        <h3>Add queued product</h3>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-          <input placeholder="Item code e.g. A12" aria-label="Item code" value={item.item_code} onChange={(e) => setItem({ ...item, item_code: e.target.value.toUpperCase() })} />
-          <input placeholder="Product name" aria-label="Product name" value={item.title} onChange={(e) => setItem({ ...item, title: e.target.value })} />
-          <select aria-label="Selling mode" value={item.mode} onChange={(e) => setItem({ ...item, mode: e.target.value })}><option value="SELLING">Selling</option><option value="MINING">Mining</option><option value="AUCTION">Auction</option></select>
-          <input type="number" min="1" aria-label="Quantity" value={item.quantity} onChange={(e) => setItem({ ...item, quantity: e.target.value })} />
-          {(item.mode === "SELLING" ? ["unit_price"] : item.mode === "MINING" ? ["mine_price", "take_price", "lock_price"] : ["starting_bid", "bid_increment"]).map((field) => <input key={field} type="number" min="0" step="0.01" aria-label={field.replaceAll("_", " ")} placeholder={field.replaceAll("_", " ")} value={item[field]} onChange={(e) => setItem({ ...item, [field]: e.target.value })} />)}
-          <button type="button" className="secondary-button" disabled={busy || !item.title || !item.item_code} onClick={() => run("add-item", { session_id: selected, ...item })}>＋ Add Item</button>
-        </div>
-        <p><button className="primary-button" type="button" disabled={busy || !(current.eo2mate_live_items || []).length} onClick={() => run("start", { session_id: selected })}>▶ Start Session</button></p>
+    <p>This module records claims and bids; automatic order creation is not enabled in this phase.</p>
+
+    <section aria-labelledby="live-session-setup-title" style={{ padding: 16, margin: "16px 0", border: "1px solid #dbe4ee", borderRadius: 12, background: "#f8fafc" }}>
+      <h3 id="live-session-setup-title" style={{ marginTop: 0 }}>1. Connect the Facebook Live video</h3>
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "end", gap: 10 }}>
+        <label style={{ display: "grid", gap: 6 }}>Facebook Page ID<input aria-label="Facebook Page ID" value={pageId} readOnly title="Use the global Facebook Page switcher to change Pages" /></label>
+        <label style={{ display: "grid", gap: 6, flex: "1 1 320px" }}>Facebook Live URL or video ID<input aria-label="Facebook Live URL or video ID" placeholder="Paste the Live video link or numeric ID" value={videoInput} onChange={(e) => setVideoInput(e.target.value)} aria-describedby="live-video-id-help" /></label>
+        <button className="primary-button" type="button" disabled={busy || !pageId || !parsedVideo.id} onClick={async () => { setBusy(true); setMessage(""); try { const d = await request("create", { fb_page_id: pageId, fb_video_id: parsedVideo.id }); await refresh(); setSelected(d.session.id); setMessage("Session created in DRAFT. Add products in the queue below."); } catch (e) { setMessage(e.message); } finally { setBusy(false); } }}>＋ Create Session</button>
+      </div>
+      <p id="live-video-id-help" role="status" style={{ marginBottom: 0, color: parsedVideo.id ? "#087443" : "#58677a" }}>{parsedVideo.message}{parsedVideo.id && <> Detected ID: <strong>{parsedVideo.id}</strong></>}</p>
+    </section>
+
+    <section aria-labelledby="live-product-queue-title" style={{ padding: 16, margin: "16px 0", border: "1px solid #dbe4ee", borderRadius: 12 }}>
+      <h3 id="live-product-queue-title" style={{ marginTop: 0 }}>2. Product queue</h3>
+      {!current ? <p style={{ marginBottom: 0 }}>Create a Live session above, or select an existing session below. The product queue and Add Item form will appear here.</p> : <>
+        <label style={{ display: "grid", gap: 6, maxWidth: 480 }}>Live session<select value={selected} onChange={(e) => setSelected(e.target.value)}><option value="">Select a session</option>{sessions.map((s) => <option key={s.id} value={s.id}>{s.fb_video_id} — {s.status}</option>)}</select></label>
+        <p><strong>Session status:</strong> {current.status} · <strong>Video ID:</strong> {current.fb_video_id}</p>
+        {current.status === "DRAFT" && <>
+          <h4 style={{ marginBottom: 8 }}>Add product to queue</h4>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+            <input placeholder="Item code e.g. A12" aria-label="Item code" value={item.item_code} onChange={(e) => setItem({ ...item, item_code: e.target.value.toUpperCase() })} />
+            <input placeholder="Product name" aria-label="Product name" value={item.title} onChange={(e) => setItem({ ...item, title: e.target.value })} />
+            <select aria-label="Selling mode" value={item.mode} onChange={(e) => setItem({ ...item, mode: e.target.value })}><option value="SELLING">Selling</option><option value="MINING">Mining</option><option value="AUCTION">Auction</option></select>
+            <input type="number" min="1" aria-label="Quantity" value={item.quantity} onChange={(e) => setItem({ ...item, quantity: e.target.value })} />
+            {(item.mode === "SELLING" ? ["unit_price"] : item.mode === "MINING" ? ["mine_price", "take_price", "lock_price"] : ["starting_bid", "bid_increment"]).map((field) => <input key={field} type="number" min="0" step="0.01" aria-label={field.replaceAll("_", " ")} placeholder={field.replaceAll("_", " ")} value={item[field]} onChange={(e) => setItem({ ...item, [field]: e.target.value })} />)}
+            <button type="button" className="secondary-button" disabled={busy || !item.title || !item.item_code} onClick={() => run("add-item", { session_id: selected, ...item })}>＋ Add Item to Queue</button>
+          </div>
+          <p><button className="primary-button" type="button" disabled={busy || !(current.eo2mate_live_items || []).length} onClick={() => run("start", { session_id: selected })}>▶ Start Session</button></p>
+        </>}
+        <div className="table-wrapper"><table><thead><tr><th>Code</th><th>Product</th><th>Mode</th><th>Status</th><th>Accepted / Stock</th><th>Action</th></tr></thead><tbody>{(current.eo2mate_live_items || []).map((it) => <tr key={it.id}><td>{it.item_code}</td><td>{it.title}</td><td>{it.mode}</td><td>{it.status}</td><td>{it.claimed} / {it.quantity}</td><td>{current.status === "ACTIVE" && it.status === "QUEUED" && <button className="secondary-button" type="button" disabled={busy} onClick={() => run("activate-item", { session_id: selected, item_id: it.id })}>▶ Activate</button>}</td></tr>)}</tbody></table>{!(current.eo2mate_live_items || []).length && <p>No products queued yet. Add your first product above.</p>}</div>
+        {current.status === "ACTIVE" && <button type="button" className="secondary-button" disabled={busy} onClick={() => { if (window.confirm("Close this live session?")) run("close", { session_id: selected }); }}>■ Close Session</button>}
       </>}
-      <div className="table-wrapper"><table><thead><tr><th>Code</th><th>Product</th><th>Mode</th><th>Status</th><th>Accepted / Stock</th><th>Action</th></tr></thead><tbody>{(current.eo2mate_live_items || []).map((it) => <tr key={it.id}><td>{it.item_code}</td><td>{it.title}</td><td>{it.mode}</td><td>{it.status}</td><td>{it.claimed} / {it.quantity}</td><td>{current.status === "ACTIVE" && it.status === "QUEUED" && <button className="secondary-button" type="button" disabled={busy} onClick={() => run("activate-item", { session_id: selected, item_id: it.id })}>▶ Activate</button>}</td></tr>)}</tbody></table></div>
-      {current.status === "ACTIVE" && <button type="button" className="secondary-button" disabled={busy} onClick={() => { if (window.confirm("Close this live session?")) run("close", { session_id: selected }); }}>■ Close Session</button>}
-    </>}
+    </section>
     {message && <p role="status">{message}</p>}
   </section>;
 }
