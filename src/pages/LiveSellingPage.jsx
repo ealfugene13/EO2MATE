@@ -199,7 +199,8 @@ import LiveMiningPage from "./LiveMiningPage";
 function parseFacebookLiveVideoId(value) {
   const input = String(value || "").trim();
   if (!input) return { id: "", message: "Paste the Facebook Live link or its numeric video ID." };
-  if (/^\d+$/.test(input)) return { id: input, message: "Video ID detected." };
+  if (/^\d{5,40}$/.test(input)) return { id: input, message: "Video ID detected." };
+  if (/^\d+$/.test(input)) return { id: "", message: "The numeric video ID must be at least 5 digits." };
 
   let url;
   try {
@@ -214,15 +215,110 @@ function parseFacebookLiveVideoId(value) {
   }
 
   const queryId = url.searchParams.get("v") || url.searchParams.get("video_id");
-  if (queryId && /^\d+$/.test(queryId)) return { id: queryId, message: "Video ID detected from the link." };
+  if (queryId && /^\d{5,40}$/.test(queryId)) return { id: queryId, message: "Video ID detected from the link." };
 
   const path = decodeURIComponent(url.pathname);
-  const match = path.match(/\/(?:videos?|live)\/(\d+)(?:\/|$)/i);
+  const match = path.match(/\/(?:videos?|live)\/(\d{5,40})(?:\/|$)/i);
   if (match) return { id: match[1], message: "Video ID detected from the link." };
 
-  return { id: "", message: host === "fb.watch"
-    ? "This is a shortened link. Open it in Facebook, copy the full video link, and paste that here."
-    : "Could not find a video ID in that link. Open the Live video itself and copy its full Facebook URL." };
+  if (host === "fb.watch" || /\/share\/v\//i.test(path)) return { id: "", canResolve: true, message: "Facebook short video link detected. EO2MATE will try to resolve its video ID when you create the session." };
+
+  return { id: "", message: "Could not find a video ID in that link. Open the Live video itself and copy its full Facebook URL." };
+}
+
+const LIVE_QUEUE_CSV_TEMPLATE = [
+  "item_code,title,mode,quantity,unit_price,mine_price,take_price,lock_price,starting_bid,bid_increment",
+  "A12,Test sale item,SELLING,2,1,,,,,",
+  "B15,Test mining item,MINING,1,,100,200,300,,",
+  "C18,Test auction item,AUCTION,1,,,,,100,10",
+].join("\n");
+
+function parseCsv(text) {
+  const rows = [];
+  let row = [];
+  let cell = "";
+  let quoted = false;
+  const input = String(text || "").replace(/^\uFEFF/, "");
+  for (let i = 0; i < input.length; i += 1) {
+    const char = input[i];
+    if (char === '"') {
+      if (quoted && input[i + 1] === '"') { cell += '"'; i += 1; }
+      else quoted = !quoted;
+    } else if (char === "," && !quoted) {
+      row.push(cell.trim()); cell = "";
+    } else if ((char === "\n" || char === "\r") && !quoted) {
+      if (char === "\r" && input[i + 1] === "\n") i += 1;
+      row.push(cell.trim());
+      if (row.some((value) => value !== "")) rows.push(row);
+      row = []; cell = "";
+    } else cell += char;
+  }
+  if (quoted) return { rows: [], error: "CSV has an opening quote without a matching closing quote." };
+  row.push(cell.trim());
+  if (row.some((value) => value !== "")) rows.push(row);
+  return { rows, error: "" };
+}
+
+function parseLiveQueueCsv(text, existingItems = []) {
+  const parsed = parseCsv(text);
+  if (parsed.error) return { rows: [], errors: [parsed.error] };
+  if (parsed.rows.length < 2) return { rows: [], errors: ["Choose a CSV with a header row and at least one product row."] };
+  if (parsed.rows.length > 101) return { rows: [], errors: ["Upload no more than 100 products in one batch."] };
+  const headers = parsed.rows[0].map((value) => value.toLowerCase().replace(/[\s-]+/g, "_"));
+  const index = Object.fromEntries(headers.map((value, i) => [value, i]));
+  const missing = ["item_code", "title"].filter((name) => index[name] === undefined);
+  if (missing.length) return { rows: [], errors: [`Missing required CSV column(s): ${missing.join(", ")}.`] };
+
+  const errors = [];
+  const rows = [];
+  const codes = new Set((existingItems || []).map((entry) => String(entry.item_code || "").toUpperCase()));
+  parsed.rows.slice(1).forEach((cells, rowIndex) => {
+    const line = rowIndex + 2;
+    const get = (name) => index[name] === undefined ? "" : String(cells[index[name]] || "").trim();
+    const item_code = get("item_code").toUpperCase();
+    const title = get("title");
+    const mode = (get("mode") || "SELLING").toUpperCase();
+    const quantityText = get("quantity");
+    const quantity = quantityText ? Number(quantityText.replaceAll(",", "")) : 1;
+    const rowErrors = [];
+    if (!/^[A-Z0-9]{2,12}$/.test(item_code)) rowErrors.push("item_code must be 2–12 letters or numbers.");
+    if (!title || title.length > 160) rowErrors.push("title is required and must be 160 characters or fewer.");
+    if (!["SELLING", "MINING", "AUCTION"].includes(mode)) rowErrors.push("mode must be SELLING, MINING, or AUCTION.");
+    if (!Number.isInteger(quantity) || quantity < 1) rowErrors.push("quantity must be a whole number greater than 0.");
+    if (codes.has(item_code)) rowErrors.push(`item_code ${item_code || "(blank)"} is duplicated in this file or already queued.`);
+
+    const amount = (name) => {
+      const raw = get(name).replace(/[₱,\s]/g, "");
+      return raw === "" ? null : Number(raw);
+    };
+    const fields = {};
+    const needed = mode === "SELLING" ? ["unit_price"] : mode === "MINING" ? ["mine_price", "take_price", "lock_price"] : mode === "AUCTION" ? ["starting_bid", "bid_increment"] : [];
+    needed.forEach((name) => {
+      const value = amount(name);
+      if (value === null || !Number.isFinite(value) || value < 0) rowErrors.push(`${name} must be a valid non-negative amount.`);
+      else fields[name] = value;
+    });
+    if (mode === "SELLING" && fields.unit_price === 0) rowErrors.push("unit_price must be greater than 0.");
+    if (mode === "MINING" && needed.every((name) => fields[name] !== undefined) && !(fields.mine_price < fields.take_price && fields.take_price < fields.lock_price)) rowErrors.push("Mining prices must follow Mine < Take < Lock.");
+    if (mode === "AUCTION" && fields.bid_increment === 0) rowErrors.push("bid_increment must be greater than 0.");
+
+    if (rowErrors.length) errors.push(`Row ${line}: ${rowErrors.join(" ")}`);
+    else {
+      codes.add(item_code);
+      rows.push({ item_code, title, mode, quantity, ...fields });
+    }
+  });
+  return { rows, errors };
+}
+
+function downloadLiveQueueTemplate() {
+  const blob = new Blob([LIVE_QUEUE_CSV_TEMPLATE], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "eo2mate-live-product-queue-template.csv";
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 function MixedLiveManager({ client, selectedFbPageId }) {
@@ -234,8 +330,12 @@ function MixedLiveManager({ client, selectedFbPageId }) {
   const [item, setItem] = useState({ item_code: "", title: "", mode: "SELLING", quantity: 1, unit_price: "", mine_price: "", take_price: "", lock_price: "", starting_bid: "", bid_increment: "" });
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [queueCsv, setQueueCsv] = useState("");
+  const [queueCsvName, setQueueCsvName] = useState("");
+  const [queueFileKey, setQueueFileKey] = useState(0);
   const current = sessions.find((s) => s.id === selected);
   const parsedVideo = useMemo(() => parseFacebookLiveVideoId(videoInput), [videoInput]);
+  const parsedQueue = useMemo(() => parseLiveQueueCsv(queueCsv, current?.eo2mate_live_items || []), [queueCsv, current]);
   const request = async (action, extra = {}) => {
     if (!clientId) throw new Error("Select a client workspace first.");
     const { data, error } = await supabase.functions.invoke("eo2mate", { headers: { "x-eo2mate-route": "live-admin" }, body: { action, client_id: clientId, ...extra } });
@@ -250,6 +350,18 @@ function MixedLiveManager({ client, selectedFbPageId }) {
     catch (e) { setMessage(e.message); }
     finally { setBusy(false); }
   };
+  const uploadQueueCsv = async () => {
+    if (!current || current.status !== "DRAFT" || !parsedQueue.rows.length || parsedQueue.errors.length) return;
+    setBusy(true); setMessage("Uploading products to the queue…");
+    try {
+      const result = await request("add-items", { session_id: selected, items: parsedQueue.rows });
+      await refresh();
+      setMessage(`${result.inserted || parsedQueue.rows.length} products added to the queue.`);
+      setQueueCsv(""); setQueueCsvName(""); setQueueFileKey((key) => key + 1);
+    } catch (e) {
+      setMessage(e.message || "Bulk upload failed. No products were added; review the file and try again.");
+    } finally { setBusy(false); }
+  };
   return <section className="dashboard-panel" style={{ padding: 20 }}>
     <div className="panel-header"><div><h2>Mixed Live Control Center</h2><p>One Facebook Live video. Item-coded commands: <strong>A12 +2</strong>, <strong>B15 LOCK</strong>, <strong>C18 600</strong>.</p></div><button className="secondary-button" type="button" onClick={() => run("list")} disabled={busy}>↻ Refresh</button></div>
     <p>This module records claims and bids; automatic order creation is not enabled in this phase.</p>
@@ -259,7 +371,7 @@ function MixedLiveManager({ client, selectedFbPageId }) {
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "end", gap: 10 }}>
         <label style={{ display: "grid", gap: 6 }}>Facebook Page ID<input aria-label="Facebook Page ID" value={pageId} readOnly title="Use the global Facebook Page switcher to change Pages" /></label>
         <label style={{ display: "grid", gap: 6, flex: "1 1 320px" }}>Facebook Live URL or video ID<input aria-label="Facebook Live URL or video ID" placeholder="Paste the Live video link or numeric ID" value={videoInput} onChange={(e) => setVideoInput(e.target.value)} aria-describedby="live-video-id-help" /></label>
-        <button className="primary-button" type="button" disabled={busy || !pageId || !parsedVideo.id} onClick={async () => { setBusy(true); setMessage(""); try { const d = await request("create", { fb_page_id: pageId, fb_video_id: parsedVideo.id }); await refresh(); setSelected(d.session.id); setMessage("Session created in DRAFT. Add products in the queue below."); } catch (e) { setMessage(e.message); } finally { setBusy(false); } }}>＋ Create Session</button>
+        <button className="primary-button" type="button" disabled={busy || !pageId || !(parsedVideo.id || parsedVideo.canResolve)} onClick={async () => { setBusy(true); setMessage(""); try { const payload = { fb_page_id: pageId, ...(parsedVideo.id ? { fb_video_id: parsedVideo.id } : { fb_video_url: videoInput.trim() }) }; const d = await request("create", payload); await refresh(); setSelected(d.session.id); setVideoInput(d.session.fb_video_id); setMessage("Session created in DRAFT. Add products in the queue below."); } catch (e) { setMessage(e.message); } finally { setBusy(false); } }}>＋ Create Session</button>
       </div>
       <p id="live-video-id-help" role="status" style={{ marginBottom: 0, color: parsedVideo.id ? "#087443" : "#58677a" }}>{parsedVideo.message}{parsedVideo.id && <> Detected ID: <strong>{parsedVideo.id}</strong></>}</p>
     </section>
@@ -279,6 +391,20 @@ function MixedLiveManager({ client, selectedFbPageId }) {
             {(item.mode === "SELLING" ? ["unit_price"] : item.mode === "MINING" ? ["mine_price", "take_price", "lock_price"] : ["starting_bid", "bid_increment"]).map((field) => <input key={field} type="number" min="0" step="0.01" aria-label={field.replaceAll("_", " ")} placeholder={field.replaceAll("_", " ")} value={item[field]} onChange={(e) => setItem({ ...item, [field]: e.target.value })} />)}
             <button type="button" className="secondary-button" disabled={busy || !item.title || !item.item_code} onClick={() => run("add-item", { session_id: selected, ...item })}>＋ Add Item to Queue</button>
           </div>
+          <section aria-labelledby="bulk-live-queue-title" style={{ marginTop: 18, padding: 14, border: "1px dashed #94a3b8", borderRadius: 10, background: "#f8fafc" }}>
+            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+              <div><h4 id="bulk-live-queue-title" style={{ margin: "0 0 4px" }}>Bulk upload products</h4><p style={{ margin: 0 }}>Queue many products at once from a CSV. Do this while the session is DRAFT, then activate each queued item during the livestream.</p></div>
+              <button type="button" className="secondary-button" onClick={downloadLiveQueueTemplate} disabled={busy}>Download CSV template</button>
+            </div>
+            <label style={{ display: "grid", gap: 6, maxWidth: 520, marginTop: 12 }}>Choose product queue CSV<input key={queueFileKey} type="file" accept=".csv,text/csv" disabled={busy} onChange={async (e) => { const file = e.target.files?.[0]; if (!file) return; setQueueCsvName(file.name); setMessage(""); try { setQueueCsv(await file.text()); } catch { setQueueCsv(""); setMessage("Could not read that CSV file."); } }} /></label>
+            <p style={{ margin: "8px 0", fontSize: 13 }}>Required columns: <code>item_code</code>, <code>title</code>. Also use <code>mode</code>, <code>quantity</code>, and the price columns for that mode. Save the spreadsheet as CSV before uploading. Upload up to 100 products per batch.</p>
+            {queueCsv && <>
+              <p><strong>{queueCsvName || "CSV"}</strong> · {parsedQueue.rows.length} valid product row(s) detected.</p>
+              {parsedQueue.errors.length > 0 && <div role="alert" style={{ color: "#9f1239", background: "#fff1f2", padding: 10, borderRadius: 8, marginBottom: 10 }}><strong>Fix these CSV issues before uploading:</strong><ul style={{ marginBottom: 0 }}>{parsedQueue.errors.map((error, i) => <li key={`${i}-${error}`}>{error}</li>)}</ul></div>}
+              {parsedQueue.rows.length > 0 && <div className="table-wrapper"><table><thead><tr><th>Code</th><th>Product</th><th>Mode</th><th>Qty</th><th>Mode prices</th></tr></thead><tbody>{parsedQueue.rows.slice(0, 5).map((row) => <tr key={row.item_code}><td>{row.item_code}</td><td>{row.title}</td><td>{row.mode}</td><td>{row.quantity}</td><td>{row.mode === "SELLING" ? formatCurrency(row.unit_price) : row.mode === "MINING" ? `${formatCurrency(row.mine_price)} / ${formatCurrency(row.take_price)} / ${formatCurrency(row.lock_price)}` : `${formatCurrency(row.starting_bid)} / +${formatCurrency(row.bid_increment)}`}</td></tr>)}</tbody></table>{parsedQueue.rows.length > 5 && <p>Showing the first 5 of {parsedQueue.rows.length} products.</p>}</div>}
+              <button type="button" className="primary-button" disabled={busy || !parsedQueue.rows.length || parsedQueue.errors.length > 0} onClick={uploadQueueCsv}>＋ Add {parsedQueue.rows.length} Products to Queue</button>
+            </>}
+          </section>
           <p><button className="primary-button" type="button" disabled={busy || !(current.eo2mate_live_items || []).length} onClick={() => run("start", { session_id: selected })}>▶ Start Session</button></p>
         </>}
         <div className="table-wrapper"><table><thead><tr><th>Code</th><th>Product</th><th>Mode</th><th>Status</th><th>Accepted / Stock</th><th>Action</th></tr></thead><tbody>{(current.eo2mate_live_items || []).map((it) => <tr key={it.id}><td>{it.item_code}</td><td>{it.title}</td><td>{it.mode}</td><td>{it.status}</td><td>{it.claimed} / {it.quantity}</td><td>{current.status === "ACTIVE" && it.status === "QUEUED" && <button className="secondary-button" type="button" disabled={busy} onClick={() => run("activate-item", { session_id: selected, item_id: it.id })}>▶ Activate</button>}</td></tr>)}</tbody></table>{!(current.eo2mate_live_items || []).length && <p>No products queued yet. Add your first product above.</p>}</div>
