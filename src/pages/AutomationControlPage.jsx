@@ -182,7 +182,7 @@ export default function AutomationControlPage({ client, page, onManageFacebook, 
   }
 
 
-  useEffect(() => { loadAutomationControls(); }, [client?.client_id]);
+  useEffect(() => { loadAutomationControls(); }, [client?.client_id, selectedFbPageId]);
   return (<>
     {page === "automation-control" && (
           <>
@@ -317,8 +317,8 @@ export default function AutomationControlPage({ client, page, onManageFacebook, 
             <section className="dashboard-panel automation-control-panel">
               <div className="panel-header">
                 <div>
-                  <h2>Client automation</h2>
-                  <p>Use this for account-wide suspension such as an overdue EO2MATE subscription.</p>
+                  <h2>Client-wide automation</h2>
+                  <p>This account-wide switch applies to every connected Facebook Page, including when you change the selected Page.</p>
                 </div>
               </div>
 
@@ -330,7 +330,7 @@ export default function AutomationControlPage({ client, page, onManageFacebook, 
                 <div className="automation-control-copy">
                   <strong>{client?.name || "Current client"}</strong>
                   <span>
-                    Client-wide auction, Messenger and payment automation
+                    Auction, Messenger and payment automation for all Pages
                   </span>
                   {!automationScopeEnabled("CLIENT", client?.client_id) && (
                     <small>
@@ -381,6 +381,23 @@ export default function AutomationControlPage({ client, page, onManageFacebook, 
                   Client-level ON/OFF is locked to SUPER_ADMIN so a subscription-suspended client cannot reactivate itself.
                 </div>
               )}
+
+              {selectedAutomationPages[0] && (() => {
+                const selectedPage = selectedAutomationPages[0];
+                const enabled = automationScopeEnabled("CLIENT", client?.client_id)
+                  && automationScopeEnabled("PAGE", selectedPage.fb_page_id);
+                return (
+                  <div className="automation-permission-note" aria-live="polite">
+                    <strong>Selected Page status — {selectedPage.page_name || selectedPage.fb_page_id}: </strong>
+                    {enabled ? "Active" : "Suspended"}
+                    {!automationScopeEnabled("CLIENT", client?.client_id)
+                      ? " (blocked by the client-wide switch)"
+                      : !automationScopeEnabled("PAGE", selectedPage.fb_page_id)
+                        ? " (paused for this Page)"
+                        : ""}
+                  </div>
+                );
+              })()}
             </section>
 
             <section className="dashboard-panel automation-control-panel">

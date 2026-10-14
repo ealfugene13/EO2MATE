@@ -99,7 +99,6 @@ export default function OnboardingPage({ session, initialStatus = null, onComple
   const client = status?.client;
   const pages = status?.pages || [];
   const subscription = status?.subscription;
-  const pageNames = pages.map((page) => page.page_name || page.fb_page_id).join(", ");
 
   return (
     <div className="onboarding-shell">
@@ -112,13 +111,13 @@ export default function OnboardingPage({ session, initialStatus = null, onComple
         <div className="wizard-heading">
           <p className="eyebrow">GET STARTED</p>
           <h1>Set up your EO2MATE workspace</h1>
-          <p>Your account is secured with MFA. Add your business details and activate your workspace. Facebook can be connected later when you are ready to use Facebook selling automation.</p>
+          <p>Your account is secured with MFA. Add your business details and activate your workspace. You can connect one or more Facebook Pages now or later; EO2MATE follows the Page you select in the workspace.</p>
         </div>
 
         <div className="wizard-stepper wizard-stepper-four">
           <div className="wizard-step done"><span>✓</span><div><strong>Security</strong><small>MFA enabled</small></div></div>
           <div className={`wizard-step ${client ? "done" : "current"}`}><span>2</span><div><strong>Business</strong><small>{client ? "Complete" : "Required"}</small></div></div>
-          <div className={`wizard-step ${pages.length ? "done" : client ? "optional" : ""}`}><span>3</span><div><strong>Facebook</strong><small>{pages.length ? "Connected" : "Optional / later"}</small></div></div>
+          <div className={`wizard-step ${pages.length ? "done" : client ? "optional" : ""}`}><span>3</span><div><strong>Facebook Pages</strong><small>{pages.length ? `${pages.length} connected` : "Optional / later"}</small></div></div>
           <div className={`wizard-step ${status?.onboarding_complete ? "done" : client ? "current" : ""}`}><span>4</span><div><strong>Workspace</strong><small>{status?.onboarding_complete ? "Ready" : "Activate"}</small></div></div>
         </div>
 
@@ -171,12 +170,35 @@ export default function OnboardingPage({ session, initialStatus = null, onComple
         {client && !status?.onboarding_complete && (
           <>
             <section className="onboarding-stage-card">
-              <div className="onboarding-stage-heading"><span>Step 3</span><div><strong>Facebook Page (optional)</strong><small>{pages.length ? "Connected" : "You can connect this later from Facebook Setup."}</small></div></div>
+              <div className="onboarding-stage-heading"><span>Step 3</span><div><strong>Facebook Pages & automation (optional)</strong><small>{pages.length ? `${pages.length} Page${pages.length === 1 ? "" : "s"} connected` : "Connect now or later from Facebook Setup."}</small></div></div>
               {pages.length ? (
-                <div className="connected-page-row"><span>Connected Page</span><strong>{pageNames}</strong></div>
+                <>
+                  <div className="onboarding-connected-pages">
+                    {pages.map((page) => {
+                      const connectionStatus = String(page.connection_status || "").toUpperCase();
+                      const setupLabel = connectionStatus === "ACTIVE"
+                        ? "Connection ready"
+                        : connectionStatus === "SETUP_INCOMPLETE"
+                          ? "Automation setup needs attention"
+                          : connectionStatus === "ERROR"
+                            ? "Reconnect required"
+                            : "Connection saved";
+                      return (
+                        <div className="connected-page-row" key={page.fb_page_id}>
+                          <span>{page.page_name || page.fb_page_id}</span>
+                          <strong>{setupLabel}</strong>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="onboarding-permission-note">
+                    After activation, choose the Active Facebook Page at the top of EO2MATE. Inventory, sales and purchases, reports, setup, and Page automation then follow that selection. The client-wide automation switch applies to every connected Page; each Page also has its own automation control under Setup → Automation Control. Newly connected Pages can remain paused until an administrator enables them.
+                  </div>
+                  <button className="secondary-button" type="button" onClick={connectFacebook} disabled={loading}>Connect another Facebook Page</button>
+                </>
               ) : (
                 <>
-                  <div className="onboarding-permission-note">Facebook is not required to activate EO2MATE. Connect a Page now only if you want to start using Facebook selling automation immediately.</div>
+                  <div className="onboarding-permission-note">Facebook is not required to activate EO2MATE. Connect one or more Pages now only if you want to start using Facebook selling automation immediately. After activation, each Page has its own data and automation settings, selected from the Active Facebook Page control.</div>
                   <button className="secondary-button" type="button" onClick={connectFacebook} disabled={loading}>Connect Facebook Page Now</button>
                   {status?.meta_skip_enabled && <button className="secondary-button" type="button" disabled={loading} onClick={() => setShowSkipDialog(true)} style={{marginLeft:8}}>🔒 Skip Meta (TEST)</button>}
                 </>
