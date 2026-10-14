@@ -111,12 +111,12 @@ export default function OnboardingPage({ session, initialStatus = null, onComple
         <div className="wizard-heading">
           <p className="eyebrow">GET STARTED</p>
           <h1>Set up your EO2MATE workspace</h1>
-          <p>Your account is secured with MFA. Add your business details and activate your workspace. You can connect one or more Facebook Pages now or later; EO2MATE follows the Page you select in the workspace.</p>
+          <p>Your account is secured with MFA. Add your client or brand details and activate your workspace. Your client/brand name identifies the EO2MATE workspace and may differ from the Facebook Page names you connect.</p>
         </div>
 
         <div className="wizard-stepper wizard-stepper-four">
           <div className="wizard-step done"><span>✓</span><div><strong>Security</strong><small>MFA enabled</small></div></div>
-          <div className={`wizard-step ${client ? "done" : "current"}`}><span>2</span><div><strong>Business</strong><small>{client ? "Complete" : "Required"}</small></div></div>
+          <div className={`wizard-step ${client ? "done" : "current"}`}><span>2</span><div><strong>Client / brand</strong><small>{client ? "Complete" : "Required"}</small></div></div>
           <div className={`wizard-step ${pages.length ? "done" : client ? "optional" : ""}`}><span>3</span><div><strong>Facebook Pages</strong><small>{pages.length ? `${pages.length} connected` : "Optional / later"}</small></div></div>
           <div className={`wizard-step ${status?.onboarding_complete ? "done" : client ? "current" : ""}`}><span>4</span><div><strong>Workspace</strong><small>{status?.onboarding_complete ? "Ready" : "Activate"}</small></div></div>
         </div>
@@ -149,9 +149,9 @@ export default function OnboardingPage({ session, initialStatus = null, onComple
 
         {!client ? (
           <section className="onboarding-stage-card">
-            <div className="onboarding-stage-heading"><span>Step 2</span><div><strong>Business profile</strong><small>This identifies the client workspace and its owner.</small></div></div>
+            <div className="onboarding-stage-heading"><span>Step 2</span><div><strong>Client / brand profile</strong><small>This name identifies your EO2MATE client workspace and may differ from your Facebook Page name.</small></div></div>
             <form className="wizard-form onboarding-clean-form" onSubmit={createClient}>
-              <label>Business / shop name<input value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="e.g. Euan Collectibles" required maxLength="120" /></label>
+              <label>Client / brand name<input value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="e.g. Euan Collectibles" required maxLength="120" /></label>
               <label>Account email<input value={session?.user?.email || ""} disabled /></label>
               <label>Contact phone<input value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="Optional" /></label>
               <label>Timezone<input value="Asia/Manila" disabled /></label>
@@ -160,7 +160,7 @@ export default function OnboardingPage({ session, initialStatus = null, onComple
           </section>
         ) : (
           <div className="wizard-summary">
-            <div className="wizard-summary-row"><span>Business</span><strong>{client.name}</strong></div>
+            <div className="wizard-summary-row"><span>Client / brand</span><strong>{client.name}</strong></div>
             <div className="wizard-summary-row"><span>Environment</span><strong>EO2MATE-CLNT</strong></div>
             <div className="wizard-summary-row"><span>Payment setup</span><strong>Manual</strong></div>
             <div className="wizard-summary-row"><span>Subscription</span><strong>{subscription?.subscription_status || "TRIAL"}</strong></div>
@@ -185,20 +185,20 @@ export default function OnboardingPage({ session, initialStatus = null, onComple
                             : "Connection saved";
                       return (
                         <div className="connected-page-row" key={page.fb_page_id}>
-                          <span>{page.page_name || page.fb_page_id}</span>
+                        <span>Facebook Page: {page.page_name || page.fb_page_id}</span>
                           <strong>{setupLabel}</strong>
                         </div>
                       );
                     })}
                   </div>
                   <div className="onboarding-permission-note">
-                    After activation, choose the Active Facebook Page at the top of EO2MATE. Page-specific automation status and controls follow that selection, along with the connected Page's activity. Client-wide automation is a separate suspension that applies to every connected Page. Newly connected Pages can remain paused until an administrator enables them.
+                    After activation, choose the Active Facebook Page at the top of EO2MATE. Page-specific automation status and controls follow that selection, along with the connected Page's activity. A separate all-Pages suspension is reserved for Super Admins. Newly connected Pages can remain paused until an administrator enables them.
                   </div>
                   <button className="secondary-button" type="button" onClick={connectFacebook} disabled={loading}>Connect another Facebook Page</button>
                 </>
               ) : (
                 <>
-                  <div className="onboarding-permission-note">Facebook is not required to activate EO2MATE. Connect one or more Pages now only if you want to start using Facebook selling automation immediately. After activation, choose the Active Facebook Page to view its Page-specific automation status and controls. Client-wide automation remains a separate suspension that applies to every connected Page.</div>
+                  <div className="onboarding-permission-note">Facebook is not required to activate EO2MATE. Connect one or more Pages now only if you want to start using Facebook selling automation immediately. After activation, choose the Active Facebook Page to view its Page-specific automation status and controls. A separate all-Pages suspension is reserved for Super Admins.</div>
                   <button className="secondary-button" type="button" onClick={connectFacebook} disabled={loading}>Connect Facebook Page Now</button>
                   {status?.meta_skip_enabled && <button className="secondary-button" type="button" disabled={loading} onClick={() => setShowSkipDialog(true)} style={{marginLeft:8}}>🔒 Skip Meta (TEST)</button>}
                 </>
