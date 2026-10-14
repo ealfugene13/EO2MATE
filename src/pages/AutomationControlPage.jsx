@@ -6,6 +6,19 @@ function statusLabel(value) {
   return String(value || "-").replaceAll("_", " ");
 }
 
+async function readableFunctionError(error) {
+  const response = error?.context;
+  if (response && typeof response.clone === "function") {
+    try {
+      const body = await response.clone().json();
+      if (body?.message) return body.message;
+      if (body?.error === "MFA_REQUIRED") return "Authenticator verification is required. Verify your account, then try again.";
+      if (body?.error === "FORBIDDEN") return "Your account does not have access to automation controls for this client.";
+    } catch { /* Fall back to the Supabase Functions error. */ }
+  }
+  return error?.message || "Unable to load automation controls.";
+}
+
 function StatusBadge({ status }) {
   const normalized = String(status || "").toUpperCase();
   let className = "status-badge";
@@ -96,7 +109,7 @@ export default function AutomationControlPage({ client, page, onManageFacebook, 
       return data;
     } catch (error) {
       setAutomationControlMessage(
-        error.message || "Unable to load automation controls."
+        await readableFunctionError(error)
       );
       return null;
     } finally {
@@ -161,7 +174,7 @@ export default function AutomationControlPage({ client, page, onManageFacebook, 
       await loadAutomationControls();
     } catch (error) {
       setAutomationControlMessage(
-        error.message || "Unable to update automation control."
+        await readableFunctionError(error)
       );
     } finally {
       setAutomationControlLoading(false);

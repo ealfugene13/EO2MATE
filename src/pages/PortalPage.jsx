@@ -1140,7 +1140,7 @@ export default function PortalPage({ session }) {
               </button>
             </nav>
             <div className="setup-workspace-content" role="tabpanel">
-              {setupSection === "configuration" && <SetupPage client={client} />}
+              {setupSection === "configuration" && <SetupPage key={`setup-${effectivePageId}`} client={client} selectedFbPageId={effectivePageId} />}
               {setupSection === "automation" && <AutomationControlPage key={`automation-${effectivePageId}`} client={client} page="automation-control" selectedFbPageId={effectivePageId} />}
               {setupSection === "messages" && <AutomatedMessagesPage client={client} />}
               {setupSection === "caption-templates" && <PostCaptionTemplatePage client={client} />}
