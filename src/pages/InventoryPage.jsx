@@ -685,6 +685,16 @@ export default function InventoryPage({
       {
         ...EMPTY_ITEM,
 
+        page_scope_mode:
+          selectedFbPageId && pages.some((page) => String(page.fb_page_id) === String(selectedFbPageId))
+            ? "SELECTED"
+            : "ALL",
+
+        page_ids:
+          selectedFbPageId && pages.some((page) => String(page.fb_page_id) === String(selectedFbPageId))
+            ? [String(selectedFbPageId)]
+            : [],
+
         inventory_owner_id:
           defaultOwner
             ?.inventory_owner_id ||

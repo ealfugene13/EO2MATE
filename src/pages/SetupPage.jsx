@@ -44,7 +44,6 @@ export default function SetupPage({ client, selectedFbPageId }) {
     // shared client would replace the current aal2 session with an aal1 session.
     const verifier=createClient(import.meta.env.VITE_SUPABASE_URL,import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
     const {error:authError}=await verifier.auth.signInWithPassword({email:user.email,password});
-    await verifier.auth.signOut();
     if(authError)throw new Error("Incorrect password. No setup changes were made.");
     const key=confirm.item.effective.setting_key; const existing=selectedFbPageId?confirm.item.override:(confirm.item.clientOverride||confirm.item.override);
     if(existing){const {error:e}=await supabase.from("eo2mate_settings").update({setting_value:confirm.value,updated_at:new Date().toISOString()}).eq("setting_id",existing.setting_id);if(e)throw e;}
