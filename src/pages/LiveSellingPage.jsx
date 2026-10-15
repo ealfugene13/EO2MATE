@@ -309,25 +309,7 @@ function downloadLiveQueueTemplate(mode = "MIXED") {
   URL.revokeObjectURL(url);
 }
 
-function downloadLiveReport(sessions, activeMode) {
-  const quote = (value) => `"${String(value ?? "").replaceAll('"', '""')}"`;
-  const lines = [["session_id", "facebook_video_id", "session_status", "item_code", "product", "mode", "item_status", "claimed", "quantity", "unit_price"]];
-  for (const session of sessions || []) {
-    for (const item of session.eo2mate_live_items || []) {
-      if (activeMode !== "MIXED" && String(item.mode || "").toUpperCase() !== activeMode) continue;
-      lines.push([session.id, session.fb_video_id, session.status, item.item_code, item.title, item.mode, item.status, item.claimed, item.quantity, item.unit_price]);
-    }
-  }
-  const csv = lines.map((row) => row.map(quote).join(",")).join("\r\n");
-  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `eo2mate-live-${activeMode.toLowerCase()}-report.csv`;
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
-function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", section = "SESSIONS", setSection }) {
+function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED" }) {
   const clientId = client?.client_id;
   const [sessions, setSessions] = useState([]);
   const [selected, setSelected] = useState("");
@@ -342,15 +324,6 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
   const current = sessions.find((s) => s.id === selected);
   const visibleSessions = sessions.filter((session) => activeMode === "MIXED" || !(session.eo2mate_live_items || []).length || (session.eo2mate_live_items || []).some((entry) => String(entry.mode || "").toUpperCase() === activeMode));
   const visibleItems = (current?.eo2mate_live_items || []).filter((entry) => activeMode === "MIXED" || String(entry.mode || "").toUpperCase() === activeMode);
-  const reportItems = visibleSessions.flatMap((session) => (session.eo2mate_live_items || [])
-    .filter((entry) => activeMode === "MIXED" || String(entry.mode || "").toUpperCase() === activeMode)
-    .map((entry) => ({ ...entry, session_status: session.status, fb_video_id: session.fb_video_id })));
-  const totals = {
-    sessions: visibleSessions.length,
-    active: visibleSessions.filter((session) => session.status === "ACTIVE").length,
-    products: reportItems.length,
-    claimed: reportItems.reduce((sum, entry) => sum + (Number(entry.claimed) || 0), 0),
-  };
   const parsedVideo = useMemo(() => parseFacebookLiveVideoId(videoInput), [videoInput]);
   const parsedQueue = useMemo(() => parseLiveQueueCsv(queueCsv, current?.eo2mate_live_items || [], activeMode === "MIXED" ? "" : activeMode), [queueCsv, current, activeMode]);
   useEffect(() => {
@@ -366,7 +339,7 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
     const result = await request("list", pageId ? { fb_page_id: pageId } : {});
     const nextSessions = result.sessions || [];
     setSessions(nextSessions);
-    if (!selected || !nextSessions.some((session) => session.id === selected)) setSelected(nextSessions[0]?.id || "");
+    if (selected && !nextSessions.some((session) => session.id === selected)) setSelected("");
   };
   useEffect(() => { if (clientId) refresh().catch((e) => setMessage(e.message)); }, [clientId, pageId]);
   const run = async (action, extra = {}) => {
@@ -387,31 +360,6 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
       setMessage(e.message || "Bulk upload failed. No products were added; review the file and try again.");
     } finally { setBusy(false); }
   };
-  if (section !== "SESSIONS") return <section className="dashboard-panel" style={{ padding: 20 }}>
-    {section === "SUMMARY" && <>
-      <div className="panel-header"><div><h2>{activeMode === "MIXED" ? "Mixed Live Summary" : `${activeMode} Summary`}</h2><p>Live-session and product-queue totals for the selected Facebook Page.</p></div><button type="button" className="primary-button" onClick={() => setSection?.("SESSIONS")}>Manage sessions</button></div>
-      <section className="metrics-grid">
-        <button type="button" className="metric-card metric-button" onClick={() => setSection?.("SESSIONS")}><div className="metric-title">Live sessions</div><div className="metric-value">{totals.sessions}</div><div className="metric-subtitle">For this Page</div></button>
-        <button type="button" className="metric-card metric-button" onClick={() => setSection?.("SESSIONS")}><div className="metric-title">Active sessions</div><div className="metric-value">{totals.active}</div><div className="metric-subtitle">Currently processing</div></button>
-        <button type="button" className="metric-card metric-button" onClick={() => setSection?.("ACTIVITY")}><div className="metric-title">Products</div><div className="metric-value">{totals.products}</div><div className="metric-subtitle">Queued in this mode</div></button>
-        <button type="button" className="metric-card metric-button" onClick={() => setSection?.("BUYERS")}><div className="metric-title">Claimed units</div><div className="metric-value">{totals.claimed}</div><div className="metric-subtitle">Across queued products</div></button>
-      </section>
-    </>}
-    {section === "ACTIVITY" && <>
-      <div className="panel-header"><div><h2>{activeMode === "AUCTION" ? "Bid Activity" : "Claim Activity"}</h2><p>Current accepted quantity and status for each queued product.</p></div><button type="button" className="secondary-button" onClick={() => refresh().catch((e) => setMessage(e.message))} disabled={busy}>↻ Refresh</button></div>
-      <div className="table-wrapper"><table><thead><tr><th>Session</th><th>Code</th><th>Product</th><th>Status</th><th>Claimed / Stock</th></tr></thead><tbody>{reportItems.map((entry) => <tr key={entry.id}><td>{entry.fb_video_id} · {entry.session_status}</td><td>{entry.item_code}</td><td>{entry.title}</td><td>{entry.status}</td><td>{entry.claimed} / {entry.quantity}</td></tr>)}</tbody></table>{!reportItems.length && <p>No live item activity is available for this mode.</p>}</div>
-    </>}
-    {section === "BUYERS" && <>
-      <div className="panel-header"><div><h2>Buyer Claims</h2><p>Claimed quantities grouped by product.</p></div><button type="button" className="secondary-button" onClick={() => setSection?.("ACTIVITY")}>View activity</button></div>
-      <p>Buyer names are not included in the Live data returned to this page. This view shows claim totals per item.</p>
-      <div className="table-wrapper"><table><thead><tr><th>Session</th><th>Code</th><th>Product</th><th>Claimed units</th><th>Stock limit</th></tr></thead><tbody>{reportItems.map((entry) => <tr key={entry.id}><td>{entry.fb_video_id}</td><td>{entry.item_code}</td><td>{entry.title}</td><td>{entry.claimed}</td><td>{entry.quantity}</td></tr>)}</tbody></table>{!reportItems.length && <p>No buyer claim totals are available yet.</p>}</div>
-    </>}
-    {section === "REPORTS" && <>
-      <div className="panel-header"><div><h2>Live Report</h2><p>Export session and product totals for the selected Page.</p></div><button type="button" className="primary-button" onClick={() => downloadLiveReport(visibleSessions, activeMode)} disabled={!reportItems.length}>Download CSV</button></div>
-      <div className="table-wrapper"><table><thead><tr><th>Session</th><th>Code</th><th>Product</th><th>Mode</th><th>Status</th><th>Claimed / Stock</th></tr></thead><tbody>{reportItems.map((entry) => <tr key={entry.id}><td>{entry.fb_video_id} · {entry.session_status}</td><td>{entry.item_code}</td><td>{entry.title}</td><td>{entry.mode}</td><td>{entry.status}</td><td>{entry.claimed} / {entry.quantity}</td></tr>)}</tbody></table>{!reportItems.length && <p>No report data is available yet.</p>}</div>
-    </>}
-    {message && <p role="status">{message}</p>}
-  </section>;
   return <section className="dashboard-panel" style={{ padding: 20 }}>
     <div className="panel-header"><div><h2>{activeMode === "MIXED" ? "Mixed Live Control Center" : `${activeMode === "SELLING" ? "Live Selling" : activeMode === "MINING" ? "Live Mining" : "Live Auction"} Control Center`}</h2><p>Connect the current Facebook Live video, queue products, activate each item, and end the EO2MATE session when the broadcast is over.</p></div><button className="secondary-button" type="button" onClick={() => run("list", pageId ? { fb_page_id: pageId } : {})} disabled={busy}>↻ Refresh</button></div>
     <p>{activeMode === "MIXED" ? <>Use item-coded commands such as <strong>A12 +2</strong>, <strong>B15 LOCK</strong>, or <strong>C18 600</strong>.</> : <>Queue products in {activeMode} mode. Include the item code with each Facebook Live comment.</>}</p>
@@ -428,8 +376,8 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
 
     <section aria-labelledby="live-product-queue-title" style={{ padding: 16, margin: "16px 0", border: "1px solid #dbe4ee", borderRadius: 12 }}>
       <h3 id="live-product-queue-title" style={{ marginTop: 0 }}>2. Product queue</h3>
-      <label style={{ display: "grid", gap: 6, maxWidth: 480, marginBottom: 14 }}>Live session<select value={selected} onChange={(e) => setSelected(e.target.value)}><option value="">Select a session</option>{visibleSessions.map((s) => <option key={s.id} value={s.id}>{s.fb_video_id} — {s.status}</option>)}</select></label>
       {!current ? <p style={{ marginBottom: 0 }}>Create a Live session above, or select an existing session below. The product queue and Add Item form will appear here.</p> : <>
+        <label style={{ display: "grid", gap: 6, maxWidth: 480 }}>Live session<select value={selected} onChange={(e) => setSelected(e.target.value)}><option value="">Select a session</option>{visibleSessions.map((s) => <option key={s.id} value={s.id}>{s.fb_video_id} — {s.status}</option>)}</select></label>
         <p><strong>Session status:</strong> {current.status} · <strong>Video ID:</strong> {current.fb_video_id}</p>
         {current.status === "DRAFT" && <>
           <h4 style={{ marginBottom: 8 }}>Add product to queue</h4>
@@ -474,16 +422,8 @@ const LIVE_MODES = [
 
 export default function LiveSellingPage({ metaConnected, page, client, selectedFbPageId }) {
   const [mode, setMode] = useState("SELLING");
-  const [section, setSection] = useState("SUMMARY");
   if (page !== "live-selling") return null;
   const current = LIVE_MODES.find((entry) => entry.key === mode);
-  const sections = [
-    { key: "SUMMARY", label: "Summary", icon: "dashboard" },
-    { key: "SESSIONS", label: "Sessions", icon: "facebook" },
-    { key: "ACTIVITY", label: mode === "AUCTION" ? "Bids" : "Activity", icon: "sales" },
-    { key: "BUYERS", label: "Buyers", icon: "users" },
-    { key: "REPORTS", label: "Reports", icon: "reports" },
-  ];
   return <>
     <header className="dashboard-header">
       <div>
@@ -494,21 +434,14 @@ export default function LiveSellingPage({ metaConnected, page, client, selectedF
     </header>
     <section className="selling-workspace-tabs" style={{ marginBottom: 18 }}>
       <div className="selling-workspace-tablist selling-workspace-nav" role="tablist" aria-label="Live selling modes">
-        {LIVE_MODES.map((entry) => <button key={entry.key} type="button" role="tab" aria-selected={mode === entry.key} className={`selling-workspace-tab${mode === entry.key ? " active" : ""}`} onClick={() => { setMode(entry.key); setSection("SUMMARY"); }}>
-          <span className="selling-nav-icon"><NavIcon type={entry.icon} /></span><span>{entry.label}</span>
-        </button>)}
-      </div>
-    </section>
-    <section className="selling-workspace-tabs" style={{ marginBottom: 18 }}>
-      <div className="selling-workspace-tablist selling-workspace-nav" role="tablist" aria-label={`${current.label} sections`}>
-        {sections.map((entry) => <button key={entry.key} type="button" role="tab" aria-selected={section === entry.key} className={`selling-workspace-tab${section === entry.key ? " active" : ""}`} onClick={() => setSection(entry.key)}>
+        {LIVE_MODES.map((entry) => <button key={entry.key} type="button" role="tab" aria-selected={mode === entry.key} className={`selling-workspace-tab${mode === entry.key ? " active" : ""}`} onClick={() => setMode(entry.key)}>
           <span className="selling-nav-icon"><NavIcon type={entry.icon} /></span><span>{entry.label}</span>
         </button>)}
       </div>
     </section>
     <section className="dashboard-panel" style={{ marginBottom: 18 }}>
       <div className="panel-header"><div><h2>{current.label}</h2><p>{current.description} Buyer command: <strong>{current.command}</strong>.</p></div></div>
-      <MixedLiveManager key={mode} activeMode={mode} client={client} selectedFbPageId={selectedFbPageId} section={section} setSection={setSection} />
+      <MixedLiveManager key={mode} activeMode={mode} client={client} selectedFbPageId={selectedFbPageId} />
     </section>
     {!metaConnected && <section className="dashboard-panel"><div className="panel-header"><div><h2>Facebook Page required</h2><p>Connect an authorized Facebook Page before starting a real livestream. Simulated Pages cannot publish to Meta.</p></div></div></section>}
   </>;
