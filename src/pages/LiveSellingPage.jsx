@@ -434,6 +434,12 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
     setSessions(nextSessions);
     if (!selected || !nextSessions.some((session) => session.id === selected)) setSelected(nextSessions[0]?.id || "");
   };
+  const refreshSessions = async () => {
+    setBusy(true); setMessage("");
+    try { await refresh(); setMessage("Live sessions refreshed."); }
+    catch (error) { setMessage(error.message || "Unable to refresh Live sessions."); }
+    finally { setBusy(false); }
+  };
   useEffect(() => {
     if (clientId) {
       refresh().catch((e) => setMessage(e.message));
@@ -516,10 +522,10 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
     {message && <p role="status">{message}</p>}
   </section>;
   return <section className="dashboard-panel" style={{ padding: 20 }}>
-    <div className="panel-header"><div><h2>Live Selling Control Center</h2><p>Connect the current Facebook Live video, queue products, activate each item, and end the EO2MATE session when the broadcast is over.</p></div><button className="secondary-button" type="button" onClick={() => run("list", pageId ? { fb_page_id: pageId } : {})} disabled={busy}><NavIcon type="refresh" />Refresh</button></div>
+    <div className="panel-header"><div><h2>Live Selling Control Center</h2><p>Connect the current Facebook Live video, queue products, activate each item, and end the EO2MATE session when the broadcast is over.</p></div><button className="icon-button refresh-icon-button" type="button" onClick={refreshSessions} disabled={busy} title="Refresh Live sessions and queues" aria-label="Refresh Live sessions and queues"><NavIcon type="refresh" /></button></div>
     <p>{activeMode === "MIXED" ? <>Use item-coded commands such as <strong>A12 +2</strong>, <strong>B15 LOCK</strong>, or <strong>C18 600</strong>.</> : <>Queue products in {activeMode} mode. Include the item code with each Facebook Live comment.</>}</p>
 
-      <section aria-labelledby="live-session-setup-title" style={{ padding: 18, margin: "16px 0", border: "1px solid #dbe4ee", borderRadius: 14, background: "#f8fafc" }}>
+      <section aria-labelledby="live-session-setup-title" style={{ boxSizing: "border-box", padding: 24, margin: "20px 0 24px", border: "1px solid #e1e8f0", borderRadius: 18, background: "#fff", boxShadow: "0 5px 16px rgba(15, 23, 42, 0.035)" }}>
       <h3 id="live-session-setup-title" style={{ marginTop: 0 }}>Connect the Facebook Live video</h3>
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "end", gap: 10 }}>
         <label style={{ display: "grid", gap: 6 }}>Facebook Page ID<input aria-label="Facebook Page ID" value={pageId} readOnly title="Use the global Facebook Page switcher to change Pages" /></label>
@@ -529,9 +535,9 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
       <p id="live-video-id-help" role="status" style={{ marginBottom: 0, color: parsedVideo.id ? "#087443" : "#58677a" }}>{parsedVideo.message}{parsedVideo.id && <> Detected ID: <strong>{parsedVideo.id}</strong></>}</p>
     </section>
 
-    <section aria-labelledby="live-previous-posts-title" style={{ padding: 16, margin: "16px 0", border: "1px solid #dbe4ee", borderRadius: 12 }}>
-      <div className="panel-header"><div><h3 id="live-previous-posts-title" style={{ marginTop: 0 }}>Previous Live posts</h3><p>Select a post to view its product queue below.</p></div><button type="button" className="secondary-button" onClick={() => refresh().catch((e) => setMessage(e.message))} disabled={busy}><NavIcon type="refresh" />Refresh posts</button></div>
-      <div className="table-wrapper"><table><thead><tr><th>Facebook Live post</th><th>Created</th><th>Status</th><th>Products</th><th>Claimed</th><th></th></tr></thead><tbody>
+    <section aria-labelledby="live-previous-posts-title" style={{ boxSizing: "border-box", padding: 26, margin: "20px 0 24px", border: "1px solid #e1e8f0", borderRadius: 18, background: "#fff", boxShadow: "0 5px 16px rgba(15, 23, 42, 0.035)" }}>
+      <div className="panel-header" style={{ padding: "0 0 18px", margin: "0 0 20px", borderBottom: "1px solid #e7edf3" }}><div><h3 id="live-previous-posts-title" style={{ margin: 0 }}>Previous Live posts</h3><p style={{ margin: "6px 0 0" }}>Select a post to view its product queue below.</p></div></div>
+      <div className="table-wrapper" style={{ marginTop: 18, borderRadius: 14, overflow: "auto" }}><table><thead><tr><th>Facebook Live post</th><th>Created</th><th>Status</th><th>Products</th><th>Claimed</th><th aria-label="Actions"></th></tr></thead><tbody>
         {visibleSessions.map((session) => {
           const items = (session.eo2mate_live_items || []).filter((entry) => activeMode === "MIXED" || String(entry.mode || "").toUpperCase() === activeMode);
           const claimed = items.reduce((sum, entry) => sum + (Number(entry.claimed) || 0), 0);
@@ -546,10 +552,12 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
       </tbody></table></div>
     </section>
 
-    <section aria-labelledby="live-product-queue-title" style={{ padding: 16, margin: "16px 0", border: "1px solid #dbe4ee", borderRadius: 12 }}>
-      <h3 id="live-product-queue-title" style={{ marginTop: 0 }}>Product queue{current ? ` · ${current.fb_video_id}` : ""}</h3>
-      {!current ? <p style={{ marginBottom: 0 }}>Select a previous Live post above, or connect a video to create a session. Its product queue will appear here.</p> : <>
-        <p><strong>Session status:</strong> {current.status} · <strong>Video ID:</strong> {current.fb_video_id}</p>
+    <section aria-labelledby="live-product-queue-title" style={{ boxSizing: "border-box", padding: 26, margin: "20px 0 24px", border: "1px solid #e1e8f0", borderRadius: 18, background: "#fff", boxShadow: "0 5px 16px rgba(15, 23, 42, 0.035)" }}>
+      {!current ? <><h3 id="live-product-queue-title" style={{ marginTop: 0 }}>Product queue</h3><p style={{ marginBottom: 0 }}>Select a previous Live post above, or connect a video to create a session. Its product queue will appear here.</p></> : <>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 14, paddingBottom: 18, marginBottom: 20, borderBottom: "1px solid #e7edf3" }}>
+          <div><p className="eyebrow" style={{ margin: "0 0 5px" }}>LIVE SESSION</p><h3 id="live-product-queue-title" style={{ margin: 0 }}>Product queue</h3><p style={{ margin: "6px 0 0", color: "#64748b", fontSize: 13 }}>Facebook video ID · {current.fb_video_id}</p></div>
+          <span className="status-badge">{current.status}</span>
+        </div>
         {current.status === "DRAFT" && <>
           <h4 style={{ marginBottom: 8 }}>Add one product</h4>
           <div style={{ marginBottom: 16, padding: 14, border: "1px solid #dbe4ee", borderRadius: 12, background: "#f8fafc" }}>
