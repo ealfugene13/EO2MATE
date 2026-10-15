@@ -171,7 +171,7 @@ function NavIcon({ type }) {
   );
 }
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../supabase";
 
 
@@ -183,18 +183,6 @@ function formatCurrency(value) {
     maximumFractionDigits: 0,
   }).format(Number(value || 0));
 }
-
-function MetricCard({ title, value, subtitle, onClick }) {
-  return (
-    <button type="button" className="metric-card metric-button" onClick={onClick}>
-      <div className="metric-title">{title}</div>
-      <div className="metric-value">{value}</div>
-      <div className="metric-subtitle">{subtitle}</div>
-    </button>
-  );
-}
-
-import LiveMiningPage from "./LiveMiningPage";
 
 function parseFacebookLiveVideoId(value) {
   const input = String(value || "").trim();
@@ -226,15 +214,6 @@ function parseFacebookLiveVideoId(value) {
   return { id: "", message: "Could not find a video ID in that link. Open the Live video itself and copy its full Facebook URL." };
 }
 
-const LIVE_QUEUE_CSV_TEMPLATE = [
-  "item_code,title,mode,quantity,unit_price,mine_price,take_price,lock_price,starting_bid,bid_increment",
-  "LIVE001,One Piece Luffy Figure,SELLING,1,850,,,,,",
-  "LIVE002,Demon Slayer Tanjiro Figure,SELLING,2,1200,,,,,",
-  "LIVE003,Pokemon Pikachu Plush,MINING,3,,250,350,450,,",
-  "LIVE004,Dragon Ball Goku Figure,AUCTION,1,,,,,500,50",
-  "LIVE005,Naruto Keychain Set,SELLING,5,250,,,,,",
-].join("\n");
-
 function parseCsv(text) {
   const rows = [];
   let row = [];
@@ -261,7 +240,7 @@ function parseCsv(text) {
   return { rows, error: "" };
 }
 
-function parseLiveQueueCsv(text, existingItems = []) {
+function parseLiveQueueCsv(text, existingItems = [], forcedMode = "") {
   const parsed = parseCsv(text);
   if (parsed.error) return { rows: [], errors: [parsed.error] };
   if (parsed.rows.length < 2) return { rows: [], errors: ["Choose a CSV with a header row and at least one product row."] };
@@ -279,7 +258,7 @@ function parseLiveQueueCsv(text, existingItems = []) {
     const get = (name) => index[name] === undefined ? "" : String(cells[index[name]] || "").trim();
     const item_code = get("item_code").toUpperCase();
     const title = get("title");
-    const mode = (get("mode") || "SELLING").toUpperCase();
+    const mode = (forcedMode || get("mode") || "SELLING").toUpperCase();
     const quantityText = get("quantity");
     const quantity = quantityText ? Number(quantityText.replaceAll(",", "")) : 1;
     const rowErrors = [];
@@ -313,8 +292,15 @@ function parseLiveQueueCsv(text, existingItems = []) {
   return { rows, errors };
 }
 
-function downloadLiveQueueTemplate() {
-  const blob = new Blob([LIVE_QUEUE_CSV_TEMPLATE], { type: "text/csv;charset=utf-8" });
+function downloadLiveQueueTemplate(mode = "MIXED") {
+  const rows = {
+    SELLING: ["A12,Test sale item,SELLING,2,1,,,,,"],
+    MINING: ["B15,Test mining item,MINING,1,,100,200,300,,"],
+    AUCTION: ["C18,Test auction item,AUCTION,1,,,,,100,10"],
+  };
+  const examples = mode === "MIXED" ? [rows.SELLING[0], rows.MINING[0], rows.AUCTION[0]] : rows[mode] || rows.SELLING;
+  const csv = ["item_code,title,mode,quantity,unit_price,mine_price,take_price,lock_price,starting_bid,bid_increment", ...examples].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -323,32 +309,42 @@ function downloadLiveQueueTemplate() {
   URL.revokeObjectURL(url);
 }
 
-function MixedLiveManager({ client, selectedFbPageId }) {
+function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED" }) {
   const clientId = client?.client_id;
   const [sessions, setSessions] = useState([]);
   const [selected, setSelected] = useState("");
   const pageId = selectedFbPageId || "";
   const [videoInput, setVideoInput] = useState("");
-  const [item, setItem] = useState({ item_code: "", title: "", mode: "SELLING", quantity: 1, unit_price: "", mine_price: "", take_price: "", lock_price: "", starting_bid: "", bid_increment: "" });
+  const [item, setItem] = useState({ item_code: "", title: "", mode: activeMode === "MIXED" ? "SELLING" : activeMode, quantity: 1, unit_price: "", mine_price: "", take_price: "", lock_price: "", starting_bid: "", bid_increment: "" });
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [queueCsv, setQueueCsv] = useState("");
   const [queueCsvName, setQueueCsvName] = useState("");
   const [queueFileKey, setQueueFileKey] = useState(0);
   const current = sessions.find((s) => s.id === selected);
+  const visibleSessions = sessions.filter((session) => activeMode === "MIXED" || !(session.eo2mate_live_items || []).length || (session.eo2mate_live_items || []).some((entry) => String(entry.mode || "").toUpperCase() === activeMode));
+  const visibleItems = (current?.eo2mate_live_items || []).filter((entry) => activeMode === "MIXED" || String(entry.mode || "").toUpperCase() === activeMode);
   const parsedVideo = useMemo(() => parseFacebookLiveVideoId(videoInput), [videoInput]);
-  const parsedQueue = useMemo(() => parseLiveQueueCsv(queueCsv, current?.eo2mate_live_items || []), [queueCsv, current]);
+  const parsedQueue = useMemo(() => parseLiveQueueCsv(queueCsv, current?.eo2mate_live_items || [], activeMode === "MIXED" ? "" : activeMode), [queueCsv, current, activeMode]);
+  useEffect(() => {
+    setItem((previous) => ({ ...previous, mode: activeMode === "MIXED" ? "SELLING" : activeMode }));
+  }, [activeMode]);
   const request = async (action, extra = {}) => {
     if (!clientId) throw new Error("Select a client workspace first.");
     const { data, error } = await supabase.functions.invoke("eo2mate", { headers: { "x-eo2mate-route": "live-admin" }, body: { action, client_id: clientId, ...extra } });
     if (error || data?.error) throw new Error(data?.detail || data?.error || error?.message || "Request failed");
     return data;
   };
-  const refresh = async () => { const result = await request("list"); const next = (result.sessions || []).filter((session) => session.fb_page_id === pageId); setSessions(next); setSelected((currentSelected) => next.some((session) => session.id === currentSelected) ? currentSelected : ""); return next; };
-  useEffect(() => { if (clientId && pageId) refresh().catch((e) => setMessage(e.message)); else { setSessions([]); setSelected(""); } }, [clientId, pageId]);
-  const run = async (action, extra = {}, successMessage = `${action} completed.`) => {
+  const refresh = async () => {
+    const result = await request("list", pageId ? { fb_page_id: pageId } : {});
+    const nextSessions = result.sessions || [];
+    setSessions(nextSessions);
+    if (selected && !nextSessions.some((session) => session.id === selected)) setSelected("");
+  };
+  useEffect(() => { if (clientId) refresh().catch((e) => setMessage(e.message)); }, [clientId, pageId]);
+  const run = async (action, extra = {}) => {
     setBusy(true); setMessage("");
-    try { await request(action, extra); await refresh(); setMessage(successMessage); }
+    try { await request(action, extra); await refresh(); setMessage(`${action} completed.`); }
     catch (e) { setMessage(e.message); }
     finally { setBusy(false); }
   };
@@ -365,49 +361,30 @@ function MixedLiveManager({ client, selectedFbPageId }) {
     } finally { setBusy(false); }
   };
   return <section className="dashboard-panel" style={{ padding: 20 }}>
-    <div className="panel-header"><div><h2>Mixed Live Control Center</h2><p>One Facebook Live video. Item-coded commands: <strong>A12 +2</strong>, <strong>B15 LOCK</strong>, <strong>C18 600</strong>.</p></div><button className="secondary-button" type="button" onClick={() => run("list")} disabled={busy}>↻ Refresh</button></div>
-    <p>This module records claims and bids; automatic order creation is not enabled in this phase.</p>
+    <div className="panel-header"><div><h2>{activeMode === "MIXED" ? "Mixed Live Control Center" : `${activeMode === "SELLING" ? "Live Selling" : activeMode === "MINING" ? "Live Mining" : "Live Auction"} Control Center`}</h2><p>Connect the current Facebook Live video, queue products, activate each item, and end the EO2MATE session when the broadcast is over.</p></div><button className="secondary-button" type="button" onClick={() => run("list", pageId ? { fb_page_id: pageId } : {})} disabled={busy}>↻ Refresh</button></div>
+    <p>{activeMode === "MIXED" ? <>Use item-coded commands such as <strong>A12 +2</strong>, <strong>B15 LOCK</strong>, or <strong>C18 600</strong>.</> : <>Queue products in {activeMode} mode. Include the item code with each Facebook Live comment.</>}</p>
 
     <section aria-labelledby="live-session-setup-title" style={{ padding: 16, margin: "16px 0", border: "1px solid #dbe4ee", borderRadius: 12, background: "#f8fafc" }}>
       <h3 id="live-session-setup-title" style={{ marginTop: 0 }}>1. Connect the Facebook Live video</h3>
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "end", gap: 10 }}>
         <label style={{ display: "grid", gap: 6 }}>Facebook Page ID<input aria-label="Facebook Page ID" value={pageId} readOnly title="Use the global Facebook Page switcher to change Pages" /></label>
         <label style={{ display: "grid", gap: 6, flex: "1 1 320px" }}>Facebook Live URL or video ID<input aria-label="Facebook Live URL or video ID" placeholder="Paste the Live video link or numeric ID" value={videoInput} onChange={(e) => setVideoInput(e.target.value)} aria-describedby="live-video-id-help" /></label>
-        <button className="primary-button" type="button" disabled={busy || !pageId || !(parsedVideo.id || parsedVideo.canResolve)} onClick={async () => { setBusy(true); setMessage(""); try { const payload = { fb_page_id: pageId, ...(parsedVideo.id ? { fb_video_id: parsedVideo.id } : { fb_video_url: videoInput.trim() }) }; const d = await request("create", payload); await refresh(); setSelected(d.session.id); setVideoInput(d.session.fb_video_id); setMessage(d.reused ? "This video already has a session for the selected Page. The existing session is selected." : "Session created in DRAFT. Add products in the queue below."); } catch (e) { setMessage(e.message); } finally { setBusy(false); } }}>＋ Create Session</button>
+        <button className="primary-button" type="button" disabled={busy || !pageId || !(parsedVideo.id || parsedVideo.canResolve)} onClick={async () => { setBusy(true); setMessage(""); try { const payload = { fb_page_id: pageId, ...(parsedVideo.id ? { fb_video_id: parsedVideo.id } : { fb_video_url: videoInput.trim() }) }; const d = await request("create", payload); await refresh(); setSelected(d.session.id); setVideoInput(d.session.fb_video_id); setMessage("Session created in DRAFT. Add products in the queue below."); } catch (e) { setMessage(e.message); } finally { setBusy(false); } }}>＋ Create Session</button>
       </div>
       <p id="live-video-id-help" role="status" style={{ marginBottom: 0, color: parsedVideo.id ? "#087443" : "#58677a" }}>{parsedVideo.message}{parsedVideo.id && <> Detected ID: <strong>{parsedVideo.id}</strong></>}</p>
     </section>
 
-    <section aria-labelledby="live-sessions-title" style={{ padding: 16, margin: "16px 0", border: "1px solid #dbe4ee", borderRadius: 12 }}>
-      <h3 id="live-sessions-title" style={{ marginTop: 0 }}>2. Live sessions</h3>
-      {sessions.length === 0 ? <p style={{ marginBottom: 0 }}>No sessions yet. Connect a Live video above to create one.</p> : <div className="table-wrapper"><table>
-        <thead><tr><th>Video ID</th><th>Status</th><th>Products</th><th>Actions</th></tr></thead>
-        <tbody>{sessions.map((session) => {
-          const productCount = (session.eo2mate_live_items || []).length;
-          return <tr key={session.id} style={selected === session.id ? { background: "#eff6ff" } : undefined}>
-            <td>{session.fb_video_id}</td><td>{session.status}</td><td>{productCount}</td>
-            <td><div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              <button className={selected === session.id ? "primary-button" : "secondary-button"} type="button" disabled={busy} onClick={() => setSelected(session.id)}>{selected === session.id ? "Selected" : "Select"}</button>
-              {session.status === "DRAFT" && <button className="secondary-button" type="button" disabled={busy || productCount === 0} title={productCount === 0 ? "Add a product before starting this session." : "Start this session"} onClick={() => run("start", { session_id: session.id }, "Session started. Activate a queued product to begin accepting comments.")}>▶ Start</button>}
-              {session.status === "ACTIVE" && <button className="secondary-button" type="button" disabled={busy} onClick={() => { if (window.confirm("End this live session?")) run("close", { session_id: session.id }, "Live session ended."); }}>■ End</button>}
-            </div></td>
-          </tr>;
-        })}</tbody>
-      </table></div>}
-    </section>
-
     <section aria-labelledby="live-product-queue-title" style={{ padding: 16, margin: "16px 0", border: "1px solid #dbe4ee", borderRadius: 12 }}>
-      <h3 id="live-product-queue-title" style={{ marginTop: 0 }}>3. Product queue</h3>
-      {!current ? <p style={{ marginBottom: 0 }}>Select a session in the table above to manage its products.</p> : <>
+      <h3 id="live-product-queue-title" style={{ marginTop: 0 }}>2. Product queue</h3>
+      {!current ? <p style={{ marginBottom: 0 }}>Create a Live session above, or select an existing session below. The product queue and Add Item form will appear here.</p> : <>
+        <label style={{ display: "grid", gap: 6, maxWidth: 480 }}>Live session<select value={selected} onChange={(e) => setSelected(e.target.value)}><option value="">Select a session</option>{visibleSessions.map((s) => <option key={s.id} value={s.id}>{s.fb_video_id} — {s.status}</option>)}</select></label>
         <p><strong>Session status:</strong> {current.status} · <strong>Video ID:</strong> {current.fb_video_id}</p>
         {current.status === "DRAFT" && <>
           <h4 style={{ marginBottom: 8 }}>Add product to queue</h4>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
             <input placeholder="Item code e.g. A12" aria-label="Item code" value={item.item_code} onChange={(e) => setItem({ ...item, item_code: e.target.value.toUpperCase() })} />
             <input placeholder="Product name" aria-label="Product name" value={item.title} onChange={(e) => setItem({ ...item, title: e.target.value })} />
-            <div role="group" aria-label="Selling mode" style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {[{ value: "SELLING", label: "Selling" }, { value: "MINING", label: "Mining" }, { value: "AUCTION", label: "Auction" }].map((option) => <button key={option.value} type="button" className={item.mode === option.value ? "primary-button" : "secondary-button"} aria-pressed={item.mode === option.value} onClick={() => setItem({ ...item, mode: option.value })}>{option.label}</button>)}
-            </div>
+            {activeMode === "MIXED" ? <select aria-label="Selling mode" value={item.mode} onChange={(e) => setItem({ ...item, mode: e.target.value })}><option value="SELLING">Selling</option><option value="MINING">Mining</option><option value="AUCTION">Auction</option></select> : <span className="status-badge">{activeMode}</span>}
             <input type="number" min="1" aria-label="Quantity" value={item.quantity} onChange={(e) => setItem({ ...item, quantity: e.target.value })} />
             {(item.mode === "SELLING" ? ["unit_price"] : item.mode === "MINING" ? ["mine_price", "take_price", "lock_price"] : ["starting_bid", "bid_increment"]).map((field) => <input key={field} type="number" min="0" step="0.01" aria-label={field.replaceAll("_", " ")} placeholder={field.replaceAll("_", " ")} value={item[field]} onChange={(e) => setItem({ ...item, [field]: e.target.value })} />)}
             <button type="button" className="secondary-button" disabled={busy || !item.title || !item.item_code} onClick={() => run("add-item", { session_id: selected, ...item })}>＋ Add Item to Queue</button>
@@ -415,10 +392,10 @@ function MixedLiveManager({ client, selectedFbPageId }) {
           <section aria-labelledby="bulk-live-queue-title" style={{ marginTop: 18, padding: 14, border: "1px dashed #94a3b8", borderRadius: 10, background: "#f8fafc" }}>
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
               <div><h4 id="bulk-live-queue-title" style={{ margin: "0 0 4px" }}>Bulk upload products</h4><p style={{ margin: 0 }}>Queue many products at once from a CSV. Do this while the session is DRAFT, then activate each queued item during the livestream.</p></div>
-              <button type="button" className="secondary-button" onClick={downloadLiveQueueTemplate} disabled={busy}>Download CSV template</button>
+              <button type="button" className="secondary-button" onClick={() => downloadLiveQueueTemplate(activeMode)} disabled={busy}>Download CSV template</button>
             </div>
             <label style={{ display: "grid", gap: 6, maxWidth: 520, marginTop: 12 }}>Choose product queue CSV<input key={queueFileKey} type="file" accept=".csv,text/csv" disabled={busy} onChange={async (e) => { const file = e.target.files?.[0]; if (!file) return; setQueueCsvName(file.name); setMessage(""); try { setQueueCsv(await file.text()); } catch { setQueueCsv(""); setMessage("Could not read that CSV file."); } }} /></label>
-            <p style={{ margin: "8px 0", fontSize: 13 }}>Use the downloaded template as-is. Required: <code>item_code</code>, <code>title</code>, <code>mode</code>, <code>quantity</code>, and the price columns for that mode. CSV only; XLSX is not accepted. Upload up to 100 products per batch.</p>
+            <p style={{ margin: "8px 0", fontSize: 13 }}>Required columns: <code>item_code</code>, <code>title</code>. Also use <code>mode</code>, <code>quantity</code>, and the price columns for that mode. Save the spreadsheet as CSV before uploading. Upload up to 100 products per batch.</p>
             {queueCsv && <>
               <p><strong>{queueCsvName || "CSV"}</strong> · {parsedQueue.rows.length} valid product row(s) detected.</p>
               {parsedQueue.errors.length > 0 && <div role="alert" style={{ color: "#9f1239", background: "#fff1f2", padding: 10, borderRadius: 8, marginBottom: 10 }}><strong>Fix these CSV issues before uploading:</strong><ul style={{ marginBottom: 0 }}>{parsedQueue.errors.map((error, i) => <li key={`${i}-${error}`}>{error}</li>)}</ul></div>}
@@ -426,8 +403,10 @@ function MixedLiveManager({ client, selectedFbPageId }) {
               <button type="button" className="primary-button" disabled={busy || !parsedQueue.rows.length || parsedQueue.errors.length > 0} onClick={uploadQueueCsv}>＋ Add {parsedQueue.rows.length} Products to Queue</button>
             </>}
           </section>
+          <p><button className="primary-button" type="button" disabled={busy || !(current.eo2mate_live_items || []).length} onClick={() => run("start", { session_id: selected })}>▶ Start EO2MATE Session</button></p>
         </>}
-        <div className="table-wrapper"><table><thead><tr><th>Code</th><th>Product</th><th>Mode</th><th>Status</th><th>Accepted / Stock</th><th>Action</th></tr></thead><tbody>{(current.eo2mate_live_items || []).map((it) => <tr key={it.id}><td>{it.item_code}</td><td>{it.title}</td><td>{it.mode}</td><td>{it.status}</td><td>{it.claimed} / {it.quantity}</td><td>{current.status === "ACTIVE" && it.status === "QUEUED" && <button className="secondary-button" type="button" disabled={busy} onClick={() => run("activate-item", { session_id: selected, item_id: it.id })}>▶ Activate</button>}</td></tr>)}</tbody></table>{!(current.eo2mate_live_items || []).length && <p>No products queued yet. Add your first product above.</p>}</div>
+        <div className="table-wrapper"><table><thead><tr><th>Code</th><th>Product</th><th>Mode</th><th>Status</th><th>Accepted / Stock</th><th>Action</th></tr></thead><tbody>{visibleItems.map((it) => <tr key={it.id}><td>{it.item_code}</td><td>{it.title}</td><td>{it.mode}</td><td>{it.status}</td><td>{it.claimed} / {it.quantity}</td><td>{current.status === "ACTIVE" && it.status === "QUEUED" && <button className="secondary-button" type="button" disabled={busy} onClick={() => run("activate-item", { session_id: selected, item_id: it.id })}>▶ Activate</button>}</td></tr>)}</tbody></table>{!visibleItems.length && <p>No {activeMode === "MIXED" ? "products" : `${activeMode.toLowerCase()} products`} queued yet. Add a product above.</p>}</div>
+        {current.status === "ACTIVE" && <div style={{ marginTop: 14 }}><button type="button" className="secondary-button" disabled={busy} onClick={() => { if (window.confirm("End this EO2MATE Live session? This stops EO2MATE processing for this session. End the Facebook broadcast separately.")) run("close", { session_id: selected }); }}>■ End EO2MATE Session</button><p style={{ fontSize: 13, marginBottom: 0 }}>After ending the Facebook broadcast, also end this EO2MATE session to stop comment processing.</p></div>}
       </>}
     </section>
     {message && <p role="status">{message}</p>}
@@ -443,7 +422,6 @@ const LIVE_MODES = [
 
 export default function LiveSellingPage({ metaConnected, page, client, selectedFbPageId }) {
   const [mode, setMode] = useState("SELLING");
-  const [section, setSection] = useState("SUMMARY");
   if (page !== "live-selling") return null;
   const current = LIVE_MODES.find((entry) => entry.key === mode);
   return <>
@@ -451,43 +429,20 @@ export default function LiveSellingPage({ metaConnected, page, client, selectedF
       <div>
         <p className="eyebrow">FACEBOOK LIVE OPERATIONS</p>
         <h1>Live Selling</h1>
-        <p>Manage Live Selling, Live Mining and Live Auction in one workspace.</p>
+        <p>Run Live Selling, Live Mining, Live Auction, or a mixed product queue in one workspace.</p>
       </div>
     </header>
     <section className="selling-workspace-tabs" style={{ marginBottom: 18 }}>
       <div className="selling-workspace-tablist selling-workspace-nav" role="tablist" aria-label="Live selling modes">
-        {LIVE_MODES.map((entry) => <button key={entry.key} type="button" role="tab" aria-selected={mode === entry.key} className={`selling-workspace-tab${mode === entry.key ? " active" : ""}`} onClick={() => { setMode(entry.key); setSection("SUMMARY"); }}>
+        {LIVE_MODES.map((entry) => <button key={entry.key} type="button" role="tab" aria-selected={mode === entry.key} className={`selling-workspace-tab${mode === entry.key ? " active" : ""}`} onClick={() => setMode(entry.key)}>
           <span className="selling-nav-icon"><NavIcon type={entry.icon} /></span><span>{entry.label}</span>
         </button>)}
       </div>
     </section>
     <section className="dashboard-panel" style={{ marginBottom: 18 }}>
       <div className="panel-header"><div><h2>{current.label}</h2><p>{current.description} Buyer command: <strong>{current.command}</strong>.</p></div></div>
-      <div className="selling-workspace-tablist selling-workspace-nav" role="tablist" aria-label={`${current.label} sections`} style={{ margin: 14 }}>
-        {[
-          { key: "SUMMARY", label: "Summary", icon: "dashboard" },
-          { key: "SESSIONS", label: "Sessions", icon: "reports" },
-          { key: "ACTIVITY", label: mode === "AUCTION" ? "Bids" : "Claims", icon: "orders" },
-          { key: "BUYERS", label: "Buyers", icon: "users" },
-          { key: "REPORTS", label: "Reports", icon: "reports" },
-        ].map((tab) => <button key={tab.key} type="button" role="tab" aria-selected={section === tab.key} className={`selling-workspace-tab${section === tab.key ? " active" : ""}`} onClick={() => setSection(tab.key)}><span className="selling-nav-icon"><NavIcon type={tab.icon} /></span><span>{tab.label}</span></button>)}
-      </div>
+      <MixedLiveManager key={mode} activeMode={mode} client={client} selectedFbPageId={selectedFbPageId} />
     </section>
-    {mode === "MIXED" ? <MixedLiveManager client={client} selectedFbPageId={selectedFbPageId} /> : mode === "MINING" && (section === "SUMMARY" || section === "SESSIONS") ? <LiveMiningPage /> : <>
-      {section === "SUMMARY" && <section className="metrics-grid">
-        <MetricCard title="Live sessions" value="—" subtitle="Awaiting live integration" />
-        <MetricCard title="Active sessions" value="—" subtitle="Awaiting live integration" />
-        <MetricCard title={mode === "AUCTION" ? "Bids" : "Claims"} value="—" subtitle="Awaiting live integration" />
-        <MetricCard title="Buyers" value="—" subtitle="Awaiting live integration" />
-        <MetricCard title="Sales value" value="—" subtitle="Awaiting live integration" />
-      </section>}
-      <section className="dashboard-panel">
-        <div className="panel-header"><div><h2>{current.label} — {section.toLowerCase()}</h2><p>Facebook Live session processing and live activity retrieval are not connected yet.</p></div>
-          {section === "SESSIONS" && <button type="button" className="secondary-button" disabled title="Requires live session backend and Meta permissions">Create Live Session · Soon</button>}
-        </div>
-        <div className="table-wrapper"><table><thead><tr><th>Session</th><th>Facebook Page</th><th>Status</th><th>{mode === "AUCTION" ? "Bids" : "Claims"}</th><th>Buyers</th><th>Sales</th></tr></thead><tbody><tr><td colSpan="6">No verified live session data available. Backend integration pending.</td></tr></tbody></table></div>
-      </section>
-    </>}
     {!metaConnected && <section className="dashboard-panel"><div className="panel-header"><div><h2>Facebook Page required</h2><p>Connect an authorized Facebook Page before starting a real livestream. Simulated Pages cannot publish to Meta.</p></div></div></section>}
   </>;
 }
