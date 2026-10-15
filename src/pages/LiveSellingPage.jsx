@@ -539,7 +539,7 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
             <td><button type="button" className="table-link-button" aria-label={`View product queue for Facebook Live post ${session.fb_video_id}`} onClick={(event) => { event.stopPropagation(); setSelected(session.id); }}>{session.fb_video_id}</button></td>
             <td>{session.created_at ? new Date(session.created_at).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" }) : "—"}</td>
             <td>{session.status}</td><td>{items.length}</td><td>{claimed}</td>
-            <td><button type="button" className="table-action-button" aria-pressed={selected === session.id} onClick={(event) => { event.stopPropagation(); setSelected(session.id); }}><NavIcon type="view" />{selected === session.id ? "Viewing queue" : "View queue"}</button></td>
+            <td><button type="button" className="table-action-button" aria-label={`View queue for Live post ${session.fb_video_id}`} title={selected === session.id ? "Currently viewing this queue" : "View product queue"} aria-pressed={selected === session.id} onClick={(event) => { event.stopPropagation(); setSelected(session.id); }}><NavIcon type="view" /></button></td>
           </tr>;
         })}
         {!visibleSessions.length && <tr><td colSpan="6" className="empty-table-cell">No previous Live posts for this Facebook Page yet. Connect a Live video above to create the first session.</td></tr>}
@@ -592,18 +592,15 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
           {item.inventory_item_id && item.mode !== "SELLING" && <p style={{ margin: "8px 0 0", color: "#64748b", fontSize: 13 }}>The inventory record supplies the default selling price, but not Mining price levels or Auction bid increments. Enter the pricing fields shown for the selected mode.</p>}
           <section aria-labelledby="bulk-live-queue-title" style={{ marginTop: 18, padding: 16, border: "1px solid #d7e2ee", borderRadius: 12, background: "linear-gradient(135deg, #f8fbff 0%, #f1f6fc 100%)", boxShadow: "0 4px 14px rgba(15, 23, 42, 0.04)" }}>
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
+              <label title="Choose a CSV file with up to 100 products" style={{ position: "relative", display: "flex", alignItems: "center", gap: 11, flex: "1 1 260px", minWidth: 240, padding: 5, margin: -5, borderRadius: 10, cursor: busy ? "not-allowed" : "pointer" }}>
                 <span style={{ display: "grid", placeItems: "center", width: 40, height: 40, borderRadius: 11, color: "#176b55", background: "#e2f3ed" }}><NavIcon type="upload" /></span>
-                <div><h4 id="bulk-live-queue-title" style={{ margin: "0 0 3px" }}>Import multiple products</h4><p style={{ margin: 0, color: "#64748b", fontSize: 13 }}>CSV file · up to 100 products</p></div>
-              </div>
+                <span style={{ display: "grid", gap: 3 }}><strong id="bulk-live-queue-title">Import multiple products</strong><span style={{ color: "#64748b", fontSize: 13 }}>CSV file · up to 100 products</span></span>
+                <input aria-label="Import multiple products from CSV" key={queueFileKey} type="file" accept=".csv,text/csv" disabled={busy} onChange={async (e) => { const file = e.target.files?.[0]; if (!file) return; setQueueCsvName(file.name); setMessage(""); try { setQueueCsv(await file.text()); } catch { setQueueCsv(""); setMessage("Could not read that CSV file."); } }} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0, cursor: "inherit" }} />
+              </label>
               <button type="button" className="secondary-button" style={{ display: "inline-flex", alignItems: "center", gap: 7 }} onClick={() => downloadLiveQueueTemplate(activeMode)} disabled={busy}><NavIcon type="download" />CSV template</button>
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, marginTop: 14, paddingTop: 13, borderTop: "1px solid #dbe5ef" }}>
-              <label style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: 8, padding: "10px 14px", border: "1px solid #b8c9dc", borderRadius: 9, color: "#174a70", background: "#fff", fontWeight: 650, cursor: busy ? "not-allowed" : "pointer", overflow: "hidden" }}>
-                <NavIcon type="upload" /><span>Select CSV file</span>
-                <input aria-label="Choose product queue CSV" key={queueFileKey} type="file" accept=".csv,text/csv" disabled={busy} onChange={async (e) => { const file = e.target.files?.[0]; if (!file) return; setQueueCsvName(file.name); setMessage(""); try { setQueueCsv(await file.text()); } catch { setQueueCsv(""); setMessage("Could not read that CSV file."); } }} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0, cursor: "inherit" }} />
-              </label>
-              <span style={{ color: queueCsvName ? "#243b53" : "#718096", fontSize: 13 }}>{queueCsvName || "No file selected"}</span>
+              <span style={{ color: queueCsvName ? "#243b53" : "#718096", fontSize: 13, fontWeight: queueCsvName ? 600 : 400 }}>{queueCsvName ? `Selected: ${queueCsvName}` : "Click the import area above to choose a CSV."}</span>
               <span style={{ color: "#64748b", fontSize: 12 }}>Required: <code>item_code</code>, <code>title</code>. Add mode, quantity, and mode prices as needed.</span>
             </div>
             {queueCsv && <>
