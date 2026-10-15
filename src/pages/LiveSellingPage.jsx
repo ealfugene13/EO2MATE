@@ -333,7 +333,10 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
   const [selected, setSelected] = useState("");
   const pageId = selectedFbPageId || "";
   const [videoInput, setVideoInput] = useState("");
-  const [item, setItem] = useState({ item_code: "", title: "", mode: activeMode === "MIXED" ? "SELLING" : activeMode, quantity: 1, unit_price: "", mine_price: "", take_price: "", lock_price: "", starting_bid: "", bid_increment: "" });
+  const [item, setItem] = useState({ inventory_item_id: "", item_code: "", title: "", mode: activeMode === "MIXED" ? "SELLING" : activeMode, quantity: 1, unit_price: "", mine_price: "", take_price: "", lock_price: "", starting_bid: "", bid_increment: "" });
+  const [inventoryItems, setInventoryItems] = useState([]);
+  const [inventoryLoading, setInventoryLoading] = useState(false);
+  const [inventoryError, setInventoryError] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [queueCsv, setQueueCsv] = useState("");
@@ -362,13 +365,40 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
     if (error || data?.error) throw new Error(data?.detail || data?.error || error?.message || "Request failed");
     return data;
   };
+  const loadInventoryItems = async () => {
+    if (!clientId) return;
+    setInventoryLoading(true);
+    setInventoryError("");
+    try {
+      const { data, error } = await supabase.functions.invoke("eo2mate", {
+        headers: { "x-eo2mate-route": "inventory-admin" },
+        body: { action: "LIST_ITEMS", client_id: clientId, search: "", status: "ACTIVE", fb_page_id: pageId || null },
+      });
+      if (error || data?.error || data?.success === false) throw new Error(data?.detail || data?.message || data?.error || error?.message || "Unable to load inventory items.");
+      const availableItems = (data?.items || []).filter((entry) => String(entry.status || "ACTIVE").toUpperCase() === "ACTIVE" && Math.floor(Number(entry.qty_available ?? 0)) > 0);
+      setInventoryItems(availableItems);
+      setItem((previous) => previous.inventory_item_id && !availableItems.some((entry) => String(entry.inventory_item_id) === String(previous.inventory_item_id))
+        ? { ...previous, inventory_item_id: "" }
+        : previous);
+    } catch (error) {
+      setInventoryItems([]);
+      setInventoryError(error.message || "Unable to load inventory items.");
+    } finally {
+      setInventoryLoading(false);
+    }
+  };
   const refresh = async () => {
     const result = await request("list", pageId ? { fb_page_id: pageId } : {});
     const nextSessions = result.sessions || [];
     setSessions(nextSessions);
     if (!selected || !nextSessions.some((session) => session.id === selected)) setSelected(nextSessions[0]?.id || "");
   };
-  useEffect(() => { if (clientId) refresh().catch((e) => setMessage(e.message)); }, [clientId, pageId]);
+  useEffect(() => {
+    if (clientId) {
+      refresh().catch((e) => setMessage(e.message));
+      loadInventoryItems();
+    }
+  }, [clientId, pageId]);
   const run = async (action, extra = {}) => {
     setBusy(true); setMessage("");
     try { await request(action, extra); await refresh(); setMessage(`${action} completed.`); }
@@ -412,8 +442,8 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
     <div className="panel-header"><div><h2>Live Selling Control Center</h2><p>Connect the current Facebook Live video, queue products, activate each item, and end the EO2MATE session when the broadcast is over.</p></div><button className="secondary-button" type="button" onClick={() => run("list", pageId ? { fb_page_id: pageId } : {})} disabled={busy}>↻ Refresh</button></div>
     <p>{activeMode === "MIXED" ? <>Use item-coded commands such as <strong>A12 +2</strong>, <strong>B15 LOCK</strong>, or <strong>C18 600</strong>.</> : <>Queue products in {activeMode} mode. Include the item code with each Facebook Live comment.</>}</p>
 
-    <section aria-labelledby="live-session-setup-title" style={{ padding: 16, margin: "16px 0", border: "1px solid #dbe4ee", borderRadius: 12, background: "#f8fafc" }}>
-      <h3 id="live-session-setup-title" style={{ marginTop: 0 }}>1. Connect the Facebook Live video</h3>
+      <section aria-labelledby="live-session-setup-title" style={{ padding: 18, margin: "16px 0", border: "1px solid #dbe4ee", borderRadius: 14, background: "#f8fafc" }}>
+      <h3 id="live-session-setup-title" style={{ marginTop: 0 }}>Connect the Facebook Live video</h3>
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "end", gap: 10 }}>
         <label style={{ display: "grid", gap: 6 }}>Facebook Page ID<input aria-label="Facebook Page ID" value={pageId} readOnly title="Use the global Facebook Page switcher to change Pages" /></label>
         <label style={{ display: "grid", gap: 6, flex: "1 1 320px" }}>Facebook Live URL or video ID<input aria-label="Facebook Live URL or video ID" placeholder="Paste the Live video link or numeric ID" value={videoInput} onChange={(e) => setVideoInput(e.target.value)} aria-describedby="live-video-id-help" /></label>
@@ -423,7 +453,7 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
     </section>
 
     <section aria-labelledby="live-previous-posts-title" style={{ padding: 16, margin: "16px 0", border: "1px solid #dbe4ee", borderRadius: 12 }}>
-      <div className="panel-header"><div><h3 id="live-previous-posts-title" style={{ marginTop: 0 }}>2. Previous Live posts</h3><p>Select a post to view its product queue below.</p></div><button type="button" className="secondary-button" onClick={() => refresh().catch((e) => setMessage(e.message))} disabled={busy}>↻ Refresh posts</button></div>
+      <div className="panel-header"><div><h3 id="live-previous-posts-title" style={{ marginTop: 0 }}>Previous Live posts</h3><p>Select a post to view its product queue below.</p></div><button type="button" className="secondary-button" onClick={() => refresh().catch((e) => setMessage(e.message))} disabled={busy}>↻ Refresh posts</button></div>
       <div className="table-wrapper"><table><thead><tr><th>Facebook Live post</th><th>Created</th><th>Status</th><th>Products</th><th>Claimed</th><th></th></tr></thead><tbody>
         {visibleSessions.map((session) => {
           const items = (session.eo2mate_live_items || []).filter((entry) => activeMode === "MIXED" || String(entry.mode || "").toUpperCase() === activeMode);
@@ -440,11 +470,36 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
     </section>
 
     <section aria-labelledby="live-product-queue-title" style={{ padding: 16, margin: "16px 0", border: "1px solid #dbe4ee", borderRadius: 12 }}>
-      <h3 id="live-product-queue-title" style={{ marginTop: 0 }}>3. Product queue{current ? ` · ${current.fb_video_id}` : ""}</h3>
+      <h3 id="live-product-queue-title" style={{ marginTop: 0 }}>Product queue{current ? ` · ${current.fb_video_id}` : ""}</h3>
       {!current ? <p style={{ marginBottom: 0 }}>Select a previous Live post above, or connect a video to create a session. Its product queue will appear here.</p> : <>
         <p><strong>Session status:</strong> {current.status} · <strong>Video ID:</strong> {current.fb_video_id}</p>
         {current.status === "DRAFT" && <>
           <h4 style={{ marginBottom: 8 }}>Add product to queue</h4>
+          <div style={{ marginBottom: 16, padding: 14, border: "1px solid #dbe4ee", borderRadius: 12, background: "#f8fafc" }}>
+          <label style={{ display: "grid", gap: 7, maxWidth: 680, fontWeight: 600 }}>Select a product from inventory
+            <select aria-label="Select product from inventory" value={item.inventory_item_id} disabled={busy || inventoryLoading} onChange={(event) => {
+              const inventory = inventoryItems.find((entry) => String(entry.inventory_item_id) === event.target.value);
+              if (!inventory) {
+                setItem((previous) => ({ ...previous, inventory_item_id: "" }));
+                return;
+              }
+              setItem((previous) => ({
+                ...previous,
+                inventory_item_id: String(inventory.inventory_item_id),
+                item_code: String(inventory.item_code || "").toUpperCase(),
+                title: inventory.item_name || "",
+                quantity: String(Math.floor(Number(inventory.qty_available) || 0)),
+                unit_price: inventory.default_selling_price == null ? "" : String(inventory.default_selling_price),
+              }));
+            }}>
+              <option value="">{inventoryLoading ? "Loading inventory…" : "Choose an available inventory product"}</option>
+              {inventoryItems.map((entry) => <option key={entry.inventory_item_id} value={entry.inventory_item_id}>{entry.item_code} · {entry.item_name} · {Math.floor(Number(entry.qty_available) || 0)} available · {formatCurrency(entry.default_selling_price)}</option>)}
+            </select>
+          </label>
+          <p style={{ margin: "8px 0 0", color: "#64748b", fontSize: 13 }}>Selecting a product fills its item code, name, available quantity, and default selling price. Choose the Live mode below.</p>
+          {inventoryError && <p role="alert" style={{ margin: "8px 0 0", color: "#b42318" }}>Inventory could not be loaded: {inventoryError}</p>}
+          {!inventoryLoading && !inventoryError && !inventoryItems.length && <p style={{ margin: "8px 0 0", color: "#64748b" }}>No active inventory products with whole units available were found for this Facebook Page. You can still enter the product details below.</p>}
+          </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
             <input placeholder="Item code e.g. A12" aria-label="Item code" value={item.item_code} onChange={(e) => setItem({ ...item, item_code: e.target.value.toUpperCase() })} />
             <input placeholder="Product name" aria-label="Product name" value={item.title} onChange={(e) => setItem({ ...item, title: e.target.value })} />
@@ -453,6 +508,7 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
             {(item.mode === "SELLING" ? ["unit_price"] : item.mode === "MINING" ? ["mine_price", "take_price", "lock_price"] : ["starting_bid", "bid_increment"]).map((field) => <input key={field} type="number" min="0" step="0.01" aria-label={field.replaceAll("_", " ")} placeholder={field.replaceAll("_", " ")} value={item[field]} onChange={(e) => setItem({ ...item, [field]: e.target.value })} />)}
             <button type="button" className="secondary-button" disabled={busy || !item.title || !item.item_code} onClick={() => run("add-item", { session_id: selected, ...item })}>＋ Add Item to Queue</button>
           </div>
+          {item.inventory_item_id && item.mode !== "SELLING" && <p style={{ margin: "8px 0 0", color: "#64748b", fontSize: 13 }}>The inventory record supplies the default selling price, but not Mining price levels or Auction bid increments. Enter the pricing fields shown for the selected mode.</p>}
           <section aria-labelledby="bulk-live-queue-title" style={{ marginTop: 18, padding: 14, border: "1px dashed #94a3b8", borderRadius: 10, background: "#f8fafc" }}>
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
               <div><h4 id="bulk-live-queue-title" style={{ margin: "0 0 4px" }}>Bulk upload products</h4><p style={{ margin: 0 }}>Queue many products at once from a CSV. Do this while the session is DRAFT, then activate each queued item during the livestream.</p></div>
