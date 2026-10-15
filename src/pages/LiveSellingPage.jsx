@@ -343,6 +343,8 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
   const [queueCsvName, setQueueCsvName] = useState("");
   const [queueFileKey, setQueueFileKey] = useState(0);
   const current = sessions.find((s) => s.id === selected);
+  const queuedItemCodes = new Set((current?.eo2mate_live_items || []).map((entry) => String(entry.item_code || "").trim().toUpperCase()));
+  const itemCodeAlreadyQueued = Boolean(item.item_code && queuedItemCodes.has(String(item.item_code).trim().toUpperCase()));
   const visibleSessions = sessions.filter((session) => activeMode === "MIXED" || !(session.eo2mate_live_items || []).length || (session.eo2mate_live_items || []).some((entry) => String(entry.mode || "").toUpperCase() === activeMode));
   const visibleItems = (current?.eo2mate_live_items || []).filter((entry) => activeMode === "MIXED" || String(entry.mode || "").toUpperCase() === activeMode);
   const reportItems = visibleSessions.flatMap((session) => (session.eo2mate_live_items || [])
@@ -399,11 +401,47 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
       loadInventoryItems();
     }
   }, [clientId, pageId]);
+  useEffect(() => {
+    if (!clientId || !selected) return undefined;
+    let realtimeStatus = "CONNECTING";
+    const channel = supabase
+      .channel(`live-queue-${selected}`)
+      .on("postgres_changes", {
+        event: "*",
+        schema: "public",
+        table: "eo2mate_live_items",
+        filter: `session_id=eq.${selected}`,
+      }, () => {
+        refresh().catch((error) => setMessage(error.message || "Unable to refresh the Live queue."));
+      })
+      .subscribe((status) => { realtimeStatus = status; });
+    const fallbackRefresh = window.setInterval(() => {
+      if (realtimeStatus !== "SUBSCRIBED") {
+        refresh().catch((error) => setMessage(error.message || "Unable to refresh the Live queue."));
+      }
+    }, 5000);
+    return () => {
+      window.clearInterval(fallbackRefresh);
+      supabase.removeChannel(channel);
+    };
+  }, [clientId, selected, pageId]);
   const run = async (action, extra = {}) => {
     setBusy(true); setMessage("");
     try { await request(action, extra); await refresh(); setMessage(`${action} completed.`); }
     catch (e) { setMessage(e.message); }
     finally { setBusy(false); }
+  };
+  const addItemToQueue = async () => {
+    if (!current || current.status !== "DRAFT") return;
+    setBusy(true); setMessage("");
+    try {
+      await request("add-item", { session_id: selected, ...item });
+      await refresh();
+      setItem({ inventory_item_id: "", item_code: "", title: "", mode: item.mode, quantity: 1, unit_price: "", mine_price: "", take_price: "", lock_price: "", starting_bid: "", bid_increment: "" });
+      setMessage("Product added to queue. Select the next inventory item when ready.");
+    } catch (e) {
+      setMessage(e.message || "Unable to add this product to the queue.");
+    } finally { setBusy(false); }
   };
   const uploadQueueCsv = async () => {
     if (!current || current.status !== "DRAFT" || !parsedQueue.rows.length || parsedQueue.errors.length) return;
@@ -493,7 +531,10 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
               }));
             }}>
               <option value="">{inventoryLoading ? "Loading inventory…" : "Choose an available inventory product"}</option>
-              {inventoryItems.map((entry) => <option key={entry.inventory_item_id} value={entry.inventory_item_id}>{entry.item_code} · {entry.item_name} · {Math.floor(Number(entry.qty_available) || 0)} available · {formatCurrency(entry.default_selling_price)}</option>)}
+              {inventoryItems.map((entry) => {
+                const alreadyQueued = queuedItemCodes.has(String(entry.item_code || "").trim().toUpperCase());
+                return <option key={entry.inventory_item_id} value={entry.inventory_item_id} disabled={alreadyQueued}>{entry.item_code} · {entry.item_name} · {alreadyQueued ? "Already queued" : `${Math.floor(Number(entry.qty_available) || 0)} available · ${formatCurrency(entry.default_selling_price)}`}</option>;
+              })}
             </select>
           </label>
           <p style={{ margin: "8px 0 0", color: "#64748b", fontSize: 13 }}>Selecting a product fills its item code, name, available quantity, and default selling price. Choose the Live mode below.</p>
@@ -506,8 +547,9 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
             {activeMode === "MIXED" ? <select aria-label="Selling mode" value={item.mode} onChange={(e) => setItem({ ...item, mode: e.target.value })}><option value="SELLING">Selling</option><option value="MINING">Mining</option><option value="AUCTION">Auction</option></select> : <span className="status-badge">{activeMode}</span>}
             <input type="number" min="1" aria-label="Quantity" value={item.quantity} onChange={(e) => setItem({ ...item, quantity: e.target.value })} />
             {(item.mode === "SELLING" ? ["unit_price"] : item.mode === "MINING" ? ["mine_price", "take_price", "lock_price"] : ["starting_bid", "bid_increment"]).map((field) => <input key={field} type="number" min="0" step="0.01" aria-label={field.replaceAll("_", " ")} placeholder={field.replaceAll("_", " ")} value={item[field]} onChange={(e) => setItem({ ...item, [field]: e.target.value })} />)}
-            <button type="button" className="secondary-button" disabled={busy || !item.title || !item.item_code} onClick={() => run("add-item", { session_id: selected, ...item })}>＋ Add Item to Queue</button>
+            <button type="button" className="secondary-button" disabled={busy || !item.title || !item.item_code || itemCodeAlreadyQueued} onClick={addItemToQueue}>＋ Add Item to Queue</button>
           </div>
+          {itemCodeAlreadyQueued && <p role="status" style={{ margin: "8px 0 0", color: "#b54708", fontSize: 13 }}>This item code is already in the selected Live queue. Choose another inventory product or use a new code.</p>}
           {item.inventory_item_id && item.mode !== "SELLING" && <p style={{ margin: "8px 0 0", color: "#64748b", fontSize: 13 }}>The inventory record supplies the default selling price, but not Mining price levels or Auction bid increments. Enter the pricing fields shown for the selected mode.</p>}
           <section aria-labelledby="bulk-live-queue-title" style={{ marginTop: 18, padding: 14, border: "1px dashed #94a3b8", borderRadius: 10, background: "#f8fafc" }}>
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
