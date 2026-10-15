@@ -551,9 +551,9 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
       {!current ? <p style={{ marginBottom: 0 }}>Select a previous Live post above, or connect a video to create a session. Its product queue will appear here.</p> : <>
         <p><strong>Session status:</strong> {current.status} · <strong>Video ID:</strong> {current.fb_video_id}</p>
         {current.status === "DRAFT" && <>
-          <h4 style={{ marginBottom: 8 }}>Add product to queue</h4>
+          <h4 style={{ marginBottom: 8 }}>Add one product</h4>
           <div style={{ marginBottom: 16, padding: 14, border: "1px solid #dbe4ee", borderRadius: 12, background: "#f8fafc" }}>
-          <label style={{ display: "grid", gap: 7, maxWidth: 680, fontWeight: 600 }}>Select a product from inventory
+          <label style={{ display: "grid", gap: 7, maxWidth: 680, fontWeight: 600 }}>Choose inventory product (optional)
             <select aria-label="Select product from inventory" value={item.inventory_item_id} disabled={busy || inventoryLoading} onChange={(event) => {
               const inventory = inventoryItems.find((entry) => String(entry.inventory_item_id) === event.target.value);
               if (!inventory) {
@@ -576,7 +576,7 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
               })}
             </select>
           </label>
-          <p style={{ margin: "8px 0 0", color: "#64748b", fontSize: 13 }}>Selecting a product fills its item code, name, available quantity, and default selling price. Choose the Live mode below.</p>
+          <p style={{ margin: "8px 0 0", color: "#64748b", fontSize: 13 }}>Select a product to fill its details, or enter them below. Choose the Live mode for this item.</p>
           {inventoryError && <p role="alert" style={{ margin: "8px 0 0", color: "#b42318" }}>Inventory could not be loaded: {inventoryError}</p>}
           {!inventoryLoading && !inventoryError && !inventoryItems.length && <p style={{ margin: "8px 0 0", color: "#64748b" }}>No active inventory products with whole units available were found for this Facebook Page. You can still enter the product details below.</p>}
           </div>
@@ -586,7 +586,7 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
             {activeMode === "MIXED" ? <select aria-label="Selling mode" value={item.mode} onChange={(e) => setItem({ ...item, mode: e.target.value })}><option value="SELLING">Selling</option><option value="MINING">Mining</option><option value="AUCTION">Auction</option></select> : <span className="status-badge">{activeMode}</span>}
             <input type="number" min="1" aria-label="Quantity" value={item.quantity} onChange={(e) => setItem({ ...item, quantity: e.target.value })} />
             {(item.mode === "SELLING" ? ["unit_price"] : item.mode === "MINING" ? ["mine_price", "take_price", "lock_price"] : ["starting_bid", "bid_increment"]).map((field) => <input key={field} type="number" min="0" step="0.01" aria-label={field.replaceAll("_", " ")} placeholder={field.replaceAll("_", " ")} value={item[field]} onChange={(e) => setItem({ ...item, [field]: e.target.value })} />)}
-            <button type="button" className="secondary-button" disabled={busy || !item.title || !item.item_code || itemCodeAlreadyQueued} onClick={addItemToQueue}><NavIcon type="add" />Add to Queue</button>
+            <button type="button" className="secondary-button" disabled={busy || !item.title || !item.item_code || itemCodeAlreadyQueued} onClick={addItemToQueue}><NavIcon type="add" />Add product</button>
           </div>
           {itemCodeAlreadyQueued && <p role="status" style={{ margin: "8px 0 0", color: "#b54708", fontSize: 13 }}>This item code is already in the selected Live queue. Choose another inventory product or use a new code.</p>}
           {item.inventory_item_id && item.mode !== "SELLING" && <p style={{ margin: "8px 0 0", color: "#64748b", fontSize: 13 }}>The inventory record supplies the default selling price, but not Mining price levels or Auction bid increments. Enter the pricing fields shown for the selected mode.</p>}
@@ -594,13 +594,13 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
                 <span style={{ display: "grid", placeItems: "center", width: 40, height: 40, borderRadius: 11, color: "#176b55", background: "#e2f3ed" }}><NavIcon type="upload" /></span>
-                <div><h4 id="bulk-live-queue-title" style={{ margin: "0 0 3px" }}>Bulk add from CSV</h4><p style={{ margin: 0, color: "#64748b", fontSize: 13 }}>Upload up to 100 products at once.</p></div>
+                <div><h4 id="bulk-live-queue-title" style={{ margin: "0 0 3px" }}>Import multiple products</h4><p style={{ margin: 0, color: "#64748b", fontSize: 13 }}>CSV file · up to 100 products</p></div>
               </div>
               <button type="button" className="secondary-button" style={{ display: "inline-flex", alignItems: "center", gap: 7 }} onClick={() => downloadLiveQueueTemplate(activeMode)} disabled={busy}><NavIcon type="download" />CSV template</button>
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, marginTop: 14, paddingTop: 13, borderTop: "1px solid #dbe5ef" }}>
               <label style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: 8, padding: "10px 14px", border: "1px solid #b8c9dc", borderRadius: 9, color: "#174a70", background: "#fff", fontWeight: 650, cursor: busy ? "not-allowed" : "pointer", overflow: "hidden" }}>
-                <NavIcon type="upload" /><span>Choose CSV</span>
+                <NavIcon type="upload" /><span>Select CSV file</span>
                 <input aria-label="Choose product queue CSV" key={queueFileKey} type="file" accept=".csv,text/csv" disabled={busy} onChange={async (e) => { const file = e.target.files?.[0]; if (!file) return; setQueueCsvName(file.name); setMessage(""); try { setQueueCsv(await file.text()); } catch { setQueueCsv(""); setMessage("Could not read that CSV file."); } }} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0, cursor: "inherit" }} />
               </label>
               <span style={{ color: queueCsvName ? "#243b53" : "#718096", fontSize: 13 }}>{queueCsvName || "No file selected"}</span>
