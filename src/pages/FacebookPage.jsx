@@ -45,9 +45,84 @@ function StatusBadge({ status }) {
   return <span className={className}>{statusLabel(normalized)}</span>;
 }
 
+function showroomUrl(pageId) {
+  const url = new URL(window.location.href);
+  url.search = "";
+  url.hash = "";
+  url.searchParams.set("showroom", pageId);
+  return url.toString();
+}
+
+function toLocalDateTime(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+
+function ShowroomBoardEditor({ clientId, page, onClose }) {
+  const emptyForm = { id: "", announcement_type: "ANNOUNCEMENT", title: "", body: "", cta_label: "", cta_url: "", starts_at: "", ends_at: "", is_published: true };
+  const [rows, setRows] = useState([]);
+  const [form, setForm] = useState(emptyForm);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
+  const invoke = async (action, extra = {}) => {
+    const { data, error: invokeError } = await supabase.functions.invoke("eo2mate", {
+      headers: { "x-eo2mate-route": "public-showroom" },
+      body: { action, client_id: clientId, fb_page_id: page.fb_page_id, ...extra },
+    });
+    if (invokeError || !data?.success) throw new Error(data?.error || invokeError?.message || "Unable to update showroom information.");
+    return data;
+  };
+  const load = async () => {
+    setLoading(true); setError("");
+    try { const data = await invoke("board-list"); setRows(data.announcements || []); }
+    catch (e) { setError(e.message || "Unable to load the information board."); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { load(); }, [clientId, page.fb_page_id]);
+  const edit = (row) => setForm({ ...row, starts_at: toLocalDateTime(row.starts_at), ends_at: toLocalDateTime(row.ends_at), cta_label: row.cta_label || "", cta_url: row.cta_url || "" });
+  const save = async (event) => {
+    event.preventDefault(); setSaving(true); setError(""); setNotice("");
+    try {
+      const payload = { ...form, starts_at: form.starts_at ? new Date(form.starts_at).toISOString() : null, ends_at: form.ends_at ? new Date(form.ends_at).toISOString() : null };
+      await invoke("board-save", payload);
+      setForm(emptyForm); setNotice("Showroom update saved."); await load();
+    } catch (e) { setError(e.message || "Unable to save this update."); }
+    finally { setSaving(false); }
+  };
+  const remove = async (id) => {
+    if (!window.confirm("Remove this update from the showroom?")) return;
+    setError("");
+    try { await invoke("board-delete", { id }); setRows((current) => current.filter((row) => row.id !== id)); setNotice("Update removed."); if (form.id === id) setForm(emptyForm); }
+    catch (e) { setError(e.message || "Unable to remove this update."); }
+  };
+  return <section className="dashboard-panel showroom-board-editor" aria-label={`Showroom information board for ${page.page_name || page.fb_page_id}`}>
+    <div className="panel-header"><div><h2>Promotions & updates · {page.page_name || "Facebook Page"}</h2><p>Publish a promotion, announcement or store information on this Page's public showroom. Set dates for scheduled offers.</p></div><button type="button" className="secondary-button" onClick={onClose}>Close</button></div>
+    {error && <div className="error-banner" role="alert">{error}</div>}{notice && <div className="success-banner" role="status">{notice}</div>}
+    <div className="showroom-board-editor-grid">
+      <form className="showroom-board-form" onSubmit={save}>
+        <h3>{form.id ? "Edit board item" : "Add a board item"}</h3>
+        <label>Type<select value={form.announcement_type} onChange={(e) => setForm({ ...form, announcement_type: e.target.value })}><option value="PROMOTION">Promotion</option><option value="ANNOUNCEMENT">Announcement</option><option value="INFO">Store information</option></select></label>
+        <label>Title<input required maxLength={120} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="e.g. Weekend free shipping" /></label>
+        <label>Details<textarea rows={4} maxLength={2000} value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} placeholder="Share the offer, new arrival, store hours or other important details." /></label>
+        <div className="showroom-board-form-row"><label>Button label <small>Optional</small><input maxLength={50} value={form.cta_label} onChange={(e) => setForm({ ...form, cta_label: e.target.value })} placeholder="e.g. Message us" /></label><label>Button link <small>HTTPS only</small><input type="url" value={form.cta_url} onChange={(e) => setForm({ ...form, cta_url: e.target.value })} placeholder="https://…" /></label></div>
+        <div className="showroom-board-form-row"><label>Show from<input type="datetime-local" value={form.starts_at} onChange={(e) => setForm({ ...form, starts_at: e.target.value })} /></label><label>Hide after<input type="datetime-local" value={form.ends_at} onChange={(e) => setForm({ ...form, ends_at: e.target.value })} /></label></div>
+        <label className="showroom-publish-toggle"><input type="checkbox" checked={form.is_published} onChange={(e) => setForm({ ...form, is_published: e.target.checked })} /> Publish on the showroom</label>
+        <div className="showroom-form-actions"><button className="primary-button" type="submit" disabled={saving}>{saving ? "Saving…" : form.id ? "Save changes" : "Publish update"}</button>{form.id && <button className="secondary-button" type="button" onClick={() => setForm(emptyForm)}>Cancel edit</button>}</div>
+      </form>
+      <div className="showroom-board-existing"><h3>Page board <span>{rows.length}</span></h3>{loading ? <p>Loading board…</p> : !rows.length ? <p>No board items yet. Published promotions and announcements will appear on the public showroom.</p> : rows.map((row) => <article className="showroom-board-admin-card" key={row.id}><div><span className={`showroom-admin-type ${row.announcement_type.toLowerCase()}`}>{row.announcement_type}</span><span className={`showroom-admin-status ${row.is_published ? "published" : "draft"}`}>{row.is_published ? "Published" : "Hidden"}</span></div><strong>{row.title}</strong><p>{row.body || "No details provided."}</p><div className="showroom-board-admin-actions"><button type="button" className="secondary-button" onClick={() => edit(row)}>Edit</button><button type="button" className="secondary-button" onClick={() => remove(row.id)}>Remove</button></div></article>)}</div>
+    </div>
+  </section>;
+}
+
 export default function FacebookPage({ client, facebookLoading, facebookMessage, facebookStatus, loadFacebookStatus, page, setFacebookMessage, setPage }) {
   const connectedPages = facebookStatus?.pages || [];
   const [showAddPageGuide, setShowAddPageGuide] = useState(false);
+  const [showroomBoardPage, setShowroomBoardPage] = useState(null);
+  const [copiedShowroomPage, setCopiedShowroomPage] = useState("");
 
   const [connecting, setConnecting] = useState(false);
   const [repairPage,setRepairPage]=useState(null);
@@ -232,6 +307,7 @@ export default function FacebookPage({ client, facebookLoading, facebookMessage,
                       <th>Status</th>
                       <th>Authorization</th>
                       <th>Connected</th>
+                      <th>Public showroom</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -242,17 +318,19 @@ export default function FacebookPage({ client, facebookLoading, facebookMessage,
                         <td><StatusBadge status={fbPage.status || "ACTIVE"} /></td>
                         <td><StatusBadge status={fbPage.token_present ? "AUTHORIZED" : "RECONNECT"} /></td>
                         <td>{formatDateTime(fbPage.connected_at)}</td>
+                        <td><div className="facebook-showroom-actions"><a className="secondary-button" href={showroomUrl(fbPage.fb_page_id)} target="_blank" rel="noreferrer">Open showroom</a><button className="secondary-button" type="button" onClick={async () => { try { await navigator.clipboard.writeText(showroomUrl(fbPage.fb_page_id)); setCopiedShowroomPage(fbPage.fb_page_id); window.setTimeout(() => setCopiedShowroomPage(""), 1800); } catch { setFacebookMessage("Copy the showroom URL from the address bar after opening it."); } }}>{copiedShowroomPage === fbPage.fb_page_id ? "Copied" : "Copy link"}</button><button className="secondary-button" type="button" onClick={() => setShowroomBoardPage((current) => current?.fb_page_id === fbPage.fb_page_id ? null : fbPage)}>{showroomBoardPage?.fb_page_id === fbPage.fb_page_id ? "Close board" : "Manage board"}</button></div></td>
                       </tr>
                     ))}
 
                     {!facebookLoading && !(facebookStatus?.pages || []).length && (
                       <tr>
-                        <td colSpan="5" className="empty-table-cell">No Facebook Page connected yet.</td>
+                        <td colSpan="6" className="empty-table-cell">No Facebook Page connected yet.</td>
                       </tr>
                     )}
                   </tbody>
                 </table>
               </div>
+              {showroomBoardPage && <ShowroomBoardEditor clientId={client?.client_id} page={showroomBoardPage} onClose={() => setShowroomBoardPage(null)} />}
             </section>
 
             <section className="setup-requirements-card">
