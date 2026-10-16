@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../supabase";
 import "./PublicShowroomPage.css";
+import "./PublicShowroomCards.css";
 
 const formatPrice = (value) => new Intl.NumberFormat("en-PH", {
   style: "currency", currency: "PHP", maximumFractionDigits: 2,
@@ -59,8 +60,7 @@ export default function PublicShowroomPage({ storeToken }) {
   const page = showroom?.page || {};
   const pageUrl = page.link || "https://www.facebook.com/";
   const messengerUrl = page.messenger_url || "";
-  const featuredItem = showroom?.items?.[0];
-  const featuredImage = featuredItem?.images?.find((image) => image.is_primary)?.url || featuredItem?.images?.[0]?.url;
+  const featuredItems = showroom?.featured_items || [];
 
   return <main className="showroom-site">
     <nav className="showroom-nav">
@@ -86,8 +86,18 @@ export default function PublicShowroomPage({ storeToken }) {
         </div>
         <div className="showroom-trust-row"><span><i/>Current available stock</span><b>·</b><span>Updated from the Page inventory</span></div>
       </div>
-      <aside className="showroom-hero-feature" aria-label="Featured available item">
-        {featuredItem ? <><div className="showroom-feature-photo">{featuredImage ? <img src={featuredImage} alt={featuredItem.item_name}/> : <div className="showroom-feature-placeholder">{(page.name || "S").slice(0, 1)}</div>}<span>AVAILABLE NOW</span></div><div className="showroom-feature-details"><small>FROM THE COLLECTION</small><strong>{featuredItem.item_name}</strong><div><b>{formatPrice(featuredItem.price)}</b><span>{featuredItem.available} in stock</span></div><a href="#collection">Explore all items <StoreIcon kind="arrow"/></a></div></> : <div className="showroom-feature-welcome"><span className="showroom-feature-star">✦</span><small>CURATED FOR YOU</small><strong>Find your next favorite.</strong><p>Thoughtfully chosen finds, ready to discover.</p><a href="#collection">Browse the collection <StoreIcon kind="arrow"/></a></div>}
+      <aside className="showroom-card-fan" aria-label="Featured available items">
+        <div className="showroom-card-fan-heading"><span>IN STOCK · POPULAR · NEW</span><strong>Featured picks</strong></div>
+        <div className="showroom-playing-cards">
+          {featuredItems.length ? featuredItems.map((item, index) => {
+            const image = item.images?.find((entry) => entry.is_primary)?.url || item.images?.[0]?.url;
+            return <a className="showroom-playing-card" href="#collection" key={item.id} style={{ "--card-index": index }} aria-label={`View ${item.item_name}`}>
+              <div className="showroom-playing-card-image">{image ? <img src={image} alt="" /> : <span>{(item.item_name || "E").slice(0, 1).toUpperCase()}</span>}<small>AVAILABLE</small></div>
+              <div className="showroom-playing-card-info"><span>{item.item_code}</span><strong>{item.item_name}</strong><b>{formatPrice(item.price)}</b></div>
+            </a>;
+          }) : <div className="showroom-card-fan-empty"><span>✦</span><strong>New finds are on the way</strong><small>In-stock Page items will appear here.</small></div>}
+        </div>
+        <a className="showroom-card-fan-link" href="#collection">Explore the collection <StoreIcon kind="arrow"/></a>
       </aside>
       <a className="showroom-scroll-cue" href="#collection">Explore the collection <span>↓</span></a>
     </section>
