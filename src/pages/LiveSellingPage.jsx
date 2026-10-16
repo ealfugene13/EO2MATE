@@ -253,22 +253,8 @@ function parseFacebookLiveVideoId(value) {
   return { id: "", message: "Could not find a video ID in that link. Open the Live video itself and copy its full Facebook URL." };
 }
 
-function toLiveItemCode(value) {
-  const source = String(value || "").trim().toUpperCase();
-  if (/^[A-Z0-9]{2,12}$/.test(source)) return source;
-  const parts = source.match(/[A-Z0-9]+/g) || [];
-  const last = parts.at(-1) || "";
-  const suffix = last.match(/^\d+$/)?.[0];
-  if (suffix && parts.length > 1) {
-    const prefix = parts.at(-2) || parts[0];
-    return `${prefix.slice(0, Math.max(2, 12 - suffix.length))}${suffix}`.slice(0, 12);
-  }
-  const compact = source.replace(/[^A-Z0-9]/g, "");
-  return compact.length >= 2 ? compact.slice(0, 12) : "";
-}
-
 function isValidLiveItemCode(value) {
-  return /^[A-Z0-9]{2,12}$/.test(String(value || "").trim().toUpperCase());
+  return /^[A-Z0-9][A-Z0-9-]{0,39}$/.test(String(value || "").trim().toUpperCase());
 }
 
 function parseCsv(text) {
@@ -319,7 +305,7 @@ function parseLiveQueueCsv(text, existingItems = [], forcedMode = "") {
     const quantityText = get("quantity");
     const quantity = quantityText ? Number(quantityText.replaceAll(",", "")) : 1;
     const rowErrors = [];
-    if (!/^[A-Z0-9]{2,12}$/.test(item_code)) rowErrors.push("item_code must be 2–12 letters or numbers.");
+    if (!/^[A-Z0-9][A-Z0-9-]{0,39}$/.test(item_code)) rowErrors.push("item_code must be 1–40 letters, numbers, or hyphens.");
     if (!title || title.length > 160) rowErrors.push("title is required and must be 160 characters or fewer.");
     if (!["SELLING", "MINING", "AUCTION"].includes(mode)) rowErrors.push("mode must be SELLING, MINING, or AUCTION.");
     if (!Number.isInteger(quantity) || quantity < 1) rowErrors.push("quantity must be a whole number greater than 0.");
@@ -403,7 +389,6 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
   const [queueFileKey, setQueueFileKey] = useState(0);
   const current = sessions.find((s) => s.id === selected);
   const selectedInventoryItem = inventoryItems.find((entry) => String(entry.inventory_item_id) === String(item.inventory_item_id));
-  const inventoryCodeConverted = Boolean(selectedInventoryItem && String(selectedInventoryItem.item_code || "").toUpperCase() !== item.item_code);
   const queuedItemCodes = new Set((current?.eo2mate_live_items || []).map((entry) => String(entry.item_code || "").trim().toUpperCase()));
   const itemCodeAlreadyQueued = Boolean(item.item_code && queuedItemCodes.has(String(item.item_code).trim().toUpperCase()));
   const visibleSessions = sessions.filter((session) => activeMode === "MIXED" || !(session.eo2mate_live_items || []).length || (session.eo2mate_live_items || []).some((entry) => String(entry.mode || "").toUpperCase() === activeMode));
@@ -462,6 +447,7 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
     const result = await request("list", pageId ? { fb_page_id: pageId } : {});
     const nextSessions = result.sessions || [];
     setSessions(nextSessions);
+    setPostCaptions((previous) => ({ ...previous, ...Object.fromEntries(nextSessions.filter((session) => session.fb_caption).map((session) => [session.id, session.fb_caption])) }));
     if (selected && !nextSessions.some((session) => session.id === selected)) setSelected("");
     const missingCaptions = nextSessions.filter((session) => !captionRequests.current.has(session.id));
     if (missingCaptions.length) {
@@ -540,7 +526,7 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
   const addItemToQueue = async () => {
     if (!current || current.status !== "DRAFT") return;
     if (!isValidLiveItemCode(item.item_code)) {
-      setMessage("Live comment code must be 2–12 letters or numbers, with no spaces or punctuation.");
+      setMessage("Item code must be 1–40 letters, numbers, or hyphens.");
       return;
     }
     setBusy(true); setMessage("");
@@ -608,7 +594,7 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
           const items = (session.eo2mate_live_items || []).filter((entry) => activeMode === "MIXED" || String(entry.mode || "").toUpperCase() === activeMode);
           const claimed = items.reduce((sum, entry) => sum + (Number(entry.claimed) || 0), 0);
           return <tr key={session.id} className={selected === session.id ? "selected-table-row" : "clickable-row"} onClick={() => setSelected(session.id)}>
-            <td title={postCaptions[session.id] || "Caption unavailable"} style={{ maxWidth: 0, padding: "10px 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}><button type="button" className="table-link-button" aria-label={`View product queue for Facebook Live post ${session.fb_video_id}`} onClick={(event) => { event.stopPropagation(); setSelected(session.id); }} style={{ display: "block", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left" }}>{postCaptions[session.id] || (captionRequests.current.has(session.id) ? "Loading caption…" : "Caption unavailable")}</button></td>
+            <td title={postCaptions[session.id] || "Caption unavailable"} style={{ maxWidth: 0, padding: "10px 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}><button type="button" className="table-link-button" aria-label={`View product queue for Facebook Live post ${session.fb_video_id}`} onClick={(event) => { event.stopPropagation(); setSelected(session.id); }} style={{ display: "block", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left" }}>{postCaptions[session.id] || "Caption unavailable"}</button></td>
             <td>{session.created_at ? new Date(session.created_at).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" }) : "—"}</td>
             <td>{session.status}</td><td>{items.length}</td><td>{claimed}</td>
             <td><button type="button" className="table-action-button" aria-label={`View queue for Live post ${session.fb_video_id}`} title={selected === session.id ? "Currently viewing this queue" : "View product queue"} aria-pressed={selected === session.id} onClick={(event) => { event.stopPropagation(); setSelected(session.id); }}><NavIcon type="view" /></button></td>
@@ -636,7 +622,7 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
               setItem((previous) => ({
                 ...previous,
                 inventory_item_id: String(inventory.inventory_item_id),
-                item_code: toLiveItemCode(inventory.item_code),
+                item_code: String(inventory.item_code || "").trim().toUpperCase(),
                 title: inventory.item_name || "",
                 quantity: String(Math.floor(Number(inventory.qty_available) || 0)),
                 unit_price: inventory.default_selling_price == null ? "" : String(inventory.default_selling_price),
@@ -650,13 +636,12 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
             </select>
           </label>
           <p style={{ margin: "8px 0 0", color: "#64748b", fontSize: 13 }}>Select a product to fill its details, or enter them below. Choose the Live mode for this item.</p>
-          {inventoryCodeConverted && <p role="status" style={{ margin: "8px 0 0", color: "#805b13", fontSize: 13 }}>Inventory code <strong>{selectedInventoryItem.item_code}</strong> is longer than the Live comment-code limit. Use <strong>{item.item_code}</strong> in comments, or edit the code below. Live codes allow 2–12 letters or numbers.</p>}
           {inventoryError && <p role="alert" style={{ margin: "8px 0 0", color: "#b42318" }}>Inventory could not be loaded: {inventoryError}</p>}
           {!inventoryLoading && !inventoryError && !inventoryItems.length && <p style={{ margin: "8px 0 0", color: "#64748b" }}>No active inventory products with whole units available were found for this Facebook Page. You can still enter the product details below.</p>}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 150px), 1fr))", alignItems: "end", gap: 12 }}>
             <label style={{ display: "grid", gap: 6, minWidth: 0, color: "#344054", fontSize: 13, fontWeight: 600 }}>Item code
-              <input placeholder="e.g. A12" aria-label="Item code" maxLength={12} value={item.item_code} onChange={(e) => setItem({ ...item, item_code: e.target.value.toUpperCase() })} style={{ width: "100%", minWidth: 0, height: 42, boxSizing: "border-box" }} />
+              <input placeholder="e.g. EO2MATE-REGTEST-002" aria-label="Item code" maxLength={40} value={item.item_code} onChange={(e) => setItem({ ...item, item_code: e.target.value.toUpperCase() })} style={{ width: "100%", minWidth: 0, height: 42, boxSizing: "border-box" }} />
             </label>
             <label style={{ display: "grid", gap: 6, minWidth: 0, color: "#344054", fontSize: 13, fontWeight: 600 }}>Product name
               <input placeholder="Product name" aria-label="Product name" value={item.title} onChange={(e) => setItem({ ...item, title: e.target.value })} style={{ width: "100%", minWidth: 0, height: 42, boxSizing: "border-box" }} />
