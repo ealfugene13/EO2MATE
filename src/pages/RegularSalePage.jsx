@@ -502,12 +502,11 @@ export default function RegularSalePage({ selectedFbPageId, client, metaConnecte
               </div>
             </header>
 
-            <section className="selling-workspace-tabs">
+            <section className="selling-workspace-tabs selling-workspace-tabs-with-action">
               <div className="selling-workspace-tablist selling-workspace-nav" role="tablist" aria-label="Regular Sale sections">
                 {[
                   { key: "SUMMARY", label: "Summary", icon: "dashboard" },
                   { key: "POSTS", label: "Posts", icon: "sales" },
-                  { key: "POSTING", label: "Create Post", icon: "create" },
                 ].map((tab) => (
                   <button
                     key={tab.key}
@@ -523,6 +522,7 @@ export default function RegularSalePage({ selectedFbPageId, client, metaConnecte
                   </button>
                 ))}
               </div>
+              <button type="button" className="primary-button selling-workspace-tab-action" onClick={() => setRegularSaleWorkspaceTab("POSTING")}><span className="selling-nav-icon"><NavIcon type="create" /></span><span>Create Post</span></button>
             </section>
 
             {regularSaleWorkspaceTab === "SUMMARY" && (

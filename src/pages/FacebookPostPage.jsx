@@ -2812,6 +2812,21 @@ export default function FacebookPostPage({
           box-sizing: border-box;
         }
 
+        .fb-posting-panel .eo2-rule-datetime > .eo2-date-picker-input {
+          display: block;
+          width: 100%;
+          min-width: 0;
+          height: 38px;
+          min-height: 38px;
+          margin: 0;
+          padding: 7px 10px;
+          border-radius: 9px;
+          font-size: .82rem;
+          font-weight: 600;
+          line-height: normal;
+          box-sizing: border-box;
+        }
+
         .fb-rule-grid {
           display: grid;
           grid-template-columns:
