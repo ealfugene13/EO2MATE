@@ -139,6 +139,16 @@ export default function OrdersPage({ client, detailRequest, page, setErrorMessag
   const [manualPaymentReference, setManualPaymentReference] = useState("");
 
   const canUseManualActions = ["ADMIN","CLIENT_ADMIN","OWNER","SUPER_ADMIN","STAFF"].includes(String(client?.role || "").toUpperCase());
+  const manualSubtotal = manualItems.reduce((sum,row)=>sum+(Number(row.quantity)||0)*(Number(row.unit_price)||0),0);
+  const manualShippingFee = Number(manualOrder.shipping_fee) || 0;
+  const manualTotal = manualSubtotal + manualShippingFee;
+  const manualStockIssues = manualItems.reduce((issues,row,index)=>{
+    if(!row.inventory_item_id) return issues;
+    const item=manualInventory.find(candidate=>candidate.inventory_item_id===row.inventory_item_id);
+    const requested=manualItems.filter(line=>line.inventory_item_id===row.inventory_item_id).reduce((sum,line)=>sum+(Number(line.quantity)||0),0);
+    if(item && requested>Number(item.qty_available)) issues.push(`${item.item_name} has ${item.qty_available} available; ${requested} selected.`);
+    return issues;
+  },[]);
 
   async function openManualOrder() {
     setManualNotice(""); setManualRequestId(newRequestId()); setManualOrderOpen(true); setManualItems([{inventory_item_id:"",quantity:"1",unit_price:""}]);
@@ -167,6 +177,9 @@ export default function OrdersPage({ client, detailRequest, page, setErrorMessag
     event.preventDefault(); if(manualBusy) return;
     const lines=manualItems.filter(row=>row.inventory_item_id).map(row=>({inventory_item_id:row.inventory_item_id,quantity:Number(row.quantity),unit_price:Number(row.unit_price)}));
     if(!lines.length) { setManualNotice("Add at least one inventory item."); return; }
+    if(lines.some(line=>!Number.isFinite(line.quantity)||line.quantity<=0||!Number.isFinite(line.unit_price)||line.unit_price<0)) { setManualNotice("Check each item quantity and unit price."); return; }
+    if(manualStockIssues.length) { setManualNotice(manualStockIssues[0]); return; }
+    if(!Number.isFinite(manualShippingFee)||manualShippingFee<0) { setManualNotice("Shipping fee must be zero or more."); return; }
     if(!window.confirm(`Create this manual order for ${manualOrder.buyer_name}? Inventory will be reserved immediately.`)) return;
     setManualBusy(true); setManualNotice("");
     try {
@@ -518,38 +531,46 @@ export default function OrdersPage({ client, detailRequest, page, setErrorMessag
         )}
     {manualOrderOpen && <div className="manual-order-overlay" role="presentation" onMouseDown={event=>{if(event.target===event.currentTarget&&!manualBusy)setManualOrderOpen(false);}}>
       <section className="manual-order-dialog" role="dialog" aria-modal="true" aria-labelledby="manual-order-title">
-        <header><div><p className="eyebrow">STAFF ACTION</p><h2 id="manual-order-title">Create manual order</h2><p>Uses active inventory, reserves stock, and prepares the delivery record after payment. No message is sent automatically.</p></div><button type="button" aria-label="Close" onClick={()=>setManualOrderOpen(false)} disabled={manualBusy}>×</button></header>
+        <header><div><p className="eyebrow">STAFF ACTION</p><h2 id="manual-order-title">Create manual order</h2><p>Choose products, add buyer and delivery details, then reserve available stock.</p></div><button type="button" aria-label="Close" onClick={()=>setManualOrderOpen(false)} disabled={manualBusy}>×</button></header>
         {manualNotice && <div className="manual-order-notice" role="alert">{manualNotice}</div>}
         <form onSubmit={submitManualOrder}>
-          <div className="manual-order-grid">
-            <ManualField label="Buyer name"><input required maxLength="160" value={manualOrder.buyer_name} onChange={e=>setManualOrder({...manualOrder,buyer_name:e.target.value})}/></ManualField>
-            <ManualField label="Facebook user ID (optional)"><input value={manualOrder.buyer_fb_user_id} onChange={e=>setManualOrder({...manualOrder,buyer_fb_user_id:e.target.value})}/></ManualField>
-            <ManualField label="Buyer phone"><input value={manualOrder.buyer_phone} onChange={e=>setManualOrder({...manualOrder,buyer_phone:e.target.value})}/></ManualField>
-            <ManualField label="Buyer email"><input type="email" value={manualOrder.buyer_email} onChange={e=>setManualOrder({...manualOrder,buyer_email:e.target.value})}/></ManualField>
-          </div>
-          <div className="manual-order-items-heading"><strong>Items</strong><button type="button" className="secondary-button" onClick={()=>setManualItems(current=>[...current,{inventory_item_id:"",quantity:"1",unit_price:""}])}>Add item</button></div>
+          <section className="manual-order-section"><div className="manual-order-section-heading"><span className="manual-order-step">01</span><div><h3>Buyer</h3><p>Who is placing the order?</p></div></div>
+            <div className="manual-order-grid">
+              <ManualField label="Buyer name"><input required maxLength="160" autoComplete="name" value={manualOrder.buyer_name} onChange={e=>setManualOrder({...manualOrder,buyer_name:e.target.value})}/></ManualField>
+              <ManualField label="Facebook user ID (optional)"><input value={manualOrder.buyer_fb_user_id} onChange={e=>setManualOrder({...manualOrder,buyer_fb_user_id:e.target.value})}/></ManualField>
+              <ManualField label="Buyer phone"><input autoComplete="tel" value={manualOrder.buyer_phone} onChange={e=>setManualOrder({...manualOrder,buyer_phone:e.target.value})}/></ManualField>
+              <ManualField label="Buyer email"><input type="email" autoComplete="email" value={manualOrder.buyer_email} onChange={e=>setManualOrder({...manualOrder,buyer_email:e.target.value})}/></ManualField>
+            </div>
+          </section>
+          <section className="manual-order-section"><div className="manual-order-items-heading"><div className="manual-order-section-heading"><span className="manual-order-step">02</span><div><h3>Products</h3><p>Select from active inventory. Available quantities are checked across all lines.</p></div></div><button type="button" className="secondary-button manual-add-item" onClick={()=>setManualItems(current=>[...current,{inventory_item_id:"",quantity:"1",unit_price:""}])}>＋ Add product</button></div>
           <div className="manual-order-lines">{manualItems.map((row,index)=>{
             const selected=manualInventory.find(item=>item.inventory_item_id===row.inventory_item_id);
+            const otherSelected=manualItems.filter((line,i)=>i!==index&&line.inventory_item_id===row.inventory_item_id).reduce((sum,line)=>sum+(Number(line.quantity)||0),0);
+            const availableForLine=Math.max(0,Number(selected?.qty_available||0)-otherSelected);
             return <div className="manual-order-line" key={index}>
-              <ManualField label="Inventory item"><select required value={row.inventory_item_id} onChange={event=>{const item=manualInventory.find(x=>x.inventory_item_id===event.target.value);setManualItems(current=>current.map((line,i)=>i===index?{...line,inventory_item_id:event.target.value,unit_price:String(item?.default_selling_price??"")}:line));}}><option value="">Select item</option>{manualInventory.map(item=><option key={item.inventory_item_id} value={item.inventory_item_id} disabled={Number(item.qty_available)<1}>{item.item_code} · {item.item_name} · available {item.qty_available}</option>)}</select></ManualField>
-              <ManualField label="Qty"><input type="number" min="0.0001" step="0.0001" max={selected?.qty_available??undefined} required value={row.quantity} onChange={event=>setManualItems(current=>current.map((line,i)=>i===index?{...line,quantity:event.target.value}:line))}/></ManualField>
+              <ManualField label="Inventory item"><select required value={row.inventory_item_id} onChange={event=>{const item=manualInventory.find(x=>x.inventory_item_id===event.target.value);setManualItems(current=>current.map((line,i)=>i===index?{...line,inventory_item_id:event.target.value,unit_price:String(item?.default_selling_price??"")}:line));}}><option value="">Select product</option>{manualInventory.map(item=><option key={item.inventory_item_id} value={item.inventory_item_id} disabled={Number(item.qty_available)<1}>{item.item_code} · {item.item_name}</option>)}</select>{selected&&<small className="manual-stock-hint">{availableForLine} available for this line</small>}</ManualField>
+              <ManualField label="Quantity"><input type="number" min="0.0001" step="0.0001" max={availableForLine||undefined} required value={row.quantity} onChange={event=>setManualItems(current=>current.map((line,i)=>i===index?{...line,quantity:event.target.value}:line))}/></ManualField>
               <ManualField label="Unit price"><input type="number" min="0" step="0.01" required value={row.unit_price} onChange={event=>setManualItems(current=>current.map((line,i)=>i===index?{...line,unit_price:event.target.value}:line))}/></ManualField>
-              <button type="button" className="manual-remove-line" aria-label="Remove item" disabled={manualItems.length===1} onClick={()=>setManualItems(current=>current.filter((_,i)=>i!==index))}>Remove</button>
+              <button type="button" className="manual-remove-line" aria-label={`Remove product ${index+1}`} title="Remove product" disabled={manualItems.length===1} onClick={()=>setManualItems(current=>current.filter((_,i)=>i!==index))}>×</button>
+              <div className="manual-line-total">Line total <strong>{formatCurrency((Number(row.quantity)||0)*(Number(row.unit_price)||0))}</strong></div>
             </div>;
-          })}</div>
-          <div className="manual-order-grid">
-            <ManualField label="Shipping fee"><input type="number" min="0" step="0.01" value={manualOrder.shipping_fee} onChange={e=>setManualOrder({...manualOrder,shipping_fee:e.target.value})}/></ManualField>
-            <ManualField label="Shipping name"><input required value={manualOrder.shipping_name} onChange={e=>setManualOrder({...manualOrder,shipping_name:e.target.value})}/></ManualField>
-            <ManualField label="Shipping phone"><input required value={manualOrder.shipping_phone} onChange={e=>setManualOrder({...manualOrder,shipping_phone:e.target.value})}/></ManualField>
-            <ManualField label="Address"><input required value={manualOrder.shipping_address_line1} onChange={e=>setManualOrder({...manualOrder,shipping_address_line1:e.target.value})}/></ManualField>
-            <ManualField label="Address line 2"><input value={manualOrder.shipping_address_line2} onChange={e=>setManualOrder({...manualOrder,shipping_address_line2:e.target.value})}/></ManualField>
-            <ManualField label="City"><input required value={manualOrder.shipping_city} onChange={e=>setManualOrder({...manualOrder,shipping_city:e.target.value})}/></ManualField>
-            <ManualField label="Province"><input required value={manualOrder.shipping_province} onChange={e=>setManualOrder({...manualOrder,shipping_province:e.target.value})}/></ManualField>
-            <ManualField label="Postal code"><input value={manualOrder.shipping_postal_code} onChange={e=>setManualOrder({...manualOrder,shipping_postal_code:e.target.value})}/></ManualField>
-            <ManualField label="Staff notes"><input value={manualOrder.notes} onChange={e=>setManualOrder({...manualOrder,notes:e.target.value})}/></ManualField>
-          </div>
-          <p className="manual-order-total">Subtotal {formatCurrency(manualItems.reduce((sum,row)=>sum+(Number(row.quantity)||0)*(Number(row.unit_price)||0),0))} · Total {formatCurrency(manualItems.reduce((sum,row)=>sum+(Number(row.quantity)||0)*(Number(row.unit_price)||0),0)+(Number(manualOrder.shipping_fee)||0))}</p>
-          <footer><button type="button" className="secondary-button" onClick={()=>setManualOrderOpen(false)} disabled={manualBusy}>Cancel</button><button type="submit" className="primary-button" disabled={manualBusy||!manualInventory.length}>{manualBusy?"Creating…":"Create order"}</button></footer>
+          })}</div>{manualStockIssues.length>0&&<p className="manual-stock-error" role="alert">{manualStockIssues[0]}</p>}
+          </section>
+          <section className="manual-order-section"><div className="manual-order-section-heading"><span className="manual-order-step">03</span><div><h3>Delivery</h3><p>Required for the order’s delivery record.</p></div></div>
+            <div className="manual-order-grid">
+              <ManualField label="Recipient name"><input required autoComplete="shipping name" value={manualOrder.shipping_name} onChange={e=>setManualOrder({...manualOrder,shipping_name:e.target.value})}/></ManualField>
+              <ManualField label="Recipient phone"><input required autoComplete="shipping tel" value={manualOrder.shipping_phone} onChange={e=>setManualOrder({...manualOrder,shipping_phone:e.target.value})}/></ManualField>
+              <ManualField label="Street address"><input required autoComplete="shipping address-line1" value={manualOrder.shipping_address_line1} onChange={e=>setManualOrder({...manualOrder,shipping_address_line1:e.target.value})}/></ManualField>
+              <ManualField label="Address line 2"><input autoComplete="shipping address-line2" value={manualOrder.shipping_address_line2} onChange={e=>setManualOrder({...manualOrder,shipping_address_line2:e.target.value})}/></ManualField>
+              <ManualField label="City"><input required autoComplete="shipping address-level2" value={manualOrder.shipping_city} onChange={e=>setManualOrder({...manualOrder,shipping_city:e.target.value})}/></ManualField>
+              <ManualField label="Province"><input required autoComplete="shipping address-level1" value={manualOrder.shipping_province} onChange={e=>setManualOrder({...manualOrder,shipping_province:e.target.value})}/></ManualField>
+              <ManualField label="Postal code"><input autoComplete="shipping postal-code" value={manualOrder.shipping_postal_code} onChange={e=>setManualOrder({...manualOrder,shipping_postal_code:e.target.value})}/></ManualField>
+              <ManualField label="Shipping fee"><input type="number" min="0" step="0.01" value={manualOrder.shipping_fee} onChange={e=>setManualOrder({...manualOrder,shipping_fee:e.target.value})}/></ManualField>
+              <ManualField label="Staff notes"><input value={manualOrder.notes} onChange={e=>setManualOrder({...manualOrder,notes:e.target.value})}/></ManualField>
+            </div>
+          </section>
+          <aside className="manual-order-summary"><div><span>{manualItems.filter(row=>row.inventory_item_id).length} product line{manualItems.filter(row=>row.inventory_item_id).length===1?"":"s"}</span><span>Subtotal <strong>{formatCurrency(manualSubtotal)}</strong></span><span>Shipping <strong>{formatCurrency(manualShippingFee)}</strong></span></div><p><span>Order total</span><strong>{formatCurrency(manualTotal)}</strong></p></aside>
+          <footer><button type="button" className="secondary-button" onClick={()=>setManualOrderOpen(false)} disabled={manualBusy}>Cancel</button><button type="submit" className="primary-button" disabled={manualBusy||!manualInventory.length||manualStockIssues.length>0}>{manualBusy?"Creating order…":"Create order"}</button></footer>
         </form>
       </section>
     </div>}
