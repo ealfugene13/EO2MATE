@@ -875,6 +875,7 @@ const inventoryAvailableQty = (item) => {
 export default function FacebookPostPage({
   client,
   initialPostMode = "AUCTION",
+  onBack,
 }) {
   const fileInputRef = useRef(null);
   const uploadButtonRef = useRef(null);
@@ -3199,18 +3200,23 @@ export default function FacebookPostPage({
           </p>
         </div>
 
-        <button
-          type="button"
-          className="icon-button refresh-icon-button"
-          onClick={loadPostingSetup}
-          disabled={
-            loading ||
-            publishing ||
-            processingFiles
-          }
-        >
-          ↻
-        </button>
+        <div className="fb-posting-header-actions" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {onBack && (
+            <button type="button" className="secondary-button" onClick={onBack} disabled={publishing || processingFiles}>
+              ← Back to Regular Sales
+            </button>
+          )}
+          <button
+            type="button"
+            className="icon-button refresh-icon-button"
+            onClick={loadPostingSetup}
+            disabled={loading || publishing || processingFiles}
+            aria-label="Refresh post setup"
+            title="Refresh post setup"
+          >
+            ↻
+          </button>
+        </div>
       </header>
 
       {errorMessage && (

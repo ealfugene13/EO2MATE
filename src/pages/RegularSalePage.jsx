@@ -494,36 +494,38 @@ export default function RegularSalePage({ selectedFbPageId, client, metaConnecte
             <SellingPostDetailPanel detail={sellingPostDetail} loading={sellingPostDetailLoading} error={sellingPostDetailError} onClose={() => { setSellingPostDetail(null); setSellingPostDetailError(""); }} />
           ) : (
           <>
-            <header className="dashboard-header">
-              <div>
-                <p className="eyebrow">FACEBOOK SELLING</p>
-                <h1>Regular Sales</h1>
-                <p>Manage fixed-price Facebook sales, posts and selling performance from one workspace.</p>
-              </div>
-            </header>
+            {regularSaleWorkspaceTab !== "POSTING" && <>
+              <header className="dashboard-header">
+                <div>
+                  <p className="eyebrow">FACEBOOK SELLING</p>
+                  <h1>Regular Sales</h1>
+                  <p>Manage fixed-price Facebook sales, posts and selling performance from one workspace.</p>
+                </div>
+              </header>
 
-            <section className="selling-workspace-tabs selling-workspace-tabs-with-action">
-              <div className="selling-workspace-tablist selling-workspace-nav" role="tablist" aria-label="Regular Sale sections">
-                {[
-                  { key: "SUMMARY", label: "Summary", icon: "dashboard" },
-                  { key: "POSTS", label: "Posts", icon: "sales" },
-                ].map((tab) => (
-                  <button
-                    key={tab.key}
-                    type="button"
-                    id={`regular-sale-tab-${tab.key.toLowerCase()}`}
-                    role="tab"
-                    aria-selected={regularSaleWorkspaceTab === tab.key}
-                    className={`selling-workspace-tab${regularSaleWorkspaceTab === tab.key ? " active" : ""}`}
-                    onClick={() => setRegularSaleWorkspaceTab(tab.key)}
-                  >
-                    <span className="selling-nav-icon"><NavIcon type={tab.icon} /></span>
-                    <span>{tab.label}</span>
-                  </button>
-                ))}
-              </div>
-              <button type="button" className="primary-button selling-workspace-tab-action" onClick={() => setRegularSaleWorkspaceTab("POSTING")}><span className="selling-nav-icon"><NavIcon type="create" /></span><span>Create Post</span></button>
-            </section>
+              <section className="selling-workspace-tabs selling-workspace-tabs-with-action">
+                <div className="selling-workspace-tablist selling-workspace-nav" role="tablist" aria-label="Regular Sale sections">
+                  {[
+                    { key: "SUMMARY", label: "Summary", icon: "dashboard" },
+                    { key: "POSTS", label: "Posts", icon: "sales" },
+                  ].map((tab) => (
+                    <button
+                      key={tab.key}
+                      type="button"
+                      id={`regular-sale-tab-${tab.key.toLowerCase()}`}
+                      role="tab"
+                      aria-selected={regularSaleWorkspaceTab === tab.key}
+                      className={`selling-workspace-tab${regularSaleWorkspaceTab === tab.key ? " active" : ""}`}
+                      onClick={() => setRegularSaleWorkspaceTab(tab.key)}
+                    >
+                      <span className="selling-nav-icon"><NavIcon type={tab.icon} /></span>
+                      <span>{tab.label}</span>
+                    </button>
+                  ))}
+                </div>
+                <button type="button" className="primary-button selling-workspace-tab-action" onClick={() => setRegularSaleWorkspaceTab("POSTING")}><span className="selling-nav-icon"><NavIcon type="create" /></span><span>Create Post</span></button>
+              </section>
+            </>}
 
             {regularSaleWorkspaceTab === "SUMMARY" && (
               <>
@@ -598,7 +600,7 @@ export default function RegularSalePage({ selectedFbPageId, client, metaConnecte
             )}
 
             {regularSaleWorkspaceTab === "POSTING" && (
-              <FacebookPostPage client={client} initialPostMode="REGULAR_SALE" />
+              <FacebookPostPage client={client} initialPostMode="REGULAR_SALE" onBack={() => setRegularSaleWorkspaceTab("SUMMARY")} />
             )}
           </>
           )
