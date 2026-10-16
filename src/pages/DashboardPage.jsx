@@ -236,7 +236,6 @@ function onlySelectedPage(rows, pageId) {
 function DashboardCommunicationPanel({ client, selectedFbPageId, selectedFbPageName, facebookStatus, openFacebookSetup, navigateTo }) {
   const [notifications, setNotifications] = useState([]);
   const [notificationsError, setNotificationsError] = useState("");
-  const [showAllNotifications, setShowAllNotifications] = useState(false);
   const [messengerUnread, setMessengerUnread] = useState(0);
   const [messengerBusy, setMessengerBusy] = useState(false);
   const clientId = client?.client_id;
@@ -345,7 +344,8 @@ function DashboardCommunicationPanel({ client, selectedFbPageId, selectedFbPageN
     }
   }
 
-  const displayedNotifications = showAllNotifications ? notifications : notifications.slice(0, 5);
+  const unreadNotifications = notifications.filter((entry) => !entry.read_at);
+  const displayedNotifications = unreadNotifications.slice(0, 5);
   return <section className="dashboard-panel dashboard-communications-panel">
     <div className="panel-header"><div><h2>Notifications &amp; Messenger</h2><p>Review saved Live activity and open the selected Facebook Page inbox.</p></div><button type="button" className="dashboard-notifications-page-link" onClick={() => navigateTo?.("notifications")}>Open Notification Center <span aria-hidden="true">→</span></button></div>
     <div className="dashboard-communications-grid">
@@ -358,13 +358,13 @@ function DashboardCommunicationPanel({ client, selectedFbPageId, selectedFbPageN
         </div>
         {notificationsError && <p className="dashboard-communication-error" role="status">{notificationsError}</p>}
         <div className="dashboard-notification-list">
-          {!notifications.length && !notificationsError && <p className="dashboard-notification-empty">No notifications yet. Accepted Live claims and ended sessions will be saved here.</p>}
+          {!displayedNotifications.length && !notificationsError && <p className="dashboard-notification-empty">No unread notifications.</p>}
           {displayedNotifications.map((entry) => <button type="button" key={entry.id} className={`dashboard-notification-entry${entry.read_at ? " read" : " unread"}`} onClick={() => !entry.read_at && markRead(entry.id)}>
             <span className="dashboard-notification-status-dot" />
             <span><strong>{entry.title}</strong><small>{entry.message}</small><time>{entry.created_at ? new Date(entry.created_at).toLocaleString("en-PH", { timeZone: "Asia/Manila", dateStyle: "medium", timeStyle: "short" }) : ""}</time></span>
           </button>)}
         </div>
-        {notifications.length > 5 && <button type="button" className="dashboard-notifications-more" onClick={() => setShowAllNotifications((value) => !value)}>{showAllNotifications ? "Show recent" : `View all ${notifications.length} notifications`}</button>}
+        {unreadNotifications.length > 5 && <p className="dashboard-notifications-more">Showing 5 of {unreadNotifications.length} unread notifications. Open Notification Center to view all.</p>}
       </div>
       <div className="dashboard-communication-card dashboard-messenger-card">
         <div className="dashboard-communication-heading">
