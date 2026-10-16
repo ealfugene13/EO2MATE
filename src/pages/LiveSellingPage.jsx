@@ -448,7 +448,19 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
   }, [clientId, pageId]);
   useEffect(() => {
     if (!clientId || !selected) return undefined;
-    let realtimeStatus = "CONNECTING";
+    let lastRealtimeUpdate = Date.now();
+    let refreshInFlight = false;
+    const refreshQueue = async () => {
+      if (refreshInFlight) return;
+      refreshInFlight = true;
+      try {
+        await refresh();
+      } catch (error) {
+        setMessage(error.message || "Unable to refresh the Live queue.");
+      } finally {
+        refreshInFlight = false;
+      }
+    };
     const channel = supabase
       .channel(`live-queue-${selected}`)
       .on("postgres_changes", {
@@ -457,13 +469,15 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
         table: "eo2mate_live_items",
         filter: `session_id=eq.${selected}`,
       }, () => {
-        refresh().catch((error) => setMessage(error.message || "Unable to refresh the Live queue."));
+        lastRealtimeUpdate = Date.now();
+        refreshQueue();
       })
-      .subscribe((status) => { realtimeStatus = status; });
+      .subscribe();
+    // Realtime may report SUBSCRIBED even when this table is not enabled for
+    // Postgres Changes. Keep a light fallback so claimed stock/status updates
+    // still appear promptly after Meta processes a valid Live comment.
     const fallbackRefresh = window.setInterval(() => {
-      if (realtimeStatus !== "SUBSCRIBED") {
-        refresh().catch((error) => setMessage(error.message || "Unable to refresh the Live queue."));
-      }
+      if (Date.now() - lastRealtimeUpdate >= 5000) refreshQueue();
     }, 5000);
     return () => {
       window.clearInterval(fallbackRefresh);
