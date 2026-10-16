@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../supabase";
+import Eo2DatePicker from "../components/Eo2DatePicker";
 import "./OrdersPage.css";
 
 const normalized = value => String(value || "").toUpperCase();
@@ -346,8 +347,8 @@ export default function OrdersPage({ client, detailRequest, page, setErrorMessag
               <OrderField label="Search"><input className="search-input" value={orderSearch} onChange={event=>setOrderSearch(event.target.value)} placeholder="Order, buyer or item…"/></OrderField>
               <OrderField label="Channel"><select className="filter-select" value={channel} onChange={event=>setChannel(event.target.value)}><option value="ALL">All channels</option>{channels.map(value=><option key={value} value={value}>{statusLabel(value)}</option>)}</select></OrderField>
               <OrderField label="Order status"><select className="filter-select" value={orderStatusFilter} onChange={event=>setOrderStatusFilter(event.target.value)}><option value="ALL">All statuses</option>{statuses.map(value=><option key={value} value={value}>{statusLabel(value)}</option>)}</select></OrderField>
-              <OrderField label="From (Manila)"><input type="date" value={from} onChange={event=>setFrom(event.target.value)}/></OrderField>
-              <OrderField label="To (Manila)"><input type="date" value={to} onChange={event=>setTo(event.target.value)}/></OrderField>
+              <OrderField label="From (Manila)"><Eo2DatePicker value={from} onChange={event=>setFrom(event.target.value)}/></OrderField>
+              <OrderField label="To (Manila)"><Eo2DatePicker value={to} onChange={event=>setTo(event.target.value)}/></OrderField>
               <button type="button" className="secondary-button orders-icon-action" onClick={resetFilters}><OrdersIcon type="reset"/><span>Reset</span></button>
             </section>
             {invalidRange && <div className="error-message" role="alert">The end date must be on or after the start date.</div>}

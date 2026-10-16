@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../supabase";
+import Eo2DatePicker from "../components/Eo2DatePicker";
 import "./FacebookPageRepair.css";
+import "./ShowroomBoardBuilder.css";
 
 
 function formatDateTime(value) {
@@ -60,8 +62,16 @@ function toLocalDateTime(value) {
   return local.toISOString().slice(0, 16);
 }
 
+function legacyBoardBlocks(row) {
+  if (Array.isArray(row?.content_blocks) && row.content_blocks.length) return row.content_blocks;
+  return [
+    ...(row?.body ? [{ type: "text", text: row.body, align: "left" }] : []),
+    ...(row?.cta_label && row?.cta_url ? [{ type: "button", label: row.cta_label, url: row.cta_url, align: "left" }] : []),
+  ];
+}
+
 function ShowroomBoardEditor({ clientId, page, shareToken, onShareToken, onClose }) {
-  const emptyForm = { id: "", announcement_type: "ANNOUNCEMENT", title: "", body: "", cta_label: "", cta_url: "", starts_at: "", ends_at: "", is_published: true };
+  const emptyForm = { id: "", announcement_type: "ANNOUNCEMENT", title: "", body: "", content_blocks: [{ type: "text", text: "", align: "left" }], cta_label: "", cta_url: "", starts_at: "", ends_at: "", is_published: true };
   const [rows, setRows] = useState([]);
   const [form, setForm] = useState(emptyForm);
   const [loading, setLoading] = useState(false);
@@ -69,6 +79,7 @@ function ShowroomBoardEditor({ clientId, page, shareToken, onShareToken, onClose
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [linkBusy, setLinkBusy] = useState(false);
+  const draggedBlock = useRef(null);
   const invoke = async (action, extra = {}) => {
     const { data, error: invokeError } = await supabase.functions.invoke("eo2mate", {
       headers: { "x-eo2mate-route": "public-showroom" },
@@ -84,11 +95,30 @@ function ShowroomBoardEditor({ clientId, page, shareToken, onShareToken, onClose
     finally { setLoading(false); }
   };
   useEffect(() => { load(); }, [clientId, page.fb_page_id]);
-  const edit = (row) => setForm({ ...row, starts_at: toLocalDateTime(row.starts_at), ends_at: toLocalDateTime(row.ends_at), cta_label: row.cta_label || "", cta_url: row.cta_url || "" });
+  const edit = (row) => setForm({ ...row, content_blocks: legacyBoardBlocks(row), starts_at: toLocalDateTime(row.starts_at), ends_at: toLocalDateTime(row.ends_at), cta_label: row.cta_label || "", cta_url: row.cta_url || "" });
+  const updateBlock = (index, key, value) => setForm((current) => ({ ...current, content_blocks: current.content_blocks.map((block, blockIndex) => blockIndex === index ? { ...block, [key]: value } : block) }));
+  const addBlock = (type) => {
+    const templates = {
+      heading: { type, text: "A headline for your update", align: "left" },
+      text: { type, text: "Add more details for your customers.", align: "left" },
+      highlight: { type, text: "Add a short highlighted offer", align: "center" },
+      image: { type, url: "", alt: "", align: "center" },
+      button: { type, label: "Shop now", url: "", align: "center" },
+      divider: { type },
+    };
+    setForm((current) => ({ ...current, content_blocks: [...current.content_blocks, templates[type]] }));
+  };
+  const moveBlock = (from, to) => setForm((current) => {
+    if (to < 0 || to >= current.content_blocks.length || from === to) return current;
+    const next = [...current.content_blocks];
+    const [block] = next.splice(from, 1);
+    next.splice(to, 0, block);
+    return { ...current, content_blocks: next };
+  });
   const save = async (event) => {
     event.preventDefault(); setSaving(true); setError(""); setNotice("");
     try {
-      const payload = { ...form, starts_at: form.starts_at ? new Date(form.starts_at).toISOString() : null, ends_at: form.ends_at ? new Date(form.ends_at).toISOString() : null };
+      const payload = { ...form, body: "", cta_label: "", cta_url: "", starts_at: form.starts_at ? new Date(form.starts_at).toISOString() : null, ends_at: form.ends_at ? new Date(form.ends_at).toISOString() : null };
       await invoke("board-save", payload);
       setForm(emptyForm); setNotice("Showroom update saved."); await load();
     } catch (e) { setError(e.message || "Unable to save this update."); }
@@ -116,13 +146,30 @@ function ShowroomBoardEditor({ clientId, page, shareToken, onShareToken, onClose
         <h3>{form.id ? "Edit board item" : "Add a board item"}</h3>
         <label>Type<select value={form.announcement_type} onChange={(e) => setForm({ ...form, announcement_type: e.target.value })}><option value="PROMOTION">Promotion</option><option value="ANNOUNCEMENT">Announcement</option><option value="INFO">Store information</option></select></label>
         <label>Title<input required maxLength={120} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="e.g. Weekend free shipping" /></label>
-        <label>Details<textarea rows={4} maxLength={2000} value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} placeholder="Share the offer, new arrival, store hours or other important details." /></label>
-        <div className="showroom-board-form-row"><label>Button label <small>Optional</small><input maxLength={50} value={form.cta_label} onChange={(e) => setForm({ ...form, cta_label: e.target.value })} placeholder="e.g. Message us" /></label><label>Button link <small>HTTPS only</small><input type="url" value={form.cta_url} onChange={(e) => setForm({ ...form, cta_url: e.target.value })} placeholder="https://…" /></label></div>
-        <div className="showroom-board-form-row"><label>Show from<input type="datetime-local" value={form.starts_at} onChange={(e) => setForm({ ...form, starts_at: e.target.value })} /></label><label>Hide after<input type="datetime-local" value={form.ends_at} onChange={(e) => setForm({ ...form, ends_at: e.target.value })} /></label></div>
+        <div className="showroom-builder-heading"><div><strong>Build your update</strong><small>Drag blocks to rearrange. Use the arrows if you’re on a touch screen.</small></div></div>
+        <div className="showroom-block-toolbar" aria-label="Add content block">
+          {[['heading','Heading'],['text','Text'],['highlight','Offer highlight'],['image','Image'],['button','Button'],['divider','Divider']].map(([type,label]) => <button type="button" key={type} onClick={() => addBlock(type)}>＋ {label}</button>)}
+        </div>
+        <div className="showroom-builder-layout">
+          <div className="showroom-block-list" aria-label="Content blocks">
+            {form.content_blocks.map((block, index) => <article className="showroom-content-block" key={`${block.type}-${index}`} draggable onDragStart={(event) => { draggedBlock.current = index; event.dataTransfer.effectAllowed = "move"; }} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); if (draggedBlock.current !== null) moveBlock(draggedBlock.current, index); draggedBlock.current = null; }} onDragEnd={() => { draggedBlock.current = null; }}>
+              <header><span className="showroom-block-drag" title="Drag to reorder" aria-label="Drag to reorder">⠿</span><strong>{block.type === "highlight" ? "Offer highlight" : block.type[0].toUpperCase() + block.type.slice(1)}</strong><div><button type="button" aria-label="Move block up" disabled={index === 0} onClick={() => moveBlock(index, index - 1)}>↑</button><button type="button" aria-label="Move block down" disabled={index === form.content_blocks.length - 1} onClick={() => moveBlock(index, index + 1)}>↓</button><button type="button" aria-label="Remove block" onClick={() => setForm((current) => ({ ...current, content_blocks: current.content_blocks.filter((_, blockIndex) => blockIndex !== index) }))}>×</button></div></header>
+              {block.type === "heading" && <input maxLength={140} value={block.text || ""} onChange={(event) => updateBlock(index, "text", event.target.value)} placeholder="Section heading" />}
+              {block.type === "text" && <textarea rows={3} maxLength={2500} value={block.text || ""} onChange={(event) => updateBlock(index, "text", event.target.value)} placeholder="Write details for customers" />}
+              {block.type === "highlight" && <textarea rows={2} maxLength={300} value={block.text || ""} onChange={(event) => updateBlock(index, "text", event.target.value)} placeholder="Short offer or announcement" />}
+              {block.type === "image" && <><input type="url" value={block.url || ""} onChange={(event) => updateBlock(index, "url", event.target.value)} placeholder="https:// image URL" /><input maxLength={180} value={block.alt || ""} onChange={(event) => updateBlock(index, "alt", event.target.value)} placeholder="Describe the image" /></>}
+              {block.type === "button" && <><input maxLength={60} value={block.label || ""} onChange={(event) => updateBlock(index, "label", event.target.value)} placeholder="Button label" /><input type="url" value={block.url || ""} onChange={(event) => updateBlock(index, "url", event.target.value)} placeholder="https:// destination URL" /></>}
+              {block.type !== "divider" && <label className="showroom-block-align">Align<select value={block.align || "left"} onChange={(event) => updateBlock(index, "align", event.target.value)}><option value="left">Left</option><option value="center">Center</option><option value="right">Right</option></select></label>}
+            </article>)}
+            {!form.content_blocks.length && <p className="showroom-no-blocks">Add a content block to start designing this update.</p>}
+          </div>
+          <div className="showroom-board-live-preview"><span>LIVE PREVIEW</span><article><small>{form.announcement_type === "PROMOTION" ? "SPECIAL OFFER" : form.announcement_type === "INFO" ? "STORE INFO" : "ANNOUNCEMENT"}</small><h4>{form.title || "Your update title"}</h4>{form.content_blocks.map((block, index) => block.type === "heading" && block.text ? <h5 key={index} style={{ textAlign: block.align }}>{block.text}</h5> : block.type === "text" && block.text ? <p key={index} style={{ textAlign: block.align }}>{block.text}</p> : block.type === "highlight" && block.text ? <strong className="showroom-preview-highlight" key={index} style={{ textAlign: block.align }}>{block.text}</strong> : block.type === "image" && block.url ? <img className="showroom-preview-image" key={index} src={block.url} alt={block.alt || ""} /> : block.type === "button" && block.label ? <span className="showroom-preview-button" key={index} style={{ justifySelf: block.align === "left" ? "start" : block.align === "right" ? "end" : "center" }}>{block.label}</span> : block.type === "divider" ? <hr key={index} /> : null)}</article></div>
+        </div>
+        <div className="showroom-board-form-row"><label>Show from<Eo2DatePicker type="datetime-local" value={form.starts_at} onChange={(e) => setForm({ ...form, starts_at: e.target.value })} /></label><label>Hide after<Eo2DatePicker type="datetime-local" value={form.ends_at} onChange={(e) => setForm({ ...form, ends_at: e.target.value })} /></label></div>
         <label className="showroom-publish-toggle"><input type="checkbox" checked={form.is_published} onChange={(e) => setForm({ ...form, is_published: e.target.checked })} /> Publish on the showroom</label>
         <div className="showroom-form-actions"><button className="primary-button" type="submit" disabled={saving}>{saving ? "Saving…" : form.id ? "Save changes" : "Publish update"}</button>{form.id && <button className="secondary-button" type="button" onClick={() => setForm(emptyForm)}>Cancel edit</button>}</div>
       </form>
-      <div className="showroom-board-existing"><h3>Page board <span>{rows.length}</span></h3>{loading ? <p>Loading board…</p> : !rows.length ? <p>No board items yet. Published promotions and announcements will appear on the public showroom.</p> : rows.map((row) => <article className="showroom-board-admin-card" key={row.id}><div><span className={`showroom-admin-type ${row.announcement_type.toLowerCase()}`}>{row.announcement_type}</span><span className={`showroom-admin-status ${row.is_published ? "published" : "draft"}`}>{row.is_published ? "Published" : "Hidden"}</span></div><strong>{row.title}</strong><p>{row.body || "No details provided."}</p><div className="showroom-board-admin-actions"><button type="button" className="secondary-button" onClick={() => edit(row)}>Edit</button><button type="button" className="secondary-button" onClick={() => remove(row.id)}>Remove</button></div></article>)}</div>
+      <div className="showroom-board-existing"><h3>Page board <span>{rows.length}</span></h3>{loading ? <p>Loading board…</p> : !rows.length ? <p>No board items yet. Published promotions and announcements will appear on the public showroom.</p> : rows.map((row) => <article className="showroom-board-admin-card" key={row.id}><div><span className={`showroom-admin-type ${row.announcement_type.toLowerCase()}`}>{row.announcement_type}</span><span className={`showroom-admin-status ${row.is_published ? "published" : "draft"}`}>{row.is_published ? "Published" : "Hidden"}</span></div><strong>{row.title}</strong><p>{row.body || row.content_blocks?.find((block) => block.text)?.text || `${row.content_blocks?.length || 0} visual content blocks`}</p><div className="showroom-board-admin-actions"><button type="button" className="secondary-button" onClick={() => edit(row)}>Edit</button><button type="button" className="secondary-button" onClick={() => remove(row.id)}>Remove</button></div></article>)}</div>
     </div>
   </section>;
 }

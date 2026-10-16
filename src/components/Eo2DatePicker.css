@@ -1,0 +1,38 @@
+.eo2-date-picker-input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  margin: 0;
+  padding: 7px 10px;
+  box-sizing: border-box;
+  border: 1px solid rgba(148, 163, 184, 0.42);
+  border-radius: 9px;
+  background: #fff;
+  color: #1f2937;
+  color-scheme: light;
+  font: inherit;
+  line-height: 1.25;
+  accent-color: var(--accent-color, #2563eb);
+}
+
+.eo2-date-picker-input:focus {
+  border-color: var(--accent-color, #2563eb);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  outline: none;
+}
+
+.eo2-date-picker-input::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.76;
+}
+
+.eo2-date-picker-input:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.eo2-date-picker-input.has-error {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+}

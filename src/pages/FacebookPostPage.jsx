@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../supabase";
+import Eo2DatePicker from "../components/Eo2DatePicker";
 import { captionTemplateSettingKey, DEFAULT_POST_CAPTION_TEMPLATES, renderPostCaptionTemplate, decorateGeneratedCaption } from "../postCaptionTemplates";
 
 const MAX_IMAGES = 50;
@@ -101,7 +102,7 @@ function formatMoneyForCaption(value) {
 function phDateFromLocalInput(value) {
   if (!value) return null;
 
-  // ScrollDateTimePicker normally returns a datetime-local string, but keep
+  // PostDateTimePicker normally returns a datetime-local string, but keep
   // this helper tolerant of Date values so validation/publishing never calls
   // Date methods on an un-normalized form value.
   if (value instanceof Date) {
@@ -174,258 +175,18 @@ function getPhilippineNowInput() {
   );
 }
 
-function splitDateTimeLocal(value) {
-  const raw = String(value || "").trim();
-
-  if (!raw || !raw.includes("T")) {
-    return {
-      date: "",
-      hour12: "12",
-      minute: "00",
-      period: "AM",
-    };
-  }
-
-  const [date, time = "00:00"] = raw.split("T");
-  const [hourRaw = "0", minuteRaw = "00"] = time.split(":");
-
-  let hour24 = Number(hourRaw);
-  const minute = String(minuteRaw || "00").padStart(2, "0");
-
-  if (!Number.isFinite(hour24)) hour24 = 0;
-
-  const period = hour24 >= 12 ? "PM" : "AM";
-  let hour12 = hour24 % 12;
-
-  if (hour12 === 0) hour12 = 12;
-
-  return {
-    date,
-    hour12: String(hour12).padStart(2, "0"),
-    minute,
-    period,
-  };
-}
-
-function combineDateTimeLocal({
-  date,
-  hour12,
-  minute,
-  period,
-}) {
-  if (!date) return "";
-
-  let hour = Number(hour12);
-
-  if (!Number.isFinite(hour) || hour < 1 || hour > 12) {
-    hour = 12;
-  }
-
-  if (period === "AM" && hour === 12) {
-    hour = 0;
-  } else if (period === "PM" && hour !== 12) {
-    hour += 12;
-  }
-
-  const safeMinute = String(minute || "00").padStart(2, "0");
-
-  return `${date}T${String(hour).padStart(2, "0")}:${safeMinute}`;
-}
-
-function ScrollDateTimePicker({
-  value,
-  onChange,
-  disabled = false,
-  hasError = false,
-  inputRef,
-  minDate = getPhilippineNowInput().slice(0, 10),
-}) {
-  const [open, setOpen] = useState(false);
-  const [draftValue, setDraftValue] = useState(value || "");
-
-  const committedParts = splitDateTimeLocal(value);
-  const draftParts = splitDateTimeLocal(draftValue);
-
-  useEffect(() => {
-    if (!open) {
-      setDraftValue(value || "");
-    }
-  }, [value, open]);
-
-  const updateDraft = (patch) => {
-    setDraftValue(
-      combineDateTimeLocal({
-        ...draftParts,
-        ...patch,
-      })
-    );
-  };
-
-  const hours = Array.from({ length: 12 }, (_, index) =>
-    String(index + 1).padStart(2, "0")
-  );
-
-  const minutes = Array.from({ length: 60 }, (_, index) =>
-    String(index).padStart(2, "0")
-  );
-
-  const displayValue = value
-    ? formatFacebookAuctionDate(value)
-    : "Select date & time";
-
+function PostDateTimePicker({ value, onChange, disabled = false, hasError = false, inputRef, minDate = getPhilippineNowInput().slice(0, 10) }) {
   return (
-    <div
-      className={`eo2-datetime-control ${
-        hasError ? "eo2-datetime-error" : ""
-      }`}
-      ref={inputRef}
-      tabIndex={-1}
-    >
-      <button
-        type="button"
-        className="eo2-datetime-trigger"
-        onClick={() => {
-          if (disabled) return;
-          setDraftValue(value || "");
-          setOpen(true);
-        }}
-        disabled={disabled}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-      >
-        <span className={value ? "" : "eo2-datetime-placeholder"}>
-          {displayValue}
-        </span>
-        <span className="eo2-datetime-calendar" aria-hidden="true">
-          ▣
-        </span>
-      </button>
-
-      {open && (
-        <div
-          className="eo2-datetime-overlay"
-          role="presentation"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
-              setOpen(false);
-              setDraftValue(value || "");
-            }
-          }}
-        >
-          <div
-            className="eo2-datetime-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Choose date and time"
-          >
-            <div className="eo2-datetime-dialog-header">
-              <strong>Select date & time</strong>
-              <button
-                type="button"
-                className="eo2-datetime-close"
-                onClick={() => {
-                  setOpen(false);
-                  setDraftValue(value || "");
-                }}
-                aria-label="Close date and time picker"
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="eo2-datetime-dialog-body">
-              <div className="eo2-date-part">
-                <span className="eo2-datetime-label">Date</span>
-                <input
-                  type="date"
-                  min={minDate}
-                  value={draftParts.date}
-                  onChange={(e) =>
-                    updateDraft({ date: e.target.value })
-                  }
-                  disabled={disabled}
-                />
-              </div>
-
-              <div className="eo2-time-part">
-                <span className="eo2-datetime-label">Time</span>
-
-                <div className="eo2-time-row">
-                  <select
-                    value={draftParts.hour12}
-                    onChange={(e) =>
-                      updateDraft({ hour12: e.target.value })
-                    }
-                    disabled={disabled}
-                    aria-label="Hour"
-                  >
-                    {hours.map((hour) => (
-                      <option key={hour} value={hour}>
-                        {hour}
-                      </option>
-                    ))}
-                  </select>
-
-                  <span className="eo2-time-colon">:</span>
-
-                  <select
-                    value={draftParts.minute}
-                    onChange={(e) =>
-                      updateDraft({ minute: e.target.value })
-                    }
-                    disabled={disabled}
-                    aria-label="Minute"
-                  >
-                    {minutes.map((minute) => (
-                      <option key={minute} value={minute}>
-                        {minute}
-                      </option>
-                    ))}
-                  </select>
-
-                  <select
-                    value={draftParts.period}
-                    onChange={(e) =>
-                      updateDraft({ period: e.target.value })
-                    }
-                    disabled={disabled}
-                    aria-label="AM or PM"
-                  >
-                    <option value="AM">AM</option>
-                    <option value="PM">PM</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <div className="eo2-datetime-actions">
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={() => {
-                  setOpen(false);
-                  setDraftValue(value || "");
-                }}
-              >
-                Cancel
-              </button>
-
-              <button
-                type="button"
-                className="primary-button"
-                disabled={!draftParts.date}
-                onClick={() => {
-                  onChange(draftValue);
-                  setOpen(false);
-                }}
-              >
-                Done
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    <Eo2DatePicker
+      type="datetime-local"
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      inputRef={inputRef}
+      minDate={minDate}
+      disabled={disabled}
+      hasError={hasError}
+      className="eo2-datetime-field"
+    />
   );
 }
 
@@ -936,7 +697,7 @@ function RuleFields({
               <span className="eo2-required">*</span>
             </span>
 
-            <ScrollDateTimePicker
+            <PostDateTimePicker
               inputRef={registerField(
                 key("buyoutUntil")
               )}
@@ -969,7 +730,7 @@ function RuleFields({
           <span className="eo2-required">*</span>
         </span>
 
-        <ScrollDateTimePicker
+        <PostDateTimePicker
           inputRef={registerField(
             key("auctionEnds")
           )}
@@ -3166,172 +2927,6 @@ export default function FacebookPostPage({
           color: var(--text-color, #111827);
         }
 
-        .eo2-datetime-control {
-          position: relative;
-          width: 100%;
-          min-width: 0;
-        }
-
-        .eo2-datetime-trigger {
-          width: 100%;
-          min-width: 0;
-          height: 38px;
-          min-height: 38px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 8px;
-          padding: 7px 10px;
-          border: 1px solid rgba(148, 163, 184, .42);
-          border-radius: 9px;
-          background: rgba(255, 255, 255, .96);
-          color: #111827;
-          font: inherit;
-          font-size: .82rem;
-          font-weight: 600;
-          text-align: left;
-          cursor: pointer;
-          box-sizing: border-box;
-        }
-
-        .eo2-datetime-trigger:focus {
-          border-color: var(--accent-color, #2563eb);
-          box-shadow: 0 0 0 3px rgba(37, 99, 235, .12);
-          outline: none;
-        }
-
-        .eo2-datetime-placeholder {
-          color: #94a3b8;
-          font-weight: 500;
-        }
-
-        .eo2-datetime-calendar {
-          flex: 0 0 auto;
-          opacity: .65;
-        }
-
-        .eo2-datetime-error .eo2-datetime-trigger {
-          border-color: #dc2626 !important;
-          box-shadow: 0 0 0 3px rgba(220, 38, 38, .12) !important;
-          background: rgba(254, 242, 242, .8);
-        }
-
-        .eo2-datetime-overlay {
-          position: fixed;
-          inset: 0;
-          z-index: 10020;
-          display: grid;
-          place-items: center;
-          padding: 18px;
-          background: rgba(15, 23, 42, .45);
-          backdrop-filter: blur(2px);
-        }
-
-        .eo2-datetime-dialog {
-          width: min(430px, 96vw);
-          max-height: calc(100vh - 36px);
-          overflow: auto;
-          border-radius: 18px;
-          border: 1px solid rgba(148, 163, 184, .22);
-          background: #fff;
-          color: #111827;
-          box-shadow: 0 24px 70px rgba(0, 0, 0, .26);
-        }
-
-        .eo2-datetime-dialog-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 12px;
-          padding: 14px 16px;
-          border-bottom: 1px solid rgba(148, 163, 184, .18);
-        }
-
-        .eo2-datetime-close {
-          width: 34px;
-          height: 34px;
-          min-height: 34px;
-          padding: 0;
-          border: 0;
-          border-radius: 50%;
-          background: rgba(148, 163, 184, .14);
-          color: #334155;
-          font-size: 1.35rem;
-          line-height: 1;
-          cursor: pointer;
-        }
-
-        .eo2-datetime-dialog-body {
-          display: grid;
-          grid-template-columns: minmax(0, 1.15fr) minmax(180px, .85fr);
-          gap: 14px;
-          padding: 16px;
-        }
-
-        .eo2-datetime-label {
-          display: block;
-          margin-bottom: 7px;
-          font-size: .76rem;
-          font-weight: 800;
-          color: #475569;
-        }
-
-        .eo2-date-part input[type="date"] {
-          width: 100%;
-          min-height: 44px;
-          padding: 0 11px;
-          border: 1px solid rgba(148, 163, 184, .42);
-          border-radius: 11px;
-          background: #fff;
-          color: #111827;
-          font: inherit;
-          box-sizing: border-box;
-        }
-
-        .eo2-time-row {
-          display: grid;
-          grid-template-columns: 1fr 10px 1fr 1.15fr;
-          align-items: center;
-          gap: 5px;
-        }
-
-        .eo2-time-row select {
-          width: 100%;
-          min-width: 0;
-          min-height: 44px;
-          padding: 0 8px;
-          border: 1px solid rgba(148, 163, 184, .42);
-          border-radius: 11px;
-          background: #fff;
-          color: #111827;
-          font: inherit;
-          font-weight: 700;
-        }
-
-        .eo2-time-colon {
-          text-align: center;
-          font-weight: 900;
-          color: #64748b;
-        }
-
-        .eo2-datetime-actions {
-          display: flex;
-          justify-content: flex-end;
-          gap: 9px;
-          padding: 12px 16px 16px;
-          border-top: 1px solid rgba(148, 163, 184, .18);
-        }
-
-        .eo2-datetime-actions button {
-          min-width: 90px;
-        }
-
-        @media (max-width: 520px) {
-          .eo2-datetime-dialog-body {
-            grid-template-columns: 1fr;
-          }
-        }
-
         .fb-upload-empty-error {
           border-color: #dc2626 !important;
           background: rgba(254, 242, 242, .88) !important;
@@ -3845,7 +3440,7 @@ export default function FacebookPostPage({
             <div className="fb-post-setup-grid">
               <label>Promotion Type<select value={regularSaleDiscountType} onChange={(e)=>setRegularSaleDiscountType(e.target.value)} disabled={publishing}><option value="NONE">No Discount</option><option value="PERCENTAGE">Percentage Discount (%)</option><option value="FIXED">Fixed Discount (₱)</option></select></label>
               {regularSaleDiscountType !== "NONE" && <label>Discount Value <span className="eo2-required">*</span><input type="number" min="0.01" step="0.01" value={regularSaleDiscountValue} onChange={(e)=>setRegularSaleDiscountValue(e.target.value)} disabled={publishing}/>{fieldErrors.regularSaleDiscountValue && <small className="eo2-field-error-text">{fieldErrors.regularSaleDiscountValue}</small>}</label>}
-              <div className={`eo2-rule-datetime ${fieldClass(fieldErrors, "regularSaleEndDate")}`}><span className="eo2-rule-heading">Sale End Date (optional)</span><ScrollDateTimePicker inputRef={registerField("regularSaleEndDate")} value={regularSaleEndDate} onChange={(value)=>{setRegularSaleEndDate(value);clearFieldError("regularSaleEndDate");}} disabled={publishing} hasError={Boolean(fieldErrors.regularSaleEndDate)}/>{fieldErrors.regularSaleEndDate && <small className="eo2-field-error-text">{fieldErrors.regularSaleEndDate}</small>}</div>
+              <div className={`eo2-rule-datetime ${fieldClass(fieldErrors, "regularSaleEndDate")}`}><span className="eo2-rule-heading">Sale End Date (optional)</span><PostDateTimePicker inputRef={registerField("regularSaleEndDate")} value={regularSaleEndDate} onChange={(value)=>{setRegularSaleEndDate(value);clearFieldError("regularSaleEndDate");}} disabled={publishing} hasError={Boolean(fieldErrors.regularSaleEndDate)}/>{fieldErrors.regularSaleEndDate && <small className="eo2-field-error-text">{fieldErrors.regularSaleEndDate}</small>}</div>
             </div>
             <p>Without an end date, the sale remains active until sold out. Promo prices are fixed for orders accepted during the sale.</p>
           </>
@@ -3859,7 +3454,7 @@ export default function FacebookPostPage({
               <label>Default LOCK Price <span className="eo2-required">*</span><input ref={registerField("miningLockPrice")} value={miningLockPrice} onChange={(e)=>{setMiningLockPrice(e.target.value);clearFieldError("miningLockPrice");}} disabled={publishing} placeholder="200"/>{fieldErrors.miningLockPrice&&<small className="eo2-field-error-text">{fieldErrors.miningLockPrice}</small>}</label>
               <div className={`eo2-rule-datetime ${fieldClass(fieldErrors, "miningEndDate")}`}>
                 <span className="eo2-rule-heading">Mining End Date <span className="eo2-required">*</span></span>
-                <ScrollDateTimePicker inputRef={registerField("miningEndDate")} value={miningEndDate} onChange={(nextValue)=>{setMiningEndDate(nextValue);clearFieldError("miningEndDate");}} disabled={publishing} hasError={Boolean(fieldErrors.miningEndDate)} />
+                <PostDateTimePicker inputRef={registerField("miningEndDate")} value={miningEndDate} onChange={(nextValue)=>{setMiningEndDate(nextValue);clearFieldError("miningEndDate");}} disabled={publishing} hasError={Boolean(fieldErrors.miningEndDate)} />
                 {fieldErrors.miningEndDate && <small className="eo2-field-error-text">{fieldErrors.miningEndDate}</small>}
               </div>
             </div>
@@ -3914,7 +3509,7 @@ export default function FacebookPostPage({
                 <span className="eo2-rule-heading">
                   Pre-Order Deadline <span className="eo2-required">*</span>
                 </span>
-                <ScrollDateTimePicker
+                <PostDateTimePicker
                   inputRef={registerField("preorderDeadline")}
                   value={preorderDeadline}
                   onChange={(nextValue) => { setPreorderDeadline(nextValue); clearFieldError("preorderDeadline"); }}
@@ -3927,7 +3522,7 @@ export default function FacebookPostPage({
                 <span className="eo2-rule-heading">
                   Payment Deadline <span className="eo2-required">*</span>
                 </span>
-                <ScrollDateTimePicker
+                <PostDateTimePicker
                   inputRef={registerField("preorderPaymentDeadline")}
                   value={preorderPaymentDeadline}
                   onChange={(nextValue) => { setPreorderPaymentDeadline(nextValue); clearFieldError("preorderPaymentDeadline"); }}
@@ -4059,7 +3654,7 @@ export default function FacebookPostPage({
                       <label>LOCK Price Override<input value={item.miningLockPrice} onChange={(e)=>updateItem(item.id,{miningLockPrice:e.target.value})} disabled={publishing} placeholder={miningLockPrice?`Inherit ${miningLockPrice}`:"Inherit main"}/><small>Blank = inherit main LOCK price.</small></label>
                       <div className={`eo2-rule-datetime ${fieldClass(fieldErrors, `item.${item.id}.miningEndDate`)}`}>
                         <label>End Date Override</label>
-                        <ScrollDateTimePicker value={item.miningEndDate} onChange={(nextValue)=>{updateItem(item.id,{miningEndDate:nextValue});clearFieldError(`item.${item.id}.miningEndDate`);}} disabled={publishing} hasError={Boolean(fieldErrors[`item.${item.id}.miningEndDate`])} />
+                        <PostDateTimePicker value={item.miningEndDate} onChange={(nextValue)=>{updateItem(item.id,{miningEndDate:nextValue});clearFieldError(`item.${item.id}.miningEndDate`);}} disabled={publishing} hasError={Boolean(fieldErrors[`item.${item.id}.miningEndDate`])} />
                         <small>{item.miningEndDate ? "Overrides the main Mining end date." : `Blank = inherit main end date${miningEndDate ? ` (${formatFacebookAuctionDate(miningEndDate)})` : ""}.`}</small>
                         {fieldErrors[`item.${item.id}.miningEndDate`] && <small className="eo2-field-error-text">{fieldErrors[`item.${item.id}.miningEndDate`]}</small>}
                       </div>

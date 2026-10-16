@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../supabase";
+import Eo2DatePicker from "../components/Eo2DatePicker";
 import "./PurchasesPage.css";
 
 const money = (n) =>
@@ -1055,15 +1056,13 @@ export default function PurchasesPage({ client }) {
                   </select>
                 </Field>
                 <Field label="From">
-                  <input
-                    type="date"
+                  <Eo2DatePicker
                     value={from}
                     onChange={(e) => setFrom(e.target.value)}
                   />
                 </Field>
                 <Field label="To">
-                  <input
-                    type="date"
+                  <Eo2DatePicker
                     value={to}
                     onChange={(e) => setTo(e.target.value)}
                   />
@@ -1334,9 +1333,8 @@ export default function PurchasesPage({ client }) {
                   />
                 </Field>
                 <Field label="Purchase date *">
-                  <input
+                  <Eo2DatePicker
                     required
-                    type="date"
                     value={form.purchase_date}
                     onChange={(e) =>
                       setForm({ ...form, purchase_date: e.target.value })

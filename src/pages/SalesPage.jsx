@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../supabase';
+import Eo2DatePicker from '../components/Eo2DatePicker';
 import './SalesPage.css';
 const upper = value => String(value || '').toUpperCase();
 const number = value => Number.isFinite(Number(value)) ? Number(value) : 0;
@@ -90,19 +91,19 @@ export default function SalesPage({client,selectedFbPageId,orderLabels=[],naviga
    {tab==='SUMMARY'?<>
       <Field label="Period"><select value={period} onChange={e=>setPeriod(e.target.value)}><option value="TODAY">Today</option><option value="WEEK">This week</option><option value="MONTH">This month</option><option value="CUSTOM">Custom dates</option></select></Field>
       <Field label="Channel"><select value={summaryChannel} onChange={e=>setSummaryChannel(e.target.value)}><option value="ALL">All channels</option>{[...new Set(pageRows.map(row=>upper(row.source_type)).filter(Boolean))].sort().map(value=><option key={value} value={value}>{value.replaceAll('_',' ')}</option>)}</select></Field>
-      {period==='CUSTOM'&&<><Field label="From (Manila)"><input type="date" value={summaryFrom} onChange={e=>setSummaryFrom(e.target.value)}/></Field><Field label="To (Manila)"><input type="date" value={summaryTo} onChange={e=>setSummaryTo(e.target.value)}/></Field></>}
+      {period==='CUSTOM'&&<><Field label="From (Manila)"><Eo2DatePicker value={summaryFrom} onChange={e=>setSummaryFrom(e.target.value)}/></Field><Field label="To (Manila)"><Eo2DatePicker value={summaryTo} onChange={e=>setSummaryTo(e.target.value)}/></Field></>}
    </>:tab==='TRANSACTIONS'?<>
       <Field label="Find order"><input className="search-input" value={filters.search} onChange={e=>change('search',e.target.value)} placeholder="Order, buyer or item…"/></Field>
       <Field label="Order status"><select value={filters.status} onChange={e=>change('status',e.target.value)}><option value="ALL">All statuses</option>{[...new Set(pageRows.map(row=>upper(row.order_status)).filter(Boolean))].sort().map(value=><option key={value} value={value}>{value.replaceAll('_',' ')}</option>)}</select></Field>
       <Field label="Channel"><select value={filters.channel} onChange={e=>change('channel',e.target.value)}><option value="ALL">All channels</option>{[...new Set(pageRows.map(row=>upper(row.source_type)).filter(Boolean))].sort().map(value=><option key={value} value={value}>{value.replaceAll('_',' ')}</option>)}</select></Field>
       <button type="button" className="secondary-button" onClick={()=>setAdvanced(v=>!v)} aria-expanded={advanced}>{advanced?'Hide dates':'Date filters'}</button>
-      {advanced&&<><Field label="From (Manila)"><input type="date" value={filters.from} onChange={e=>change('from',e.target.value)}/></Field><Field label="To (Manila)"><input type="date" value={filters.to} onChange={e=>change('to',e.target.value)}/></Field></>}
+      {advanced&&<><Field label="From (Manila)"><Eo2DatePicker value={filters.from} onChange={e=>change('from',e.target.value)}/></Field><Field label="To (Manila)"><Eo2DatePicker value={filters.to} onChange={e=>change('to',e.target.value)}/></Field></>}
       <button type="button" className="secondary-button" onClick={()=>setFilters({...defaults})}>Reset</button>
    </>:<>
       <Field label="Find order group"><input value={groupFilters.search} onChange={e=>setGroupFilters(f=>({...f,search:e.target.value}))} placeholder="Group number or buyer…"/></Field>
       <Field label="Group status"><select value={groupFilters.status} onChange={e=>setGroupFilters(f=>({...f,status:e.target.value}))}><option value="ALL">All statuses</option>{[...new Set(pageGroups.map(row=>upper(row.group_status||row.payment_status||row.status)).filter(Boolean))].sort().map(value=><option key={value} value={value}>{value.replaceAll('_',' ')}</option>)}</select></Field>
       <button type="button" className="secondary-button" onClick={()=>setAdvanced(v=>!v)} aria-expanded={advanced}>{advanced?'Hide dates':'Date filters'}</button>
-      {advanced&&<><Field label="From (Manila)"><input type="date" value={groupFilters.from} onChange={e=>setGroupFilters(f=>({...f,from:e.target.value}))}/></Field><Field label="To (Manila)"><input type="date" value={groupFilters.to} onChange={e=>setGroupFilters(f=>({...f,to:e.target.value}))}/></Field></>}
+      {advanced&&<><Field label="From (Manila)"><Eo2DatePicker value={groupFilters.from} onChange={e=>setGroupFilters(f=>({...f,from:e.target.value}))}/></Field><Field label="To (Manila)"><Eo2DatePicker value={groupFilters.to} onChange={e=>setGroupFilters(f=>({...f,to:e.target.value}))}/></Field></>}
       <button type="button" className="secondary-button" onClick={()=>setGroupFilters({search:'',status:'ALL',from:'',to:''})}>Reset</button>
    </>}
    <button type="button" className="secondary-button sales-export" onClick={exportCSV} disabled={tab==='SUMMARY'?!summary.length:!list.length}><Icon type="export"/>Export {tab==='GROUPS'?'groups':tab==='SUMMARY'?'summary':'orders'}</button>

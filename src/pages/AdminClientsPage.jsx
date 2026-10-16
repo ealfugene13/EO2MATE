@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../supabase";
+import Eo2DatePicker from "../components/Eo2DatePicker";
 
 function dt(value) {
   if (!value) return "-";
@@ -138,7 +139,7 @@ export default function AdminClientsPage() {
             <label>Account<select value={form.status} onChange={(e) => setForm((c) => ({ ...c, status: e.target.value }))}><option value="ACTIVE">Active</option><option value="INACTIVE">Inactive</option></select></label>
             <label>Subscription<select value={form.subscription_status} onChange={(e) => setForm((c) => ({ ...c, subscription_status: e.target.value }))}><option value="TRIAL">Trial</option><option value="ACTIVE">Active</option><option value="PAST_DUE">Past Due</option><option value="SUSPENDED">Suspended</option><option value="CANCELLED">Cancelled</option><option value="EXPIRED">Expired</option></select></label>
             <label>Manual payment<select value={form.payment_mode} onChange={(e) => setForm((c) => ({ ...c, payment_mode: e.target.value }))}><option value="MANUAL">Yes · Manual payment</option><option value="PAYMONGO">No · PayMongo</option></select></label>
-            <label>Subscription ends<input type="date" value={form.subscription_ends_at} onChange={(e) => setForm((c) => ({ ...c, subscription_ends_at: e.target.value }))} /></label>
+            <label>Subscription ends<Eo2DatePicker value={form.subscription_ends_at} onChange={(e) => setForm((c) => ({ ...c, subscription_ends_at: e.target.value }))} /></label>
             <label className="admin-client-notes">Admin notes<input value={form.subscription_notes} onChange={(e) => setForm((c) => ({ ...c, subscription_notes: e.target.value }))} placeholder="Internal notes" /></label>
             <div className="admin-client-form-actions">
               <button type="button" className="secondary-button" onClick={() => setEditing(null)} disabled={loading}>Cancel</button>
