@@ -210,7 +210,7 @@ function NavIcon({ type }) {
   );
 }
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../supabase";
 
 
@@ -388,6 +388,8 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
   const clientId = client?.client_id;
   const [sessions, setSessions] = useState([]);
   const [selected, setSelected] = useState("");
+  const [postCaptions, setPostCaptions] = useState({});
+  const captionRequests = useRef(new Set());
   const pageId = selectedFbPageId || "";
   const [videoInput, setVideoInput] = useState("");
   const [item, setItem] = useState({ inventory_item_id: "", item_code: "", title: "", mode: activeMode === "MIXED" ? "SELLING" : activeMode, quantity: 1, unit_price: "", mine_price: "", take_price: "", lock_price: "", starting_bid: "", bid_increment: "" });
@@ -461,6 +463,17 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
     const nextSessions = result.sessions || [];
     setSessions(nextSessions);
     if (selected && !nextSessions.some((session) => session.id === selected)) setSelected("");
+    const missingCaptions = nextSessions.filter((session) => !captionRequests.current.has(session.id));
+    if (missingCaptions.length) {
+      missingCaptions.forEach((session) => captionRequests.current.add(session.id));
+      try {
+        const captionResult = await request("captions", { session_ids: missingCaptions.map((session) => session.id) });
+        const received = Object.fromEntries((captionResult.captions || []).map((entry) => [entry.session_id, entry.caption || ""]));
+        setPostCaptions((previous) => ({ ...previous, ...received }));
+      } catch {
+        setPostCaptions((previous) => ({ ...previous, ...Object.fromEntries(missingCaptions.map((session) => [session.id, ""])) }));
+      }
+    }
   };
   const refreshSessions = async () => {
     setBusy(true); setMessage("");
@@ -584,12 +597,12 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
     <div style={{ display: "grid", gridTemplateColumns: current ? "repeat(auto-fit, minmax(min(100%, 450px), 1fr))" : "minmax(0, 1fr)", alignItems: "start", gap: 20, margin: "20px 0 24px" }}>
     <section aria-labelledby="live-previous-posts-title" style={{ boxSizing: "border-box", minWidth: 0, padding: 26, margin: 0, border: "1px solid #e1e8f0", borderRadius: 18, background: "#fff", boxShadow: "0 5px 16px rgba(15, 23, 42, 0.035)" }}>
       <div className="panel-header" style={{ padding: "0 0 18px", margin: "0 0 20px", borderBottom: "1px solid #e7edf3" }}><div><h3 id="live-previous-posts-title" style={{ margin: 0 }}>Previous Live posts</h3><p style={{ margin: "6px 0 0" }}>Select a post to view its product queue beside this list.</p></div></div>
-      <div className="table-wrapper" style={{ marginTop: 18, borderRadius: 14, overflow: "auto" }}><table><thead><tr><th>Facebook Live post</th><th>Created</th><th>Status</th><th>Products</th><th>Claimed</th><th aria-label="Actions"></th></tr></thead><tbody>
+      <div className="table-wrapper" style={{ marginTop: 18, borderRadius: 14, overflow: "auto" }}><table style={{ width: "100%", minWidth: 500, tableLayout: "fixed" }}><colgroup><col style={{ width: "33%" }} /><col style={{ width: "24%" }} /><col style={{ width: "12%" }} /><col style={{ width: "10%" }} /><col style={{ width: "10%" }} /><col style={{ width: 48 }} /></colgroup><thead><tr><th>Post caption</th><th>Created</th><th>Status</th><th>Products</th><th>Claimed</th><th aria-label="Actions"></th></tr></thead><tbody>
         {visibleSessions.map((session) => {
           const items = (session.eo2mate_live_items || []).filter((entry) => activeMode === "MIXED" || String(entry.mode || "").toUpperCase() === activeMode);
           const claimed = items.reduce((sum, entry) => sum + (Number(entry.claimed) || 0), 0);
           return <tr key={session.id} className={selected === session.id ? "selected-table-row" : "clickable-row"} onClick={() => setSelected(session.id)}>
-            <td><button type="button" className="table-link-button" aria-label={`View product queue for Facebook Live post ${session.fb_video_id}`} onClick={(event) => { event.stopPropagation(); setSelected(session.id); }}>{session.fb_video_id}</button></td>
+            <td title={postCaptions[session.id] || "Caption unavailable"} style={{ maxWidth: 0, padding: "10px 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}><button type="button" className="table-link-button" aria-label={`View product queue for Facebook Live post ${session.fb_video_id}`} onClick={(event) => { event.stopPropagation(); setSelected(session.id); }} style={{ display: "block", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left" }}>{postCaptions[session.id] || (captionRequests.current.has(session.id) ? "Loading caption…" : "Caption unavailable")}</button></td>
             <td>{session.created_at ? new Date(session.created_at).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" }) : "—"}</td>
             <td>{session.status}</td><td>{items.length}</td><td>{claimed}</td>
             <td><button type="button" className="table-action-button" aria-label={`View queue for Live post ${session.fb_video_id}`} title={selected === session.id ? "Currently viewing this queue" : "View product queue"} aria-pressed={selected === session.id} onClick={(event) => { event.stopPropagation(); setSelected(session.id); }}><NavIcon type="view" /></button></td>
@@ -607,8 +620,8 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
         {current.status === "DRAFT" && <>
           <h4 style={{ marginBottom: 8 }}>Add one product</h4>
           <div style={{ marginBottom: 16, padding: 14, border: "1px solid #dbe4ee", borderRadius: 12, background: "#f8fafc" }}>
-          <label style={{ display: "grid", gap: 7, maxWidth: 680, fontWeight: 600 }}>Choose inventory product (optional)
-            <select aria-label="Select product from inventory" value={item.inventory_item_id} disabled={busy || inventoryLoading} onChange={(event) => {
+          <label style={{ display: "grid", gap: 7, width: "100%", minWidth: 0, maxWidth: 680, fontWeight: 600 }}>Choose inventory product (optional)
+            <select aria-label="Select product from inventory" value={item.inventory_item_id} disabled={busy || inventoryLoading} style={{ width: "100%", maxWidth: "100%", boxSizing: "border-box" }} onChange={(event) => {
               const inventory = inventoryItems.find((entry) => String(entry.inventory_item_id) === event.target.value);
               if (!inventory) {
                 setItem((previous) => ({ ...previous, inventory_item_id: "" }));
@@ -667,7 +680,7 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
           </section>
           <p><button className="primary-button" type="button" style={{ display: "inline-flex", alignItems: "center", gap: 8 }} disabled={busy || !(current.eo2mate_live_items || []).length} onClick={() => run("start", { session_id: selected })}><NavIcon type="play" />Start EO2MATE Session</button></p>
         </>}
-        <div className="table-wrapper"><table><thead><tr><th>Code</th><th>Product</th><th>Mode</th><th>Status</th><th>Accepted / Stock</th><th>Action</th></tr></thead><tbody>{visibleItems.map((it) => <tr key={it.id}><td>{it.item_code}</td><td>{it.title}</td><td>{it.mode}</td><td>{it.status}</td><td>{it.claimed} / {it.quantity}</td><td>{current.status === "ACTIVE" && it.status === "QUEUED" && <button className="secondary-button" type="button" disabled={busy} onClick={() => run("activate-item", { session_id: selected, item_id: it.id })}><NavIcon type="play" />Activate</button>}</td></tr>)}</tbody></table>{!visibleItems.length && <p>No {activeMode === "MIXED" ? "products" : `${activeMode.toLowerCase()} products`} queued yet. Add a product above.</p>}</div>
+        <div className="table-wrapper" style={{ overflowX: "auto" }}><table style={{ width: "100%", minWidth: 500, tableLayout: "fixed", fontSize: 13 }}><colgroup><col style={{ width: "12%" }} /><col style={{ width: "29%" }} /><col style={{ width: "14%" }} /><col style={{ width: "14%" }} /><col style={{ width: "19%" }} /><col style={{ width: "12%" }} /></colgroup><thead><tr><th style={{ padding: "10px 8px" }}>Code</th><th style={{ padding: "10px 8px" }}>Product</th><th style={{ padding: "10px 8px" }}>Mode</th><th style={{ padding: "10px 8px" }}>Status</th><th style={{ padding: "10px 8px" }}>Accepted / Stock</th><th style={{ padding: "10px 8px" }}>Action</th></tr></thead><tbody>{visibleItems.map((it) => <tr key={it.id}><td style={{ padding: "10px 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.item_code}</td><td title={it.title} style={{ padding: "10px 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.title}</td><td style={{ padding: "10px 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.mode}</td><td style={{ padding: "10px 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.status}</td><td style={{ padding: "10px 8px", whiteSpace: "nowrap" }}>{it.claimed} / {it.quantity}</td><td style={{ padding: "8px 4px" }}>{current.status === "ACTIVE" && it.status === "QUEUED" && <button className="secondary-button" type="button" style={{ padding: "7px 9px", fontSize: 12, whiteSpace: "nowrap" }} disabled={busy} onClick={() => run("activate-item", { session_id: selected, item_id: it.id })}><NavIcon type="play" />Activate</button>}</td></tr>)}</tbody></table>{!visibleItems.length && <p>No {activeMode === "MIXED" ? "products" : `${activeMode.toLowerCase()} products`} queued yet. Add a product above.</p>}</div>
         {current.status === "ACTIVE" && <div style={{ marginTop: 14 }}><button type="button" className="secondary-button" style={{ display: "inline-flex", alignItems: "center", gap: 8 }} disabled={busy} onClick={() => { if (window.confirm("End this EO2MATE Live session? This stops EO2MATE processing for this session. End the Facebook broadcast separately.")) run("close", { session_id: selected }); }}><NavIcon type="stop" />End EO2MATE Session</button><p style={{ fontSize: 13, marginBottom: 0 }}>After ending the Facebook broadcast, also end this EO2MATE session to stop comment processing.</p></div>}
     </section>}
     </div>
