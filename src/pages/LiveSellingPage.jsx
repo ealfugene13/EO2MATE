@@ -370,12 +370,26 @@ function downloadLiveReport(sessions, activeMode) {
   URL.revokeObjectURL(url);
 }
 
+function LivePopupNotifications({ notifications, onDismiss }) {
+  if (!notifications.length) return null;
+  return <div aria-live="polite" aria-atomic="false" style={{ position: "fixed", top: 20, right: 20, zIndex: 10020, display: "grid", gap: 10, width: "min(420px, calc(100vw - 32px))" }}>
+    {notifications.map((notification) => <div key={notification.id} role="status" style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "14px 15px", border: `1px solid ${notification.kind === "ended" ? "#fecaca" : "#a7f3d0"}`, borderLeft: `5px solid ${notification.kind === "ended" ? "#dc2626" : "#059669"}`, borderRadius: 12, background: "#fff", boxShadow: "0 12px 32px rgba(15, 23, 42, .18)" }}>
+      <span style={{ color: notification.kind === "ended" ? "#dc2626" : "#047857", paddingTop: 1 }}><NavIcon type={notification.kind === "ended" ? "facebook" : "inventory"} /></span>
+      <span style={{ flex: 1, minWidth: 0 }}><strong style={{ display: "block", marginBottom: 3, color: "#172b4d" }}>{notification.title}</strong><span style={{ color: "#475569", fontSize: 13, lineHeight: 1.45 }}>{notification.detail}</span></span>
+      <button type="button" onClick={() => onDismiss(notification.id)} aria-label="Dismiss notification" style={{ border: 0, background: "transparent", color: "#64748b", fontSize: 20, lineHeight: 1, cursor: "pointer", padding: "0 2px" }}>×</button>
+    </div>)}
+  </div>;
+}
+
 function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", section = "SESSIONS", setSection }) {
   const clientId = client?.client_id;
   const [sessions, setSessions] = useState([]);
   const [selected, setSelected] = useState("");
   const [postCaptions, setPostCaptions] = useState({});
   const captionRequests = useRef(new Set());
+  const manualCloseRequests = useRef(new Set());
+  const liveSnapshots = useRef({ clientId: "", pageId: "", initialized: false, sessions: new Map() });
+  const [popupNotifications, setPopupNotifications] = useState([]);
   const pageId = selectedFbPageId || "";
   const [videoInput, setVideoInput] = useState("");
   const [item, setItem] = useState({ inventory_item_id: "", item_code: "", title: "", mode: activeMode === "MIXED" ? "SELLING" : activeMode, quantity: 1, unit_price: "", mine_price: "", take_price: "", lock_price: "", starting_bid: "", bid_increment: "" });
@@ -387,6 +401,8 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
   const [queueCsv, setQueueCsv] = useState("");
   const [queueCsvName, setQueueCsvName] = useState("");
   const [queueFileKey, setQueueFileKey] = useState(0);
+  const sessionsRef = useRef(sessions);
+  sessionsRef.current = sessions;
   const current = sessions.find((s) => s.id === selected);
   const selectedInventoryItem = inventoryItems.find((entry) => String(entry.inventory_item_id) === String(item.inventory_item_id));
   const queuedItemCodes = new Set((current?.eo2mate_live_items || []).map((entry) => String(entry.item_code || "").trim().toUpperCase()));
@@ -407,6 +423,11 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
   useEffect(() => {
     setItem((previous) => ({ ...previous, mode: activeMode === "MIXED" ? "SELLING" : activeMode }));
   }, [activeMode]);
+  const showPopup = (title, detail, kind = "inventory") => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    setPopupNotifications((previous) => [...previous, { id, title, detail, kind }].slice(-4));
+    window.setTimeout(() => setPopupNotifications((previous) => previous.filter((entry) => entry.id !== id)), 9000);
+  };
   const request = async (action, extra = {}) => {
     if (!clientId) throw new Error("Select a client workspace first.");
     const { data, error } = await supabase.functions.invoke("eo2mate", { headers: { "x-eo2mate-route": "live-admin" }, body: { action, client_id: clientId, ...extra } });
@@ -446,6 +467,28 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
   const refresh = async () => {
     const result = await request("list", pageId ? { fb_page_id: pageId } : {});
     const nextSessions = result.sessions || [];
+    const previousSnapshot = liveSnapshots.current;
+    const sameScope = previousSnapshot.clientId === clientId && previousSnapshot.pageId === pageId;
+    const nextSnapshot = new Map();
+    for (const session of nextSessions) {
+      const previousSession = sameScope && previousSnapshot.initialized ? previousSnapshot.sessions.get(session.id) : null;
+      const nextItems = new Map();
+      for (const entry of session.eo2mate_live_items || []) {
+        const claimed = Number(entry.claimed) || 0;
+        const previousItem = previousSession?.items.get(entry.id);
+        const previousClaimed = Number(previousItem?.claimed) || 0;
+        if (previousItem && claimed > previousClaimed) {
+          showPopup("Live inventory updated", `${entry.item_code}: ${claimed - previousClaimed} unit(s) accepted. Claimed stock is now ${claimed}/${entry.quantity}.`);
+        }
+        nextItems.set(entry.id, { claimed });
+      }
+      if (previousSession?.status === "ACTIVE" && String(session.status).toUpperCase() === "CLOSED") {
+        const wasManuallyClosed = manualCloseRequests.current.delete(session.id);
+        if (!wasManuallyClosed) showPopup("Facebook Live ended", "The EO2MATE session and its product queue have been closed automatically.", "ended");
+      }
+      nextSnapshot.set(session.id, { status: String(session.status || "").toUpperCase(), items: nextItems });
+    }
+    liveSnapshots.current = { clientId, pageId, initialized: true, sessions: nextSnapshot };
     setSessions(nextSessions);
     setPostCaptions((previous) => ({ ...previous, ...Object.fromEntries(nextSessions.filter((session) => session.fb_caption).map((session) => [session.id, session.fb_caption])) }));
     if (selected && !nextSessions.some((session) => session.id === selected)) setSelected("");
@@ -474,13 +517,17 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
     finally { setBusy(false); }
   };
   useEffect(() => {
+    liveSnapshots.current = { clientId, pageId, initialized: false, sessions: new Map() };
+    setPopupNotifications([]);
+  }, [clientId, pageId]);
+  useEffect(() => {
     if (clientId) {
       refresh().catch((e) => setMessage(e.message));
       loadInventoryItems();
     }
   }, [clientId, pageId]);
   useEffect(() => {
-    if (!clientId || !selected) return undefined;
+    if (!clientId) return undefined;
     let lastRealtimeUpdate = Date.now();
     let refreshInFlight = false;
     const refreshQueue = async () => {
@@ -494,9 +541,8 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
         refreshInFlight = false;
       }
     };
-    const channel = supabase
-      .channel(`live-queue-${selected}`)
-      .on("postgres_changes", {
+    let channel = supabase.channel(`live-queue-${selected || pageId || clientId}`);
+    if (selected) channel = channel.on("postgres_changes", {
         event: "*",
         schema: "public",
         table: "eo2mate_live_items",
@@ -504,13 +550,22 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
       }, () => {
         lastRealtimeUpdate = Date.now();
         refreshQueue();
-      })
-      .subscribe();
+      });
+    if (pageId) channel = channel.on("postgres_changes", {
+        event: "UPDATE",
+        schema: "public",
+        table: "eo2mate_live_sessions",
+        filter: `fb_page_id=eq.${pageId}`,
+      }, () => {
+        lastRealtimeUpdate = Date.now();
+        refreshQueue();
+      });
+    channel.subscribe();
     // Realtime may report SUBSCRIBED even when this table is not enabled for
     // Postgres Changes. Keep a light fallback so claimed stock/status updates
     // still appear promptly after Meta processes a valid Live comment.
     const fallbackRefresh = window.setInterval(() => {
-      if (Date.now() - lastRealtimeUpdate >= 5000) refreshQueue();
+      if (sessionsRef.current.some((session) => session.status === "ACTIVE") && Date.now() - lastRealtimeUpdate >= 5000) refreshQueue();
     }, 5000);
     return () => {
       window.clearInterval(fallbackRefresh);
@@ -524,7 +579,7 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
     finally { setBusy(false); }
   };
   const addItemToQueue = async () => {
-    if (!current || current.status !== "DRAFT") return;
+    if (!current || !["DRAFT", "ACTIVE"].includes(current.status)) return;
     if (!isValidLiveItemCode(item.item_code)) {
       setMessage("Item code must be 1–40 letters, numbers, or hyphens.");
       return;
@@ -540,7 +595,7 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
     } finally { setBusy(false); }
   };
   const uploadQueueCsv = async () => {
-    if (!current || current.status !== "DRAFT" || !parsedQueue.rows.length || parsedQueue.errors.length) return;
+    if (!current || !["DRAFT", "ACTIVE"].includes(current.status) || !parsedQueue.rows.length || parsedQueue.errors.length) return;
     setBusy(true); setMessage("Uploading products to the queue…");
     try {
       const result = await request("add-items", { session_id: selected, items: parsedQueue.rows });
@@ -571,6 +626,7 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
       <div className="table-wrapper"><table><thead><tr><th>Session</th><th>Code</th><th>Product</th><th>Mode</th><th>Status</th><th>Claimed / Stock</th></tr></thead><tbody>{reportItems.map((entry) => <tr key={entry.id}><td>{entry.fb_video_id} · {entry.session_status}</td><td>{entry.item_code}</td><td>{entry.title}</td><td>{entry.mode}</td><td>{entry.status}</td><td>{entry.claimed} / {entry.quantity}</td></tr>)}</tbody></table>{!reportItems.length && <p>No report data is available yet.</p>}</div>
     </>}
     {message && <p role="status">{message}</p>}
+    <LivePopupNotifications notifications={popupNotifications} onDismiss={(id) => setPopupNotifications((previous) => previous.filter((entry) => entry.id !== id))} />
   </section>;
   return <section className="dashboard-panel" style={{ padding: 20 }}>
     <div className="panel-header"><div><h2>Live Selling Control Center</h2><p>Connect the current Facebook Live video, queue products, activate each item, and end the EO2MATE session when the broadcast is over.</p></div><button className="icon-button refresh-icon-button" type="button" onClick={refreshSessions} disabled={busy} title="Refresh Live sessions and queues" aria-label="Refresh Live sessions and queues"><NavIcon type="refresh" /></button></div>
@@ -609,8 +665,9 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
           <div><p className="eyebrow" style={{ margin: "0 0 5px" }}>LIVE SESSION</p><h3 id="live-product-queue-title" style={{ margin: 0 }}>Product queue</h3><p style={{ margin: "6px 0 0", color: "#64748b", fontSize: 13 }}>Facebook video ID · {current.fb_video_id}</p></div>
           <span className="status-badge">{current.status}</span>
         </div>
-        {current.status === "DRAFT" && <>
-          <h4 style={{ marginBottom: 8 }}>Add one product</h4>
+        {["DRAFT", "ACTIVE"].includes(current.status) && <>
+          <h4 style={{ marginBottom: 8 }}>{current.status === "ACTIVE" ? "Add products to the live queue" : "Add one product"}</h4>
+          {current.status === "ACTIVE" && <p style={{ margin: "0 0 14px", color: "#64748b", fontSize: 13 }}>You can keep adding products while this EO2MATE session is active. Queue additions close when you end the session.</p>}
           <div style={{ marginBottom: 16, padding: 14, border: "1px solid #dbe4ee", borderRadius: 12, background: "#f8fafc" }}>
           <label style={{ display: "grid", gap: 7, width: "100%", minWidth: 0, maxWidth: 680, fontWeight: 600 }}>Choose inventory product (optional)
             <select aria-label="Select product from inventory" value={item.inventory_item_id} disabled={busy || inventoryLoading} style={{ width: "100%", maxWidth: "100%", boxSizing: "border-box" }} onChange={(event) => {
@@ -655,7 +712,7 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
             {(item.mode === "SELLING" ? ["unit_price"] : item.mode === "MINING" ? ["mine_price", "take_price", "lock_price"] : ["starting_bid", "bid_increment"]).map((field) => <label key={field} style={{ display: "grid", gap: 6, minWidth: 0, color: "#344054", fontSize: 13, fontWeight: 600 }}>{field.replaceAll("_", " ").replace(/\b\w/g, (character) => character.toUpperCase())}
               <input type="number" min="0" step="0.01" aria-label={field.replaceAll("_", " ")} placeholder="0.00" value={item[field]} onChange={(e) => setItem({ ...item, [field]: e.target.value })} style={{ width: "100%", minWidth: 0, height: 42, boxSizing: "border-box" }} />
             </label>)}
-            <button type="button" className="secondary-button" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, minWidth: 145, height: 42, boxSizing: "border-box", whiteSpace: "nowrap" }} disabled={busy || !item.title || !isValidLiveItemCode(item.item_code) || itemCodeAlreadyQueued} onClick={addItemToQueue}><NavIcon type="add" />Add product</button>
+            <button type="button" className="secondary-button" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, minWidth: 145, height: 42, boxSizing: "border-box", whiteSpace: "nowrap" }} disabled={busy || !["DRAFT", "ACTIVE"].includes(current.status) || !item.title || !isValidLiveItemCode(item.item_code) || itemCodeAlreadyQueued} onClick={addItemToQueue}><NavIcon type="add" />Add product</button>
           </div>
           {itemCodeAlreadyQueued && <p role="status" style={{ margin: "8px 0 0", color: "#b54708", fontSize: 13 }}>This item code is already in the selected Live queue. Choose another inventory product or use a new code.</p>}
           {item.inventory_item_id && item.mode !== "SELLING" && <p style={{ margin: "8px 0 0", color: "#64748b", fontSize: 13 }}>The inventory record supplies the default selling price, but not Mining price levels or Auction bid increments. Enter the pricing fields shown for the selected mode.</p>}
@@ -664,7 +721,7 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
               <label title="Choose a CSV file with up to 100 products" style={{ position: "relative", display: "flex", alignItems: "center", gap: 11, flex: "1 1 260px", minWidth: 240, padding: 5, margin: -5, borderRadius: 10, cursor: busy ? "not-allowed" : "pointer" }}>
                 <span style={{ display: "grid", placeItems: "center", width: 40, height: 40, borderRadius: 11, color: "#176b55", background: "#e2f3ed" }}><NavIcon type="upload" /></span>
                 <span style={{ display: "grid", gap: 3 }}><strong id="bulk-live-queue-title">Import multiple products</strong><span style={{ color: "#64748b", fontSize: 13 }}>CSV file · up to 100 products</span></span>
-                <input aria-label="Import multiple products from CSV" key={queueFileKey} type="file" accept=".csv,text/csv" disabled={busy} onChange={async (e) => { const file = e.target.files?.[0]; if (!file) return; setQueueCsvName(file.name); setMessage(""); try { setQueueCsv(await file.text()); } catch { setQueueCsv(""); setMessage("Could not read that CSV file."); } }} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0, cursor: "inherit" }} />
+                <input aria-label="Import multiple products from CSV" key={queueFileKey} type="file" accept=".csv,text/csv" disabled={busy || !["DRAFT", "ACTIVE"].includes(current.status)} onChange={async (e) => { const file = e.target.files?.[0]; if (!file) return; setQueueCsvName(file.name); setMessage(""); try { setQueueCsv(await file.text()); } catch { setQueueCsv(""); setMessage("Could not read that CSV file."); } }} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0, cursor: "inherit" }} />
               </label>
               <button type="button" className="secondary-button" style={{ display: "inline-flex", alignItems: "center", gap: 7 }} onClick={() => downloadLiveQueueTemplate(activeMode)} disabled={busy}><NavIcon type="download" />CSV template</button>
             </div>
@@ -676,16 +733,17 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
               <p><strong>{queueCsvName || "CSV"}</strong> · {parsedQueue.rows.length} valid product row(s) detected.</p>
               {parsedQueue.errors.length > 0 && <div role="alert" style={{ color: "#9f1239", background: "#fff1f2", padding: 10, borderRadius: 8, marginBottom: 10 }}><strong>Fix these CSV issues before uploading:</strong><ul style={{ marginBottom: 0 }}>{parsedQueue.errors.map((error, i) => <li key={`${i}-${error}`}>{error}</li>)}</ul></div>}
               {parsedQueue.rows.length > 0 && <div className="table-wrapper"><table><thead><tr><th>Code</th><th>Product</th><th>Mode</th><th>Qty</th><th>Mode prices</th></tr></thead><tbody>{parsedQueue.rows.slice(0, 5).map((row) => <tr key={row.item_code}><td>{row.item_code}</td><td>{row.title}</td><td>{row.mode}</td><td>{row.quantity}</td><td>{row.mode === "SELLING" ? formatCurrency(row.unit_price) : row.mode === "MINING" ? `${formatCurrency(row.mine_price)} / ${formatCurrency(row.take_price)} / ${formatCurrency(row.lock_price)}` : `${formatCurrency(row.starting_bid)} / +${formatCurrency(row.bid_increment)}`}</td></tr>)}</tbody></table>{parsedQueue.rows.length > 5 && <p>Showing the first 5 of {parsedQueue.rows.length} products.</p>}</div>}
-              <button type="button" className="primary-button" style={{ display: "inline-flex", alignItems: "center", gap: 7 }} disabled={busy || !parsedQueue.rows.length || parsedQueue.errors.length > 0} onClick={uploadQueueCsv}><NavIcon type="upload" />Add {parsedQueue.rows.length} Products</button>
+              <button type="button" className="primary-button" style={{ display: "inline-flex", alignItems: "center", gap: 7 }} disabled={busy || !["DRAFT", "ACTIVE"].includes(current.status) || !parsedQueue.rows.length || parsedQueue.errors.length > 0} onClick={uploadQueueCsv}><NavIcon type="upload" />Add {parsedQueue.rows.length} Products</button>
             </>}
           </section>
-          <p><button className="primary-button" type="button" style={{ display: "inline-flex", alignItems: "center", gap: 8 }} disabled={busy || !(current.eo2mate_live_items || []).length} onClick={() => run("start", { session_id: selected })}><NavIcon type="play" />Start EO2MATE Session</button></p>
+          {current.status === "DRAFT" && <p><button className="primary-button" type="button" style={{ display: "inline-flex", alignItems: "center", gap: 8, color: "#fff", background: "#138a5e", borderColor: "#138a5e" }} disabled={busy || !(current.eo2mate_live_items || []).length} onClick={() => run("start", { session_id: selected })}><NavIcon type="play" />Start Session</button></p>}
         </>}
         <div className="table-wrapper" style={{ overflowX: "auto" }}><table style={{ width: "100%", minWidth: 500, tableLayout: "fixed", fontSize: 13 }}><colgroup><col style={{ width: "12%" }} /><col style={{ width: "29%" }} /><col style={{ width: "14%" }} /><col style={{ width: "14%" }} /><col style={{ width: "19%" }} /><col style={{ width: "12%" }} /></colgroup><thead><tr><th style={{ padding: "10px 8px" }}>Code</th><th style={{ padding: "10px 8px" }}>Product</th><th style={{ padding: "10px 8px" }}>Mode</th><th style={{ padding: "10px 8px" }}>Status</th><th style={{ padding: "10px 8px" }}>Accepted / Stock</th><th style={{ padding: "10px 8px" }}>Action</th></tr></thead><tbody>{visibleItems.map((it) => <tr key={it.id}><td style={{ padding: "10px 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.item_code}</td><td title={it.title} style={{ padding: "10px 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.title}</td><td style={{ padding: "10px 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.mode}</td><td style={{ padding: "10px 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.status}</td><td style={{ padding: "10px 8px", whiteSpace: "nowrap" }}>{it.claimed} / {it.quantity}</td><td style={{ padding: "8px 4px" }}>{current.status === "ACTIVE" && it.status === "QUEUED" && <button className="secondary-button" type="button" style={{ padding: "7px 9px", fontSize: 12, whiteSpace: "nowrap" }} disabled={busy} onClick={() => run("activate-item", { session_id: selected, item_id: it.id })}><NavIcon type="play" />Activate</button>}</td></tr>)}</tbody></table>{!visibleItems.length && <p>No {activeMode === "MIXED" ? "products" : `${activeMode.toLowerCase()} products`} queued yet. Add a product above.</p>}</div>
-        {current.status === "ACTIVE" && <div style={{ marginTop: 14 }}><button type="button" className="secondary-button" style={{ display: "inline-flex", alignItems: "center", gap: 8 }} disabled={busy} onClick={() => { if (window.confirm("End this EO2MATE Live session? This stops EO2MATE processing for this session. End the Facebook broadcast separately.")) run("close", { session_id: selected }); }}><NavIcon type="stop" />End EO2MATE Session</button><p style={{ fontSize: 13, marginBottom: 0 }}>After ending the Facebook broadcast, also end this EO2MATE session to stop comment processing.</p></div>}
+        {current.status === "ACTIVE" && <div style={{ marginTop: 14 }}><button type="button" className="secondary-button" style={{ display: "inline-flex", alignItems: "center", gap: 8, color: "#fff", background: "#d92d20", borderColor: "#d92d20" }} disabled={busy} onClick={() => { if (window.confirm("End this EO2MATE session? Queue additions and comment processing will stop.")) { manualCloseRequests.current.add(selected); run("close", { session_id: selected }).finally(() => manualCloseRequests.current.delete(selected)); } }}><NavIcon type="stop" />End Session</button><p style={{ fontSize: 13, marginBottom: 0 }}>EO2MATE also checks Facebook Live status and closes this session automatically after the broadcast ends.</p></div>}
     </section>}
     </div>
     {message && <p role="status">{message}</p>}
+    <LivePopupNotifications notifications={popupNotifications} onDismiss={(id) => setPopupNotifications((previous) => previous.filter((entry) => entry.id !== id))} />
   </section>;
 }
 
