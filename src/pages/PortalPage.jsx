@@ -7,6 +7,7 @@ import ReportsPage from "./ReportsPage";
 import AutomationControlPage from "./AutomationControlPage";
 import MiningPage from "./MiningPage";
 import DashboardPage from "./DashboardPage";
+import NotificationCenterPage from "./NotificationCenterPage";
 import AuctionPage from "./AuctionPage";
 import OrdersPage from "./OrdersPage";
 import PaymentsPage from "./PaymentsPage";
@@ -307,6 +308,12 @@ function NavIcon({ type }) {
         <rect x="14" y="3" width="7" height="7" rx="1" />
         <rect x="3" y="14" width="7" height="7" rx="1" />
         <rect x="14" y="14" width="7" height="7" rx="1" />
+      </svg>
+    ),
+    bell: (
+      <svg {...common}>
+        <path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+        <path d="M10 21h4" />
       </svg>
     ),
     facebook: (
@@ -976,6 +983,14 @@ export default function PortalPage({ session }) {
             Dashboard
           </SidebarNavButton>
 
+          <SidebarNavButton
+            icon="bell"
+            className={`nav-item ${page === "notifications" ? "active" : ""}`}
+            onClick={() => navigateTo("notifications")}
+          >
+            Notifications
+          </SidebarNavButton>
+
           {metaConnected && (
             <>
               <SidebarSectionLabel>Selling</SidebarSectionLabel>
@@ -1179,6 +1194,8 @@ export default function PortalPage({ session }) {
         {(page === "post-mining") && <MiningPage key={`mining-${effectivePageId}`} selectedFbPageId={effectivePageId} client={client} metaConnected={metaConnected} miningWorkspaceTab={miningWorkspaceTab} navigateTo={navigateTo} page={page} setMiningWorkspaceTab={setMiningWorkspaceTab} />}
 
         {(page === "dashboard") && <DashboardPage selectedFbPageId={effectivePageId} selectedFbPageName={availablePages.find((p) => String(p.fb_page_id) === String(effectivePageId))?.page_name || ""} client={client} facebookStatus={facebookStatus} goToAuctions={goToAuctions} goToDeliveries={goToDeliveries} goToOrders={goToOrders} goToPayments={goToPayments} navigateTo={navigateTo} onboardingChecked={onboardingChecked} openDelivery={openDelivery} openFacebookSetup={openFacebookSetup} page={page} paymentAccountLoading={paymentAccountLoading} paymentAccountMessage={paymentAccountMessage} paymentAccountStatus={paymentAccountStatus} setErrorMessage={setErrorMessage} setPage={setPage} />}
+
+        {(page === "notifications") && <NotificationCenterPage key={`notifications-${effectivePageId}`} client={client} selectedFbPageId={effectivePageId} selectedFbPageName={availablePages.find((p) => String(p.fb_page_id) === String(effectivePageId))?.page_name || ""} />}
 
         {(page === "auctions" || page === "auction-detail") && <AuctionPage selectedFbPageId={effectivePageId} navigationFilter={navigationFilter} auctionWorkspaceTab={auctionWorkspaceTab} client={client} detailRequest={detailRequest} navigateTo={navigateTo} page={page} setAuctionWorkspaceTab={setAuctionWorkspaceTab} setErrorMessage={setErrorMessage} setPage={setPage} />}
 

@@ -233,7 +233,7 @@ function onlySelectedPage(rows, pageId) {
   );
 }
 
-function DashboardCommunicationPanel({ client, selectedFbPageId, selectedFbPageName, facebookStatus, openFacebookSetup }) {
+function DashboardCommunicationPanel({ client, selectedFbPageId, selectedFbPageName, facebookStatus, openFacebookSetup, navigateTo }) {
   const [notifications, setNotifications] = useState([]);
   const [notificationsError, setNotificationsError] = useState("");
   const [showAllNotifications, setShowAllNotifications] = useState(false);
@@ -347,7 +347,7 @@ function DashboardCommunicationPanel({ client, selectedFbPageId, selectedFbPageN
 
   const displayedNotifications = showAllNotifications ? notifications : notifications.slice(0, 5);
   return <section className="dashboard-panel dashboard-communications-panel">
-    <div className="panel-header"><div><h2>Notifications &amp; Messenger</h2><p>Review saved Live activity and open the selected Facebook Page inbox.</p></div></div>
+    <div className="panel-header"><div><h2>Notifications &amp; Messenger</h2><p>Review saved Live activity and open the selected Facebook Page inbox.</p></div><button type="button" className="dashboard-notifications-page-link" onClick={() => navigateTo?.("notifications")}>Open Notification Center <span aria-hidden="true">→</span></button></div>
     <div className="dashboard-communications-grid">
       <div className="dashboard-communication-card">
         <div className="dashboard-communication-heading">
@@ -485,7 +485,7 @@ export default function DashboardPage({ client, facebookStatus, goToAuctions, go
               </section>
             )}
 
-            <DashboardCommunicationPanel client={client} selectedFbPageId={selectedFbPageId} selectedFbPageName={selectedFbPageName} facebookStatus={facebookStatus} openFacebookSetup={openFacebookSetup} />
+            <DashboardCommunicationPanel client={client} selectedFbPageId={selectedFbPageId} selectedFbPageName={selectedFbPageName} facebookStatus={facebookStatus} openFacebookSetup={openFacebookSetup} navigateTo={navigateTo} />
 
             <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 14, marginBottom: 20 }}>
               {[

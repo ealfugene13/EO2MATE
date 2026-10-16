@@ -3192,6 +3192,65 @@ button.post-type-card:hover { transform: translateY(-2px); border-color: #bcdcc3
 .dashboard-notification-entry time { color: #8492a6; font-size: 10px; }
 .dashboard-notification-empty { margin: 0; padding: 21px 16px; color: #64748b; font-size: 12px; text-align: center; }
 .dashboard-notifications-more { width: 100%; padding: 11px; border: 0; color: #087f5b; background: #fff; font: inherit; font-size: 12px; font-weight: 750; cursor: pointer; }
+.dashboard-notifications-page-link { display: inline-flex; align-items: center; gap: 8px; padding: 9px 12px; border: 1px solid #d8e9df; border-radius: 9px; color: #087f5b; background: #fff; font: inherit; font-size: 12px; font-weight: 750; cursor: pointer; }
+.dashboard-notifications-page-link:hover { background: #f0faf4; border-color: #a8d9bc; }
+.notification-center-page { max-width: 1180px; margin: 0 auto; padding: 8px 0 42px; color: #172b25; }
+.notification-center-hero { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 26px 30px; border: 1px solid #e3eee8; border-radius: 18px; background: linear-gradient(115deg,#f5fbf7,#fff 72%); box-shadow: 0 8px 24px #193c2910; }
+.notification-center-title-wrap,.notification-center-actions { display: flex; align-items: center; gap: 17px; }
+.notification-center-hero-icon { width: 54px; height: 54px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 16px; color: #078451; background: #e4f5eb; }
+.notification-center-hero-icon svg,.notification-center-mark-all svg,.notification-mark-read svg,.notification-center-empty svg { width: 23px; height: 23px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.notification-center-eyebrow { color: #168657; font-size: 10px; font-weight: 850; letter-spacing: .14em; }
+.notification-center-hero h1 { margin: 4px 0 3px; color: #19362b; font-size: 25px; letter-spacing: -.035em; }
+.notification-center-hero p,.notification-center-toolbar p { margin: 0; color: #748278; font-size: 13px; }
+.notification-center-actions { flex: 0 0 auto; }
+.notification-center-unread { display: inline-flex; align-items: center; gap: 6px; color: #66766d; font-size: 12px; }
+.notification-center-unread b { min-width: 26px; height: 26px; display: grid; place-items: center; padding: 0 7px; border-radius: 999px; color: #fff; background: #0d9b63; font-size: 12px; }
+.notification-center-mark-all { display: inline-flex; align-items: center; gap: 7px; padding: 10px 13px; border: 1px solid #d9e8df; border-radius: 9px; color: #087f55; background: #fff; font: inherit; font-size: 12px; font-weight: 750; cursor: pointer; }
+.notification-center-mark-all svg { width: 16px; height: 16px; }
+.notification-center-mark-all:hover:not(:disabled) { background: #f1faf5; border-color: #a9d9be; }
+.notification-center-mark-all:disabled { opacity: .45; cursor: default; }
+.notification-center-content { margin-top: 19px; padding: 25px 27px 27px; border: 1px solid #e8edea; border-radius: 16px; background: #fff; box-shadow: 0 8px 24px #193c2908; }
+.notification-center-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-bottom: 21px; border-bottom: 1px solid #edf1ee; }
+.notification-center-toolbar h2 { margin: 0 0 5px; color: #253a30; font-size: 16px; }
+.notification-center-toolbar p { font-size: 12px; }
+.notification-center-filters { display: flex; gap: 5px; padding: 4px; border: 1px solid #e7ece8; border-radius: 10px; background: #f8faf8; }
+.notification-center-filters button { display: flex; align-items: center; gap: 7px; padding: 7px 10px; border: 0; border-radius: 7px; color: #6b786f; background: transparent; font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; }
+.notification-center-filters button.active { color: #087f55; background: #fff; box-shadow: 0 1px 3px #1c3b2b1a; }
+.notification-center-filters button span { color: inherit; opacity: .7; }
+.notification-center-groups { display: grid; gap: 19px; padding-top: 20px; }
+.notification-mode-group { overflow: hidden; border: 1px solid #e9eeeb; border-radius: 12px; }
+.notification-mode-group > header { min-height: 50px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 15px; background: #f8faf9; border-bottom: 1px solid #edf1ee; }
+.notification-mode-group > header > span { color: #87938b; font-size: 11px; }
+.notification-mode-badge { display: flex; align-items: center; gap: 9px; }
+.notification-mode-badge > span { width: 8px; height: 8px; border-radius: 50%; background: #15905e; }
+.notification-mode-badge h3 { margin: 0; color: #314339; font-size: 13px; font-weight: 800; }
+.notification-mode-badge.mode-auction > span { background: #7e57c2; }
+.notification-mode-badge.mode-mining > span { background: #2878c7; }
+.notification-mode-badge.mode-selling > span,.notification-mode-badge.mode-regular_sale > span { background: #15905e; }
+.notification-mode-badge.mode-preorder > span { background: #d58a23; }
+.notification-mode-badge.mode-live_session > span { background: #df5555; }
+.notification-mode-list { display: grid; }
+.notification-center-item { display: grid; grid-template-columns: 10px minmax(0,1fr) 34px; align-items: start; gap: 12px; padding: 15px 15px; border-bottom: 1px solid #f0f2f0; }
+.notification-center-item:last-child { border-bottom: 0; }
+.notification-center-item.is-unread { background: #fbfefc; }
+.notification-center-item-dot { width: 8px; height: 8px; margin-top: 6px; border-radius: 50%; background: transparent; }
+.notification-center-item.is-unread .notification-center-item-dot { background: #10a46a; box-shadow: 0 0 0 3px #e5f6ec; }
+.notification-center-item-copy { min-width: 0; }
+.notification-center-item-copy > div { display: flex; align-items: center; gap: 9px; }
+.notification-center-item-copy h4 { overflow: hidden; margin: 0; color: #2a3d32; font-size: 13px; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
+.notification-new-label { padding: 3px 6px; border-radius: 5px; color: #087b51; background: #e9f7ef; font-size: 8px; font-weight: 850; letter-spacing: .07em; }
+.notification-center-item-copy p { margin: 5px 0 7px; color: #68766d; font-size: 12px; line-height: 1.5; }
+.notification-center-item-copy time { color: #99a39c; font-size: 10px; }
+.notification-mark-read { width: 30px; height: 30px; display: grid; place-items: center; border: 1px solid #dcebe1; border-radius: 8px; color: #168255; background: #fff; cursor: pointer; }
+.notification-mark-read:hover { color: #fff; background: #128a5b; border-color: #128a5b; }
+.notification-mark-read svg { width: 16px; height: 16px; }
+.notification-center-empty,.notification-center-state { min-height: 240px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: #758279; }
+.notification-center-empty > span { width: 54px; height: 54px; display: grid; place-items: center; margin-bottom: 13px; border-radius: 16px; color: #8ca497; background: #f0f5f2; }
+.notification-center-empty strong { color: #34483c; font-size: 14px; }
+.notification-center-empty p { margin: 7px 0 0; font-size: 12px; }
+.notification-center-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; padding: 12px 14px; border: 1px solid #f2cece; border-radius: 9px; color: #a13636; background: #fff7f7; font-size: 12px; }
+.notification-center-error button { border: 0; color: #a13636; background: transparent; font: inherit; font-weight: 750; cursor: pointer; }
+@media(max-width:700px) { .notification-center-hero { align-items: flex-start; flex-direction: column; padding: 20px; } .notification-center-actions { width: 100%; justify-content: space-between; } .notification-center-content { padding: 18px 14px; } .notification-center-toolbar { align-items: flex-start; flex-direction: column; } }
 .dashboard-communication-error { margin: 0; padding: 9px 14px; color: #9f1239; background: #fff1f2; font-size: 12px; }
 .dashboard-messenger-card > p { margin: 15px; color: #64748b; font-size: 13px; line-height: 1.55; }
 .dashboard-messenger-open,.dashboard-messenger-connect { display: flex; align-items: center; justify-content: center; gap: 9px; width: calc(100% - 30px); min-height: 46px; margin: 0 15px 15px; padding: 10px 12px; border: 0; border-radius: 11px; color: #fff; background: #0866ff; font: inherit; font-size: 13px; font-weight: 750; cursor: pointer; }
