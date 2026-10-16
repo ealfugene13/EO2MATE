@@ -69,7 +69,6 @@ function PortalPageContent({ page, homePage = "dashboard", backLabel = "Back to 
 function FloatingMetaMessenger({ clientId }) {
   const [pages, setPages] = useState([]);
   const [unread, setUnread] = useState(0);
-  const [messengerAvailable, setMessengerAvailable] = useState(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [position, setPosition] = useState(() => {
     try { return JSON.parse(localStorage.getItem("eo2mateMessengerFloatPosition")) || { right: 22, bottom: 24 }; }
@@ -90,7 +89,6 @@ function FloatingMetaMessenger({ clientId }) {
       const connectedPages = data.pages || [];
       setPages(connectedPages);
       setUnread(Number(data.total_unread || 0));
-      setMessengerAvailable(connectedPages.length > 0);
     } catch { /* notification failure must never block the portal */ }
   }
 
@@ -152,13 +150,16 @@ function FloatingMetaMessenger({ clientId }) {
 
   function activate() {
     if (pages.length === 1) openPage(pages[0]);
-    else if (pages.length > 1) setPickerOpen((value) => !value);
-    else refreshNotifications();
+    else setPickerOpen((value) => !value);
   }
 
-  if (!clientId || messengerAvailable === false) return null;
+  if (!clientId) return null;
   const style = position.left != null ? { left: position.left, top: position.top } : position.top != null ? { right: position.right ?? 12, top: position.top } : { right: position.right ?? 22, bottom: position.bottom ?? 24 };
   return <div className="meta-messenger-float-wrap" style={style}>
+    {pickerOpen && pages.length === 0 && <div className="meta-messenger-page-picker">
+      <strong>Messenger isn’t connected</strong>
+      <p>Connect an active Facebook Page in Account &amp; Security → Facebook Setup to open its inbox here.</p>
+    </div>}
     {pickerOpen && pages.length > 1 && <div className="meta-messenger-page-picker">
       <strong>Open Page Messenger</strong>
       {pages.map((page) => <button key={page.fb_page_id} type="button" onClick={() => openPage(page)}>

@@ -3167,6 +3167,41 @@ button.post-type-card:hover { transform: translateY(-2px); border-color: #bcdcc3
 .portal-notification-copy time { margin-top: 6px; color: #8492a6; font-size: 11px; }
 .portal-notification-empty { margin: 0; padding: 24px; color: #64748b; text-align: center; font-size: 13px; }
 .portal-notification-error { margin: 0; padding: 10px 14px; color: #9f1239; background: #fff1f2; font-size: 12px; }
+.dashboard-communications-panel { margin: 0 0 20px; }
+.dashboard-communications-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(260px, .85fr); gap: 14px; }
+.dashboard-communication-card { min-width: 0; overflow: hidden; border: 1px solid #e5ebf1; border-radius: 15px; background: #fff; }
+.dashboard-communication-heading { display: flex; align-items: center; gap: 11px; min-height: 64px; padding: 13px 15px; border-bottom: 1px solid #edf1f5; }
+.dashboard-communication-heading > div { display: grid; gap: 3px; min-width: 0; flex: 1; }
+.dashboard-communication-heading strong { color: #1a2e43; font-size: 14px; }
+.dashboard-communication-heading span:not(.dashboard-communication-icon) { overflow: hidden; color: #718096; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.dashboard-communication-heading > button { flex: 0 0 auto; }
+.dashboard-communication-icon { width: 40px; height: 40px; flex: 0 0 40px; display: grid; place-items: center; border-radius: 12px; }
+.dashboard-communication-icon svg { width: 20px; height: 20px; }
+.dashboard-communication-icon.notification { color: #087f5b; background: #ecfdf5; }
+.dashboard-communication-icon.messenger { color: #0866ff; background: #eff6ff; }
+.dashboard-notification-list { max-height: 360px; overflow-y: auto; }
+.dashboard-notification-entry { display: grid; grid-template-columns: 10px minmax(0, 1fr); align-items: start; gap: 10px; width: 100%; padding: 12px 15px; border: 0; border-bottom: 1px solid #f0f2f5; text-align: left; cursor: pointer; }
+.dashboard-notification-entry.unread { background: #f0fdf8; }
+.dashboard-notification-entry.read { background: #fff; cursor: default; }
+.dashboard-notification-status-dot { width: 8px; height: 8px; margin-top: 5px; border-radius: 50%; background: transparent; }
+.dashboard-notification-entry.unread .dashboard-notification-status-dot { background: #059669; box-shadow: 0 0 0 2px #d1fae5; }
+.dashboard-notification-entry > span:last-child { display: grid; gap: 4px; min-width: 0; }
+.dashboard-notification-entry strong { color: #172b4d; font-size: 13px; }
+.dashboard-notification-entry small { color: #475569; font-size: 12px; line-height: 1.4; }
+.dashboard-notification-entry time { color: #8492a6; font-size: 10px; }
+.dashboard-notification-empty { margin: 0; padding: 21px 16px; color: #64748b; font-size: 12px; text-align: center; }
+.dashboard-notifications-more { width: 100%; padding: 11px; border: 0; color: #087f5b; background: #fff; font: inherit; font-size: 12px; font-weight: 750; cursor: pointer; }
+.dashboard-communication-error { margin: 0; padding: 9px 14px; color: #9f1239; background: #fff1f2; font-size: 12px; }
+.dashboard-messenger-card > p { margin: 15px; color: #64748b; font-size: 13px; line-height: 1.55; }
+.dashboard-messenger-open,.dashboard-messenger-connect { display: flex; align-items: center; justify-content: center; gap: 9px; width: calc(100% - 30px); min-height: 46px; margin: 0 15px 15px; padding: 10px 12px; border: 0; border-radius: 11px; color: #fff; background: #0866ff; font: inherit; font-size: 13px; font-weight: 750; cursor: pointer; }
+.dashboard-messenger-open svg { width: 19px; height: 19px; }
+.dashboard-messenger-open b { margin-left: auto; padding: 4px 7px; border-radius: 20px; color: #0866ff; background: #fff; font-size: 10px; white-space: nowrap; }
+.dashboard-messenger-open:disabled { opacity: .65; cursor: wait; }
+.dashboard-messenger-connect { border: 1px solid #cfe2d5; color: #14723c; background: #f1fbf4; }
+@media (max-width: 760px) {
+  .dashboard-communications-grid { grid-template-columns: minmax(0, 1fr); }
+  .dashboard-communication-heading { padding: 12px; }
+}
 @media (max-width: 480px) {
   .portal-notification-float-wrap { right: 84px; bottom: 22px; }
   .portal-notification-float { width: 54px; height: 54px; }
@@ -3236,6 +3271,7 @@ button.post-type-card:hover { transform: translateY(-2px); border-color: #bcdcc3
 }
 
 .meta-messenger-page-picker strong { display: block; padding: 6px 8px 9px; }
+.meta-messenger-page-picker p { margin: 0; padding: 0 8px 8px; color: #64748b; font-size: 12px; line-height: 1.5; }
 .meta-messenger-page-picker button {
   width: 100%;
   display: flex;

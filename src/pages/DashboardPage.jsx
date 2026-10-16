@@ -96,6 +96,12 @@ function NavIcon({ type }) {
         <path d="M8 14h5" />
       </svg>
     ),
+    bell: (
+      <svg {...common}>
+        <path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+        <path d="M10 21h4" />
+      </svg>
+    ),
     users: (
       <svg {...common}>
         <circle cx="9" cy="8" r="3" />
@@ -227,6 +233,153 @@ function onlySelectedPage(rows, pageId) {
   );
 }
 
+function DashboardCommunicationPanel({ client, selectedFbPageId, selectedFbPageName, facebookStatus, openFacebookSetup }) {
+  const [notifications, setNotifications] = useState([]);
+  const [notificationsError, setNotificationsError] = useState("");
+  const [showAllNotifications, setShowAllNotifications] = useState(false);
+  const [messengerUnread, setMessengerUnread] = useState(0);
+  const [messengerBusy, setMessengerBusy] = useState(false);
+  const clientId = client?.client_id;
+  const unreadCount = notifications.filter((entry) => !entry.read_at).length;
+  const hasConnectedPage = Boolean(facebookStatus?.connected && selectedFbPageId);
+
+  async function loadNotifications() {
+    if (!clientId) return;
+    try {
+      const { data, error } = await supabase.functions.invoke("eo2mate", {
+        headers: { "x-eo2mate-route": "live-admin" },
+        body: { action: "list", client_id: clientId, ...(selectedFbPageId ? { fb_page_id: selectedFbPageId } : {}) },
+      });
+      if (error || data?.error) throw new Error(data?.detail || data?.message || data?.error || error?.message || "Unable to load notifications.");
+      setNotifications(data?.notifications || []);
+      setNotificationsError("");
+    } catch (error) {
+      setNotificationsError(error.message || "Unable to load notifications.");
+    }
+  }
+
+  async function loadMessengerUnread() {
+    if (!clientId || !hasConnectedPage) return;
+    try {
+      const { data, error } = await supabase.functions.invoke("meta", {
+        method: "POST",
+        headers: { "x-eo2mate-meta-route": "messenger-notifications" },
+        body: { client_id: clientId },
+      });
+      if (!error && data?.success) {
+        const page = (data.pages || []).find((entry) => String(entry.fb_page_id) === String(selectedFbPageId));
+        setMessengerUnread(Number(page?.unread_count || 0));
+      }
+    } catch { /* Messenger status must not block the dashboard */ }
+  }
+
+  useEffect(() => {
+    setNotifications([]);
+    setMessengerUnread(0);
+    if (!clientId) return undefined;
+    loadNotifications();
+    loadMessengerUnread();
+    const timer = window.setInterval(() => {
+      loadNotifications();
+      loadMessengerUnread();
+    }, 10000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        loadNotifications();
+        loadMessengerUnread();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [clientId, selectedFbPageId, hasConnectedPage]);
+
+  async function markRead(notificationId) {
+    const previous = notifications;
+    const readAt = new Date().toISOString();
+    setNotifications((items) => items.map((entry) => entry.id === notificationId ? { ...entry, read_at: readAt } : entry));
+    try {
+      const { data, error } = await supabase.functions.invoke("eo2mate", {
+        headers: { "x-eo2mate-route": "live-admin" },
+        body: { action: "mark-notification-read", client_id: clientId, notification_id: notificationId, ...(selectedFbPageId ? { fb_page_id: selectedFbPageId } : {}) },
+      });
+      if (error || data?.error) throw new Error(data?.detail || data?.error || error?.message || "Unable to update notification.");
+      if (data?.notification) setNotifications((items) => items.map((entry) => entry.id === notificationId ? data.notification : entry));
+    } catch (error) {
+      setNotifications(previous);
+      setNotificationsError(error.message || "Unable to update notification.");
+    }
+  }
+
+  async function markAllRead() {
+    const readAt = new Date().toISOString();
+    setNotifications((items) => items.map((entry) => entry.read_at ? entry : { ...entry, read_at: readAt }));
+    try {
+      const { data, error } = await supabase.functions.invoke("eo2mate", {
+        headers: { "x-eo2mate-route": "live-admin" },
+        body: { action: "mark-all-notifications-read", client_id: clientId, ...(selectedFbPageId ? { fb_page_id: selectedFbPageId } : {}) },
+      });
+      if (error || data?.error) throw new Error(data?.detail || data?.error || error?.message || "Unable to update notifications.");
+      setNotificationsError("");
+    } catch (error) {
+      setNotificationsError(error.message || "Unable to update notifications.");
+      loadNotifications();
+    }
+  }
+
+  async function openMessenger() {
+    if (!clientId || !selectedFbPageId) return;
+    setMessengerBusy(true);
+    try {
+      await supabase.functions.invoke("meta", {
+        method: "POST",
+        headers: { "x-eo2mate-meta-route": "messenger-notifications" },
+        body: { client_id: clientId, action: "mark-read", fb_page_id: selectedFbPageId },
+      });
+      setMessengerUnread(0);
+    } finally {
+      setMessengerBusy(false);
+      window.open(`https://business.facebook.com/latest/inbox/all?asset_id=${encodeURIComponent(selectedFbPageId)}`, "_blank", "noopener,noreferrer");
+    }
+  }
+
+  const displayedNotifications = showAllNotifications ? notifications : notifications.slice(0, 5);
+  return <section className="dashboard-panel dashboard-communications-panel">
+    <div className="panel-header"><div><h2>Notifications &amp; Messenger</h2><p>Review saved Live activity and open the selected Facebook Page inbox.</p></div></div>
+    <div className="dashboard-communications-grid">
+      <div className="dashboard-communication-card">
+        <div className="dashboard-communication-heading">
+          <span className="dashboard-communication-icon notification"><NavIcon type="bell" /></span>
+          <div><strong>Notification center</strong><span>{unreadCount ? `${unreadCount} unread` : "Saved activity"}</span></div>
+          <button type="button" className="table-link-button" onClick={markAllRead} disabled={!unreadCount}>Mark all read</button>
+        </div>
+        {notificationsError && <p className="dashboard-communication-error" role="status">{notificationsError}</p>}
+        <div className="dashboard-notification-list">
+          {!notifications.length && !notificationsError && <p className="dashboard-notification-empty">No notifications yet. Accepted Live claims and ended sessions will be saved here.</p>}
+          {displayedNotifications.map((entry) => <button type="button" key={entry.id} className={`dashboard-notification-entry${entry.read_at ? " read" : " unread"}`} onClick={() => !entry.read_at && markRead(entry.id)}>
+            <span className="dashboard-notification-status-dot" />
+            <span><strong>{entry.title}</strong><small>{entry.message}</small><time>{entry.created_at ? new Date(entry.created_at).toLocaleString("en-PH", { timeZone: "Asia/Manila", dateStyle: "medium", timeStyle: "short" }) : ""}</time></span>
+          </button>)}
+        </div>
+        {notifications.length > 5 && <button type="button" className="dashboard-notifications-more" onClick={() => setShowAllNotifications((value) => !value)}>{showAllNotifications ? "Show recent" : `View all ${notifications.length} notifications`}</button>}
+      </div>
+      <div className="dashboard-communication-card dashboard-messenger-card">
+        <div className="dashboard-communication-heading">
+          <span className="dashboard-communication-icon messenger"><NavIcon type="chat" /></span>
+          <div><strong>Facebook Messenger</strong><span>{selectedFbPageName || "Selected Facebook Page"}</span></div>
+        </div>
+        <p>Open the Messenger inbox for the Page selected at the top of your dashboard.</p>
+        {hasConnectedPage ? <button type="button" className="dashboard-messenger-open" onClick={openMessenger} disabled={messengerBusy}>
+          <NavIcon type="chat" /><span>{messengerBusy ? "Opening Messenger…" : "Open Messenger"}</span>
+          {messengerUnread > 0 && <b>{messengerUnread > 99 ? "99+" : messengerUnread} unread</b>}
+        </button> : <button type="button" className="dashboard-messenger-connect" onClick={openFacebookSetup}>Connect a Facebook Page to use Messenger</button>}
+      </div>
+    </div>
+  </section>;
+}
+
 export default function DashboardPage({ client, facebookStatus, goToAuctions, goToDeliveries, goToOrders, goToPayments, navigateTo, onboardingChecked, openDelivery, openFacebookSetup, page, paymentAccountLoading, paymentAccountMessage, paymentAccountStatus, setErrorMessage, setPage , selectedFbPageId, selectedFbPageName }) {
   const activePageLabel = String(selectedFbPageName || "").trim();
   const welcomeName = activePageLabel || client?.name || "Business overview";
@@ -330,6 +483,8 @@ export default function DashboardPage({ client, facebookStatus, goToAuctions, go
                 <button className="primary-button" type="button" onClick={openFacebookSetup}>Connect Facebook</button>
               </section>
             )}
+
+            <DashboardCommunicationPanel client={client} selectedFbPageId={selectedFbPageId} selectedFbPageName={selectedFbPageName} facebookStatus={facebookStatus} openFacebookSetup={openFacebookSetup} />
 
             <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 14, marginBottom: 20 }}>
               {[
