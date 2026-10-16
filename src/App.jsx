@@ -25,7 +25,9 @@ export default function App() {
   const [passwordRecovery, setPasswordRecovery] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [verifiedEmail, setVerifiedEmail] = useState(null);
-  const showroomPageId = new URLSearchParams(window.location.search).get("showroom") || "";
+  const storeParams = new URLSearchParams(window.location.search);
+  const storeToken = storeParams.get("store") || "";
+  const isStoreRoute = storeParams.has("store");
 
   useEffect(() => {
     let mounted = true;
@@ -55,7 +57,7 @@ export default function App() {
     };
   }, []);
 
-  if (/^\d{5,30}$/.test(showroomPageId)) return <PublicShowroomPage fbPageId={showroomPageId} />;
+  if (isStoreRoute) return <PublicShowroomPage storeToken={storeToken} />;
   if (loading) return <LoadingScreen />;
   if (passwordRecovery && session) return <PasswordResetPage onComplete={() => setPasswordRecovery(false)} />;
   if (!session) return showLogin ? <LoginPage onBack={() => setShowLogin(false)} /> : <PublicHomePage onLogin={() => setShowLogin(true)} />;

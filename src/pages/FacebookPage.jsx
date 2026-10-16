@@ -45,11 +45,11 @@ function StatusBadge({ status }) {
   return <span className={className}>{statusLabel(normalized)}</span>;
 }
 
-function showroomUrl(pageId) {
+function storeUrl(token) {
   const url = new URL(window.location.href);
   url.search = "";
   url.hash = "";
-  url.searchParams.set("showroom", pageId);
+  url.searchParams.set("store", token);
   return url.toString();
 }
 
@@ -60,7 +60,7 @@ function toLocalDateTime(value) {
   return local.toISOString().slice(0, 16);
 }
 
-function ShowroomBoardEditor({ clientId, page, onClose }) {
+function ShowroomBoardEditor({ clientId, page, shareToken, onShareToken, onClose }) {
   const emptyForm = { id: "", announcement_type: "ANNOUNCEMENT", title: "", body: "", cta_label: "", cta_url: "", starts_at: "", ends_at: "", is_published: true };
   const [rows, setRows] = useState([]);
   const [form, setForm] = useState(emptyForm);
@@ -68,6 +68,7 @@ function ShowroomBoardEditor({ clientId, page, onClose }) {
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [linkBusy, setLinkBusy] = useState(false);
   const invoke = async (action, extra = {}) => {
     const { data, error: invokeError } = await supabase.functions.invoke("eo2mate", {
       headers: { "x-eo2mate-route": "public-showroom" },
@@ -93,6 +94,13 @@ function ShowroomBoardEditor({ clientId, page, onClose }) {
     } catch (e) { setError(e.message || "Unable to save this update."); }
     finally { setSaving(false); }
   };
+  const regenerateLink = async () => {
+    if (!window.confirm("Create a new private store link? The existing shared link will stop working.")) return;
+    setLinkBusy(true); setError(""); setNotice("");
+    try { const data = await invoke("share-regenerate"); onShareToken?.(page.fb_page_id, data.share_token); setNotice("New store link created. The old link has been revoked."); }
+    catch (e) { setError(e.message || "Unable to regenerate the store link."); }
+    finally { setLinkBusy(false); }
+  };
   const remove = async (id) => {
     if (!window.confirm("Remove this update from the showroom?")) return;
     setError("");
@@ -102,6 +110,7 @@ function ShowroomBoardEditor({ clientId, page, onClose }) {
   return <section className="dashboard-panel showroom-board-editor" aria-label={`Showroom information board for ${page.page_name || page.fb_page_id}`}>
     <div className="panel-header"><div><h2>Promotions & updates · {page.page_name || "Facebook Page"}</h2><p>Publish a promotion, announcement or store information on this Page's public showroom. Set dates for scheduled offers.</p></div><button type="button" className="secondary-button" onClick={onClose}>Close</button></div>
     {error && <div className="error-banner" role="alert">{error}</div>}{notice && <div className="success-banner" role="status">{notice}</div>}
+    <div className="showroom-share-link-row"><div><strong>Private store link</strong><span>{shareToken ? storeUrl(shareToken) : "Preparing your secure link…"}</span><small>The link uses a private random key; your Facebook Page ID is not in the URL.</small></div><button type="button" className="secondary-button" disabled={linkBusy} onClick={regenerateLink}>{linkBusy ? "Creating…" : "Regenerate link"}</button></div>
     <div className="showroom-board-editor-grid">
       <form className="showroom-board-form" onSubmit={save}>
         <h3>{form.id ? "Edit board item" : "Add a board item"}</h3>
@@ -123,6 +132,26 @@ export default function FacebookPage({ client, facebookLoading, facebookMessage,
   const [showAddPageGuide, setShowAddPageGuide] = useState(false);
   const [showroomBoardPage, setShowroomBoardPage] = useState(null);
   const [copiedShowroomPage, setCopiedShowroomPage] = useState("");
+  const [storeTokens, setStoreTokens] = useState({});
+  const pageIdsKey = (facebookStatus?.pages || []).map((fbPage) => fbPage.fb_page_id).filter(Boolean).join(",");
+  useEffect(() => {
+    if (!client?.client_id || !pageIdsKey) return undefined;
+    let cancelled = false;
+    const loadLinks = async () => {
+      const pages = (facebookStatus?.pages || []).filter((fbPage) => fbPage.fb_page_id);
+      const pairs = await Promise.all(pages.map(async (fbPage) => {
+        try {
+          const { data, error } = await supabase.functions.invoke("eo2mate", { headers: { "x-eo2mate-route": "public-showroom" }, body: { action: "share-link", client_id: client.client_id, fb_page_id: fbPage.fb_page_id } });
+          if (error || !data?.success) return null;
+          return [fbPage.fb_page_id, data.share_token];
+        } catch { return null; }
+      }));
+      if (!cancelled) setStoreTokens((current) => ({ ...current, ...Object.fromEntries(pairs.filter(Boolean)) }));
+    };
+    loadLinks();
+    return () => { cancelled = true; };
+  }, [client?.client_id, pageIdsKey]);
+  const updateStoreToken = (pageId, token) => setStoreTokens((current) => ({ ...current, [pageId]: token }));
 
   const [connecting, setConnecting] = useState(false);
   const [repairPage,setRepairPage]=useState(null);
@@ -318,7 +347,7 @@ export default function FacebookPage({ client, facebookLoading, facebookMessage,
                         <td><StatusBadge status={fbPage.status || "ACTIVE"} /></td>
                         <td><StatusBadge status={fbPage.token_present ? "AUTHORIZED" : "RECONNECT"} /></td>
                         <td>{formatDateTime(fbPage.connected_at)}</td>
-                        <td><div className="facebook-showroom-actions"><a className="secondary-button" href={showroomUrl(fbPage.fb_page_id)} target="_blank" rel="noreferrer">Open showroom</a><button className="secondary-button" type="button" onClick={async () => { try { await navigator.clipboard.writeText(showroomUrl(fbPage.fb_page_id)); setCopiedShowroomPage(fbPage.fb_page_id); window.setTimeout(() => setCopiedShowroomPage(""), 1800); } catch { setFacebookMessage("Copy the showroom URL from the address bar after opening it."); } }}>{copiedShowroomPage === fbPage.fb_page_id ? "Copied" : "Copy link"}</button><button className="secondary-button" type="button" onClick={() => setShowroomBoardPage((current) => current?.fb_page_id === fbPage.fb_page_id ? null : fbPage)}>{showroomBoardPage?.fb_page_id === fbPage.fb_page_id ? "Close board" : "Manage board"}</button></div></td>
+                        <td><div className="facebook-showroom-actions">{storeTokens[fbPage.fb_page_id] ? <a className="secondary-button" href={storeUrl(storeTokens[fbPage.fb_page_id])} target="_blank" rel="noreferrer">Open store</a> : <button className="secondary-button" type="button" disabled>Preparing link…</button>}<button className="secondary-button" type="button" disabled={!storeTokens[fbPage.fb_page_id]} onClick={async () => { try { await navigator.clipboard.writeText(storeUrl(storeTokens[fbPage.fb_page_id])); setCopiedShowroomPage(fbPage.fb_page_id); window.setTimeout(() => setCopiedShowroomPage(""), 1800); } catch { setFacebookMessage("Unable to copy the store link. Open it and copy the address from the browser."); } }}>{copiedShowroomPage === fbPage.fb_page_id ? "Copied" : "Copy link"}</button><button className="secondary-button" type="button" onClick={() => setShowroomBoardPage((current) => current?.fb_page_id === fbPage.fb_page_id ? null : fbPage)}>{showroomBoardPage?.fb_page_id === fbPage.fb_page_id ? "Close board" : "Manage board"}</button></div></td>
                       </tr>
                     ))}
 
@@ -330,7 +359,7 @@ export default function FacebookPage({ client, facebookLoading, facebookMessage,
                   </tbody>
                 </table>
               </div>
-              {showroomBoardPage && <ShowroomBoardEditor clientId={client?.client_id} page={showroomBoardPage} onClose={() => setShowroomBoardPage(null)} />}
+              {showroomBoardPage && <ShowroomBoardEditor clientId={client?.client_id} page={showroomBoardPage} shareToken={storeTokens[showroomBoardPage.fb_page_id]} onShareToken={updateStoreToken} onClose={() => setShowroomBoardPage(null)} />}
             </section>
 
             <section className="setup-requirements-card">

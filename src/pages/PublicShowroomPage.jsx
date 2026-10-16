@@ -17,7 +17,7 @@ function StoreIcon({ kind }) {
   return <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{paths[kind]}</svg>;
 }
 
-export default function PublicShowroomPage({ fbPageId }) {
+export default function PublicShowroomPage({ storeToken }) {
   const [showroom, setShowroom] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -31,10 +31,10 @@ export default function PublicShowroomPage({ fbPageId }) {
       const { data, error: invokeError } = await supabase.functions.invoke("eo2mate", {
         method: "POST",
         headers: { "x-eo2mate-route": "public-showroom" },
-        body: { fb_page_id: fbPageId },
+        body: { store_token: storeToken },
       });
       if (invokeError || !data?.success) {
-        const message = data?.error === "SHOWROOM_NOT_FOUND"
+        const message = ["SHOWROOM_NOT_FOUND", "STORE_NOT_FOUND"].includes(data?.error)
           ? "This showroom is not available. Check the link or contact the Page owner."
           : data?.message || invokeError?.message || "We couldn't load this Page's showroom.";
         throw new Error(message);
@@ -48,7 +48,7 @@ export default function PublicShowroomPage({ fbPageId }) {
     }
   }
 
-  useEffect(() => { loadShowroom(); }, [fbPageId]);
+  useEffect(() => { loadShowroom(); }, [storeToken]);
 
   const items = useMemo(() => (showroom?.items || []).filter((item) => {
     const query = search.trim().toLowerCase();
@@ -57,8 +57,10 @@ export default function PublicShowroomPage({ fbPageId }) {
   }).sort((a, b) => sort === "price-low" ? a.price - b.price : sort === "price-high" ? b.price - a.price : String(a.item_name).localeCompare(String(b.item_name))), [showroom, search, sort]);
 
   const page = showroom?.page || {};
-  const pageUrl = page.link || `https://www.facebook.com/${fbPageId}`;
-  const messengerUrl = `https://m.me/${fbPageId}`;
+  const pageUrl = page.link || "https://www.facebook.com/";
+  const messengerUrl = page.messenger_url || "";
+  const featuredItem = showroom?.items?.[0];
+  const featuredImage = featuredItem?.images?.find((image) => image.is_primary)?.url || featuredItem?.images?.[0]?.url;
 
   return <main className="showroom-site">
     <nav className="showroom-nav">
@@ -80,10 +82,13 @@ export default function PublicShowroomPage({ fbPageId }) {
         <p className="showroom-intro">{page.about || page.description || "Discover our latest available items. Browse the collection and message us on Facebook if you have a question."}</p>
         <div className="showroom-hero-actions">
           <a className="showroom-follow-button" href={pageUrl} target="_blank" rel="noreferrer"><span aria-hidden="true">f</span> Follow on Facebook</a>
-          <a className="showroom-message-button" href={messengerUrl} target="_blank" rel="noreferrer">Message the Page <StoreIcon kind="arrow" /></a>
+          {messengerUrl && <a className="showroom-message-button" href={messengerUrl} target="_blank" rel="noreferrer">Message the Page <StoreIcon kind="arrow" /></a>}
         </div>
         <div className="showroom-trust-row"><span><i/>Current available stock</span><b>·</b><span>Updated from the Page inventory</span></div>
       </div>
+      <aside className="showroom-hero-feature" aria-label="Featured available item">
+        {featuredItem ? <><div className="showroom-feature-photo">{featuredImage ? <img src={featuredImage} alt={featuredItem.item_name}/> : <div className="showroom-feature-placeholder">{(page.name || "S").slice(0, 1)}</div>}<span>AVAILABLE NOW</span></div><div className="showroom-feature-details"><small>FROM THE COLLECTION</small><strong>{featuredItem.item_name}</strong><div><b>{formatPrice(featuredItem.price)}</b><span>{featuredItem.available} in stock</span></div><a href="#collection">Explore all items <StoreIcon kind="arrow"/></a></div></> : <div className="showroom-feature-welcome"><span className="showroom-feature-star">✦</span><small>CURATED FOR YOU</small><strong>Find your next favorite.</strong><p>Thoughtfully chosen finds, ready to discover.</p><a href="#collection">Browse the collection <StoreIcon kind="arrow"/></a></div>}
+      </aside>
       <a className="showroom-scroll-cue" href="#collection">Explore the collection <span>↓</span></a>
     </section>
 
@@ -116,7 +121,7 @@ export default function PublicShowroomPage({ fbPageId }) {
 
     <section className="showroom-about" id="about">
       <div className="showroom-about-mark">{page.picture ? <img src={page.picture} alt=""/> : <span>{(page.name || "S").slice(0, 1).toUpperCase()}</span>}</div>
-      <div className="showroom-about-copy"><span className="showroom-eyebrow">A LITTLE ABOUT US</span><h2>{page.name || "Facebook Page"}</h2><p>{page.description || page.about || "Thanks for visiting our showroom. Follow our Facebook Page for new arrivals, updates and announcements."}</p><div className="showroom-about-links"><a href={pageUrl} target="_blank" rel="noreferrer"><StoreIcon kind="pin"/> Visit and follow our Facebook Page</a><a href={messengerUrl} target="_blank" rel="noreferrer">Send us a message <StoreIcon kind="arrow"/></a></div></div>
+      <div className="showroom-about-copy"><span className="showroom-eyebrow">A LITTLE ABOUT US</span><h2>{page.name || "Facebook Page"}</h2><p>{page.description || page.about || "Thanks for visiting our showroom. Follow our Facebook Page for new arrivals, updates and announcements."}</p><div className="showroom-about-links"><a href={pageUrl} target="_blank" rel="noreferrer"><StoreIcon kind="pin"/> Visit and follow our Facebook Page</a>{messengerUrl && <a href={messengerUrl} target="_blank" rel="noreferrer">Send us a message <StoreIcon kind="arrow"/></a>}</div></div>
     </section>
 
     <footer className="showroom-footer"><a className="showroom-wordmark" href="#top">{page.picture ? <img src={page.picture} alt=""/> : <span className="showroom-wordmark-mark">S</span>}<span>{page.name || "Facebook Page"}</span></a><span>Public inventory showroom</span><a href={pageUrl} target="_blank" rel="noreferrer">Follow on Facebook <StoreIcon kind="arrow"/></a></footer>
