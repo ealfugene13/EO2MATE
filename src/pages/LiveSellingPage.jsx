@@ -466,12 +466,18 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
     const missingCaptions = nextSessions.filter((session) => !captionRequests.current.has(session.id));
     if (missingCaptions.length) {
       missingCaptions.forEach((session) => captionRequests.current.add(session.id));
+      let captionTimeout;
       try {
-        const captionResult = await request("captions", { session_ids: missingCaptions.map((session) => session.id) });
+        const captionResult = await Promise.race([
+          request("captions", { session_ids: missingCaptions.map((session) => session.id) }),
+          new Promise((_, reject) => { captionTimeout = window.setTimeout(() => reject(new Error("Caption lookup timed out.")), 12000); }),
+        ]);
         const received = Object.fromEntries((captionResult.captions || []).map((entry) => [entry.session_id, entry.caption || ""]));
         setPostCaptions((previous) => ({ ...previous, ...received }));
       } catch {
         setPostCaptions((previous) => ({ ...previous, ...Object.fromEntries(missingCaptions.map((session) => [session.id, ""])) }));
+      } finally {
+        window.clearTimeout(captionTimeout);
       }
     }
   };
@@ -597,7 +603,7 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
     <div style={{ display: "grid", gridTemplateColumns: current ? "repeat(auto-fit, minmax(min(100%, 450px), 1fr))" : "minmax(0, 1fr)", alignItems: "start", gap: 20, margin: "20px 0 24px" }}>
     <section aria-labelledby="live-previous-posts-title" style={{ boxSizing: "border-box", minWidth: 0, padding: 26, margin: 0, border: "1px solid #e1e8f0", borderRadius: 18, background: "#fff", boxShadow: "0 5px 16px rgba(15, 23, 42, 0.035)" }}>
       <div className="panel-header" style={{ padding: "0 0 18px", margin: "0 0 20px", borderBottom: "1px solid #e7edf3" }}><div><h3 id="live-previous-posts-title" style={{ margin: 0 }}>Previous Live posts</h3><p style={{ margin: "6px 0 0" }}>Select a post to view its product queue beside this list.</p></div></div>
-      <div className="table-wrapper" style={{ marginTop: 18, borderRadius: 14, overflow: "auto" }}><table style={{ width: "100%", minWidth: 500, tableLayout: "fixed" }}><colgroup><col style={{ width: "33%" }} /><col style={{ width: "24%" }} /><col style={{ width: "12%" }} /><col style={{ width: "10%" }} /><col style={{ width: "10%" }} /><col style={{ width: 48 }} /></colgroup><thead><tr><th>Post caption</th><th>Created</th><th>Status</th><th>Products</th><th>Claimed</th><th aria-label="Actions"></th></tr></thead><tbody>
+      <div className="table-wrapper" style={{ marginTop: 18, borderRadius: 14, overflow: "auto" }}><table style={{ width: "100%", minWidth: 500, tableLayout: "fixed", fontSize: 12 }}><colgroup><col style={{ width: "30%" }} /><col style={{ width: "24%" }} /><col style={{ width: "14%" }} /><col style={{ width: "12%" }} /><col style={{ width: "12%" }} /><col style={{ width: "8%" }} /></colgroup><thead><tr><th style={{ padding: "9px 6px" }}>Post caption</th><th style={{ padding: "9px 6px" }}>Created</th><th style={{ padding: "9px 6px" }}>Status</th><th style={{ padding: "9px 6px" }}>Products</th><th style={{ padding: "9px 6px" }}>Claimed</th><th aria-label="Actions" style={{ padding: "9px 4px" }}></th></tr></thead><tbody>
         {visibleSessions.map((session) => {
           const items = (session.eo2mate_live_items || []).filter((entry) => activeMode === "MIXED" || String(entry.mode || "").toUpperCase() === activeMode);
           const claimed = items.reduce((sum, entry) => sum + (Number(entry.claimed) || 0), 0);
@@ -648,13 +654,23 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
           {inventoryError && <p role="alert" style={{ margin: "8px 0 0", color: "#b42318" }}>Inventory could not be loaded: {inventoryError}</p>}
           {!inventoryLoading && !inventoryError && !inventoryItems.length && <p style={{ margin: "8px 0 0", color: "#64748b" }}>No active inventory products with whole units available were found for this Facebook Page. You can still enter the product details below.</p>}
           </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-            <input placeholder="Item code e.g. A12" aria-label="Item code" maxLength={12} value={item.item_code} onChange={(e) => setItem({ ...item, item_code: e.target.value.toUpperCase() })} />
-            <input placeholder="Product name" aria-label="Product name" value={item.title} onChange={(e) => setItem({ ...item, title: e.target.value })} />
-            {activeMode === "MIXED" ? <select aria-label="Selling mode" value={item.mode} onChange={(e) => setItem({ ...item, mode: e.target.value })}><option value="SELLING">Selling</option><option value="MINING">Mining</option><option value="AUCTION">Auction</option></select> : <span className="status-badge">{activeMode}</span>}
-            <input type="number" min="1" aria-label="Quantity" value={item.quantity} onChange={(e) => setItem({ ...item, quantity: e.target.value })} />
-            {(item.mode === "SELLING" ? ["unit_price"] : item.mode === "MINING" ? ["mine_price", "take_price", "lock_price"] : ["starting_bid", "bid_increment"]).map((field) => <input key={field} type="number" min="0" step="0.01" aria-label={field.replaceAll("_", " ")} placeholder={field.replaceAll("_", " ")} value={item[field]} onChange={(e) => setItem({ ...item, [field]: e.target.value })} />)}
-            <button type="button" className="secondary-button" disabled={busy || !item.title || !isValidLiveItemCode(item.item_code) || itemCodeAlreadyQueued} onClick={addItemToQueue}><NavIcon type="add" />Add product</button>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 150px), 1fr))", alignItems: "end", gap: 12 }}>
+            <label style={{ display: "grid", gap: 6, minWidth: 0, color: "#344054", fontSize: 13, fontWeight: 600 }}>Item code
+              <input placeholder="e.g. A12" aria-label="Item code" maxLength={12} value={item.item_code} onChange={(e) => setItem({ ...item, item_code: e.target.value.toUpperCase() })} style={{ width: "100%", minWidth: 0, height: 42, boxSizing: "border-box" }} />
+            </label>
+            <label style={{ display: "grid", gap: 6, minWidth: 0, color: "#344054", fontSize: 13, fontWeight: 600 }}>Product name
+              <input placeholder="Product name" aria-label="Product name" value={item.title} onChange={(e) => setItem({ ...item, title: e.target.value })} style={{ width: "100%", minWidth: 0, height: 42, boxSizing: "border-box" }} />
+            </label>
+            <label style={{ display: "grid", gap: 6, minWidth: 0, color: "#344054", fontSize: 13, fontWeight: 600 }}>Live selling mode
+              {activeMode === "MIXED" ? <select aria-label="Live selling mode" value={item.mode} onChange={(e) => setItem({ ...item, mode: e.target.value })} style={{ width: "100%", minWidth: 0, height: 42, boxSizing: "border-box" }}><option value="SELLING">Selling</option><option value="MINING">Mining</option><option value="AUCTION">Auction</option></select> : <span className="status-badge" style={{ display: "flex", alignItems: "center", height: 42, boxSizing: "border-box" }}>{activeMode}</span>}
+            </label>
+            <label style={{ display: "grid", gap: 6, minWidth: 0, color: "#344054", fontSize: 13, fontWeight: 600 }}>Quantity
+              <input type="number" min="1" aria-label="Quantity" value={item.quantity} onChange={(e) => setItem({ ...item, quantity: e.target.value })} style={{ width: "100%", minWidth: 0, height: 42, boxSizing: "border-box" }} />
+            </label>
+            {(item.mode === "SELLING" ? ["unit_price"] : item.mode === "MINING" ? ["mine_price", "take_price", "lock_price"] : ["starting_bid", "bid_increment"]).map((field) => <label key={field} style={{ display: "grid", gap: 6, minWidth: 0, color: "#344054", fontSize: 13, fontWeight: 600 }}>{field.replaceAll("_", " ").replace(/\b\w/g, (character) => character.toUpperCase())}
+              <input type="number" min="0" step="0.01" aria-label={field.replaceAll("_", " ")} placeholder="0.00" value={item[field]} onChange={(e) => setItem({ ...item, [field]: e.target.value })} style={{ width: "100%", minWidth: 0, height: 42, boxSizing: "border-box" }} />
+            </label>)}
+            <button type="button" className="secondary-button" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, minWidth: 145, height: 42, boxSizing: "border-box", whiteSpace: "nowrap" }} disabled={busy || !item.title || !isValidLiveItemCode(item.item_code) || itemCodeAlreadyQueued} onClick={addItemToQueue}><NavIcon type="add" />Add product</button>
           </div>
           {itemCodeAlreadyQueued && <p role="status" style={{ margin: "8px 0 0", color: "#b54708", fontSize: 13 }}>This item code is already in the selected Live queue. Choose another inventory product or use a new code.</p>}
           {item.inventory_item_id && item.mode !== "SELLING" && <p style={{ margin: "8px 0 0", color: "#64748b", fontSize: 13 }}>The inventory record supplies the default selling price, but not Mining price levels or Auction bid increments. Enter the pricing fields shown for the selected mode.</p>}
