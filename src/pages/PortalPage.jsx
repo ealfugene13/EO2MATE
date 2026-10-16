@@ -204,7 +204,7 @@ function FloatingLiveNotifications({ clientId, fbPageId, pageName }) {
   async function refresh() {
     if (!clientId) return;
     try {
-      const data = await request("list");
+      const data = await request("notifications");
       setNotifications(data?.notifications || []);
       setError("");
     } catch (loadError) {

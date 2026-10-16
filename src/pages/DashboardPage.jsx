@@ -248,7 +248,7 @@ function DashboardCommunicationPanel({ client, selectedFbPageId, selectedFbPageN
     try {
       const { data, error } = await supabase.functions.invoke("eo2mate", {
         headers: { "x-eo2mate-route": "live-admin" },
-        body: { action: "list", client_id: clientId, ...(selectedFbPageId ? { fb_page_id: selectedFbPageId } : {}) },
+        body: { action: "notifications", client_id: clientId, ...(selectedFbPageId ? { fb_page_id: selectedFbPageId } : {}) },
       });
       if (error || data?.error) throw new Error(data?.detail || data?.message || data?.error || error?.message || "Unable to load notifications.");
       setNotifications(data?.notifications || []);
@@ -282,7 +282,7 @@ function DashboardCommunicationPanel({ client, selectedFbPageId, selectedFbPageN
     const timer = window.setInterval(() => {
       loadNotifications();
       loadMessengerUnread();
-    }, 10000);
+    }, 5000);
     const onVisible = () => {
       if (document.visibilityState === "visible") {
         loadNotifications();
@@ -353,6 +353,7 @@ function DashboardCommunicationPanel({ client, selectedFbPageId, selectedFbPageN
         <div className="dashboard-communication-heading">
           <span className="dashboard-communication-icon notification"><NavIcon type="bell" /></span>
           <div><strong>Notification center</strong><span>{unreadCount ? `${unreadCount} unread` : "Saved activity"}</span></div>
+          {unreadCount > 0 && <b className="dashboard-notification-count">{unreadCount > 99 ? "99+" : unreadCount}</b>}
           <button type="button" className="table-link-button" onClick={markAllRead} disabled={!unreadCount}>Mark all read</button>
         </div>
         {notificationsError && <p className="dashboard-communication-error" role="status">{notificationsError}</p>}
