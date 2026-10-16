@@ -181,6 +181,99 @@ function FloatingMetaMessenger({ clientId }) {
   </div>;
 }
 
+function FloatingLiveNotifications({ clientId, fbPageId, pageName }) {
+  const [notifications, setNotifications] = useState([]);
+  const [isOpen, setIsOpen] = useState(false);
+  const [error, setError] = useState("");
+  const unreadCount = notifications.filter((entry) => !entry.read_at).length;
+
+  async function request(action, extra = {}) {
+    if (!clientId) return null;
+    const { data, error: invokeError } = await supabase.functions.invoke("eo2mate", {
+      headers: { "x-eo2mate-route": "live-admin" },
+      body: { action, client_id: clientId, ...(fbPageId ? { fb_page_id: fbPageId } : {}), ...extra },
+    });
+    if (invokeError || data?.error) {
+      const message = data?.detail || data?.message || data?.error || invokeError?.message || "Unable to load notifications.";
+      throw new Error(message);
+    }
+    return data;
+  }
+
+  async function refresh() {
+    if (!clientId) return;
+    try {
+      const data = await request("list");
+      setNotifications(data?.notifications || []);
+      setError("");
+    } catch (loadError) {
+      setError(loadError.message || "Unable to load notifications.");
+    }
+  }
+
+  useEffect(() => {
+    setNotifications([]);
+    setIsOpen(false);
+    if (!clientId) return undefined;
+    refresh();
+    const timer = window.setInterval(refresh, 5000);
+    const onVisible = () => { if (document.visibilityState === "visible") refresh(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [clientId, fbPageId]);
+
+  async function markRead(notificationId) {
+    const original = notifications.find((entry) => entry.id === notificationId);
+    const readAt = new Date().toISOString();
+    setNotifications((current) => current.map((entry) => entry.id === notificationId ? { ...entry, read_at: readAt } : entry));
+    try {
+      const result = await request("mark-notification-read", { notification_id: notificationId });
+      if (result?.notification) setNotifications((current) => current.map((entry) => entry.id === notificationId ? result.notification : entry));
+      setError("");
+    } catch (markError) {
+      if (original) setNotifications((current) => current.map((entry) => entry.id === notificationId ? original : entry));
+      setError(markError.message || "Unable to mark this notification as read.");
+    }
+  }
+
+  async function markAllRead() {
+    const readAt = new Date().toISOString();
+    setNotifications((current) => current.map((entry) => entry.read_at ? entry : { ...entry, read_at: readAt }));
+    try {
+      await request("mark-all-notifications-read");
+      setError("");
+    } catch (markError) {
+      setError(markError.message || "Unable to mark notifications as read.");
+      refresh();
+    }
+  }
+
+  if (!clientId) return null;
+  return <div className="portal-notification-float-wrap">
+    {isOpen && <section className="portal-notification-panel" aria-label="Notification history">
+      <header className="portal-notification-header">
+        <div><strong>Notifications</strong><span>{pageName ? `${pageName} · ` : ""}{unreadCount ? `${unreadCount} unread` : "Recent Live activity"}</span></div>
+        <button type="button" onClick={markAllRead} disabled={!unreadCount}>Mark all read</button>
+      </header>
+      {error && <p className="portal-notification-error" role="status">{error}</p>}
+      <div className="portal-notification-list">
+        {!notifications.length && !error && <p className="portal-notification-empty">No notifications yet. Accepted Live claims and ended sessions will appear here.</p>}
+        {notifications.map((entry) => <button key={entry.id} type="button" className={`portal-notification-entry${entry.read_at ? " is-read" : " is-unread"}`} onClick={() => !entry.read_at && markRead(entry.id)}>
+          <span className="portal-notification-dot" aria-hidden="true" />
+          <span className="portal-notification-copy"><strong>{entry.title}</strong><span>{entry.message}</span><time>{entry.created_at ? new Date(entry.created_at).toLocaleString("en-PH", { timeZone: "Asia/Manila", dateStyle: "medium", timeStyle: "short" }) : ""}</time></span>
+        </button>)}
+      </div>
+    </section>}
+    <button type="button" className="portal-notification-float" aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ""}`} aria-expanded={isOpen} title="Notifications" onClick={() => { setIsOpen((open) => !open); if (!isOpen) refresh(); }}>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg>
+      {unreadCount > 0 && <span className="meta-messenger-badge">{unreadCount > 99 ? "99+" : unreadCount}</span>}
+    </button>
+  </div>;
+}
+
 function NavIcon({ type }) {
   const common = {
     viewBox: "0 0 24 24",
@@ -1152,6 +1245,7 @@ export default function PortalPage({ session }) {
         </PortalPageContent>
 
       </main>
+      <FloatingLiveNotifications clientId={client?.client_id} fbPageId={effectivePageId} pageName={availablePages.find((entry) => String(entry.fb_page_id) === String(effectivePageId))?.page_name || ""} />
       <FloatingMetaMessenger clientId={client?.client_id} />
     </div>
   );

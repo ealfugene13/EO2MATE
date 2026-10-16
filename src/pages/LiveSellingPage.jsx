@@ -191,6 +191,12 @@ function NavIcon({ type }) {
         <circle cx="12" cy="12" r="2.5" />
       </svg>
     ),
+    bell: (
+      <svg {...common}>
+        <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+        <path d="M10 21h4" />
+      </svg>
+    ),
   };
 
   return (
@@ -484,7 +490,9 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
       }
       if (previousSession?.status === "ACTIVE" && String(session.status).toUpperCase() === "CLOSED") {
         const wasManuallyClosed = manualCloseRequests.current.delete(session.id);
-        if (!wasManuallyClosed) showPopup("Facebook Live ended", "The EO2MATE session and its product queue have been closed automatically.", "ended");
+        if (!wasManuallyClosed && String(session.closed_reason || "").toUpperCase() === "FACEBOOK_ENDED") {
+          showPopup("Facebook Live ended", "The EO2MATE session and its product queue have been closed automatically.", "ended");
+        }
       }
       nextSnapshot.set(session.id, { status: String(session.status || "").toUpperCase(), items: nextItems });
     }
@@ -555,6 +563,15 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
         event: "UPDATE",
         schema: "public",
         table: "eo2mate_live_sessions",
+        filter: `fb_page_id=eq.${pageId}`,
+      }, () => {
+        lastRealtimeUpdate = Date.now();
+        refreshQueue();
+      });
+    if (pageId) channel = channel.on("postgres_changes", {
+        event: "INSERT",
+        schema: "public",
+        table: "eo2mate_live_notifications",
         filter: `fb_page_id=eq.${pageId}`,
       }, () => {
         lastRealtimeUpdate = Date.now();
