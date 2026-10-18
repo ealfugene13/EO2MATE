@@ -5,10 +5,13 @@ const MODE_GROUPS = {
   AUCTION: { label: "Auction", order: 1 },
   MINING: { label: "Mining", order: 2 },
   SELLING: { label: "Live Selling", order: 3 },
-  REGULAR_SALE: { label: "Regular Sale", order: 4 },
-  PREORDER: { label: "Pre-order", order: 5 },
-  LIVE_SESSION: { label: "Live Session", order: 6 },
-  MIXED: { label: "Mixed Live", order: 7 },
+  LIVE_SELLING: { label: "Live Selling", order: 3 },
+  LIVE_MINING: { label: "Live Mining", order: 4 },
+  LIVE_AUCTION: { label: "Live Auction", order: 5 },
+  REGULAR_SALE: { label: "Regular Sale", order: 6 },
+  PREORDER: { label: "Pre-order", order: 7 },
+  LIVE_SESSION: { label: "Live Session", order: 8 },
+  MIXED: { label: "Mixed Live", order: 9 },
   OTHER: { label: "Other", order: 99 },
 };
 
