@@ -3241,6 +3241,12 @@ button.post-type-card:hover { transform: translateY(-2px); border-color: #bcdcc3
 .notification-new-label { padding: 3px 6px; border-radius: 5px; color: #087b51; background: #e9f7ef; font-size: 8px; font-weight: 850; letter-spacing: .07em; }
 .notification-center-item-copy p { margin: 5px 0 7px; color: #68766d; font-size: 12px; line-height: 1.5; }
 .notification-center-item-copy time { color: #99a39c; font-size: 10px; }
+.notification-post-details { display: grid; gap: 4px; margin: 8px 0; color: #64746a; font-size: 11px; line-height: 1.45; overflow-wrap: anywhere; }
+.notification-post-details b { color: #44594b; font-weight: 700; }
+.notification-post-details details { margin-top: 2px; }
+.notification-post-details summary { color: #087f5b; cursor: pointer; font-weight: 700; }
+.notification-post-details details p { margin: 5px 0 0; padding: 8px; border-radius: 7px; background: #f4f8f5; white-space: pre-wrap; overflow-wrap: anywhere; }
+
 .notification-mark-read { width: 30px; height: 30px; display: grid; place-items: center; border: 1px solid #dcebe1; border-radius: 8px; color: #168255; background: #fff; cursor: pointer; }
 .notification-mark-read:hover { color: #fff; background: #128a5b; border-color: #128a5b; }
 .notification-mark-read svg { width: 16px; height: 16px; }

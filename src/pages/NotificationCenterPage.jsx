@@ -142,7 +142,7 @@ export default function NotificationCenterPage({ client, selectedFbPageId, selec
           <div className="notification-mode-list">
             {items.map((item) => <article className={`notification-center-item${item.read_at ? " is-read" : " is-unread"}`} key={item.id}>
               <span className="notification-center-item-dot" aria-hidden="true" />
-              <div className="notification-center-item-copy"><div><h4>{item.title}</h4>{!item.read_at && <span className="notification-new-label">NEW</span>}</div><p>{item.message}</p><time>{formatDate(item.created_at)}</time></div>
+              <div className="notification-center-item-copy"><div><h4>{item.title}</h4>{!item.read_at && <span className="notification-new-label">NEW</span>}</div><p>{item.message}</p>{(item.post_id || item.fb_post_id || item.item_label || item.post_caption) && <div className="notification-post-details">{item.item_label && <span><b>Item:</b> {item.item_label}</span>}{item.post_id && <span><b>Post ID:</b> {item.post_id}</span>}{item.fb_post_id && <span><b>Facebook post:</b> {item.fb_post_id}</span>}{item.post_caption && <details><summary>View post caption</summary><p>{item.post_caption}</p></details>}</div>}<time>{formatDate(item.created_at)}</time></div>
               {!item.read_at && <button type="button" className="notification-mark-read" aria-label={`Mark ${item.title} as read`} title="Mark as read" onClick={() => markRead(item.id)}><CheckIcon /></button>}
             </article>)}
           </div>
