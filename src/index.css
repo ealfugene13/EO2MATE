@@ -3167,6 +3167,9 @@ button.post-type-card:hover { transform: translateY(-2px); border-color: #bcdcc3
 .portal-notification-copy time { margin-top: 6px; color: #8492a6; font-size: 11px; }
 .portal-notification-empty { margin: 0; padding: 24px; color: #64748b; text-align: center; font-size: 13px; }
 .portal-notification-error { margin: 0; padding: 10px 14px; color: #9f1239; background: #fff1f2; font-size: 12px; }
+.portal-notification-footer { padding: 10px 14px; border-top: 1px solid #e7edf3; background: #fff; }
+.portal-notification-footer button { width: 100%; min-height: 38px; padding: 9px 12px; border: 1px solid #d8e9df; border-radius: 9px; color: #087f5b; background: #f7fcf9; font: inherit; font-size: 12px; font-weight: 750; cursor: pointer; }
+.portal-notification-footer button:hover { border-color: #a8d9bc; background: #eef9f2; }
 .dashboard-communications-panel { margin: 0 0 20px; }
 .dashboard-communications-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(260px, .85fr); gap: 14px; }
 .dashboard-communication-card { min-width: 0; overflow: hidden; border: 1px solid #e5ebf1; border-radius: 15px; background: #fff; }

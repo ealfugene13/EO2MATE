@@ -183,11 +183,28 @@ function FloatingMetaMessenger({ clientId }) {
   </div>;
 }
 
-function FloatingLiveNotifications({ clientId, fbPageId, pageName }) {
+function FloatingLiveNotifications({ clientId, fbPageId, pageName, navigateTo }) {
   const [notifications, setNotifications] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
   const [error, setError] = useState("");
+  const panelRef = useRef(null);
   const unreadCount = notifications.filter((entry) => !entry.read_at).length;
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const closeOnOutsideClick = (event) => {
+      if (!panelRef.current?.contains(event.target)) setIsOpen(false);
+    };
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setIsOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [isOpen]);
 
   async function request(action, extra = {}) {
     if (!clientId) return null;
@@ -254,7 +271,7 @@ function FloatingLiveNotifications({ clientId, fbPageId, pageName }) {
   }
 
   if (!clientId) return null;
-  return <div className="portal-notification-float-wrap">
+  return <div className="portal-notification-float-wrap" ref={panelRef}>
     {isOpen && <section className="portal-notification-panel" aria-label="Notification history">
       <header className="portal-notification-header">
         <div><strong>Notifications</strong><span>{pageName ? `${pageName} · ` : ""}{unreadCount ? `${unreadCount} unread` : "Recent Live activity"}</span></div>
@@ -268,6 +285,9 @@ function FloatingLiveNotifications({ clientId, fbPageId, pageName }) {
           <span className="portal-notification-copy"><strong>{entry.title}</strong><span>{entry.message}</span><time>{entry.created_at ? new Date(entry.created_at).toLocaleString("en-PH", { timeZone: "Asia/Manila", dateStyle: "medium", timeStyle: "short" }) : ""}</time></span>
         </button>)}
       </div>
+      <footer className="portal-notification-footer">
+        <button type="button" onClick={() => { setIsOpen(false); navigateTo?.("notifications"); }}>Open Notification Center</button>
+      </footer>
     </section>}
     <button type="button" className="portal-notification-float" aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ""}`} aria-expanded={isOpen} title="Notifications" onClick={() => { setIsOpen((open) => !open); if (!isOpen) refresh(); }}>
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg>
@@ -1263,7 +1283,7 @@ export default function PortalPage({ session }) {
         </PortalPageContent>
 
       </main>
-      <FloatingLiveNotifications clientId={client?.client_id} fbPageId={effectivePageId} pageName={availablePages.find((entry) => String(entry.fb_page_id) === String(effectivePageId))?.page_name || ""} />
+      <FloatingLiveNotifications clientId={client?.client_id} fbPageId={effectivePageId} pageName={availablePages.find((entry) => String(entry.fb_page_id) === String(effectivePageId))?.page_name || ""} navigateTo={navigateTo} />
       <FloatingMetaMessenger clientId={client?.client_id} />
     </div>
   );
