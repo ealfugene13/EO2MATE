@@ -335,7 +335,13 @@ function parseLiveQueueCsv(text, existingItems = [], forcedMode = "") {
     if (rowErrors.length) errors.push(`Row ${line}: ${rowErrors.join(" ")}`);
     else {
       codes.add(item_code);
-      rows.push({ item_code, title, mode, quantity, ...fields });
+      const auctionDurationText = get("auction_duration_minutes");
+      const auction_duration_minutes = auctionDurationText ? Number(auctionDurationText) : 10;
+      if (mode === "AUCTION" && (!Number.isInteger(auction_duration_minutes) || auction_duration_minutes < 1 || auction_duration_minutes > 1440)) {
+        errors.push(`Row ${line}: auction_duration_minutes must be a whole number from 1 to 1440.`);
+      } else {
+        rows.push({ item_code, title, mode, quantity, ...(mode === "AUCTION" ? { auction_duration_minutes } : {}), ...fields });
+      }
     }
   });
   return { rows, errors };
@@ -345,10 +351,10 @@ function downloadLiveQueueTemplate(mode = "MIXED") {
   const rows = {
     SELLING: ["A12,Test sale item,SELLING,2,1,,,,,"],
     MINING: ["B15,Test mining item,MINING,1,,100,200,300,,"],
-    AUCTION: ["C18,Test auction item,AUCTION,1,,,,,100,10"],
+    AUCTION: ["C18,Test auction item,AUCTION,1,,,,,100,10,10"],
   };
   const examples = mode === "MIXED" ? [rows.SELLING[0], rows.MINING[0], rows.AUCTION[0]] : rows[mode] || rows.SELLING;
-  const csv = ["item_code,title,mode,quantity,unit_price,mine_price,take_price,lock_price,starting_bid,bid_increment", ...examples].join("\n");
+  const csv = ["item_code,title,mode,quantity,unit_price,mine_price,take_price,lock_price,starting_bid,bid_increment,auction_duration_minutes", ...examples].join("\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -398,7 +404,7 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
   const [popupNotifications, setPopupNotifications] = useState([]);
   const pageId = selectedFbPageId || "";
   const [videoInput, setVideoInput] = useState("");
-  const [item, setItem] = useState({ inventory_item_id: "", item_code: "", title: "", mode: activeMode === "MIXED" ? "SELLING" : activeMode, quantity: 1, unit_price: "", mine_price: "", take_price: "", lock_price: "", starting_bid: "", bid_increment: "" });
+  const [item, setItem] = useState({ inventory_item_id: "", item_code: "", title: "", mode: activeMode === "MIXED" ? "SELLING" : activeMode, quantity: 1, unit_price: "", mine_price: "", take_price: "", lock_price: "", starting_bid: "", bid_increment: "", auction_duration_minutes: 10 });
   const [inventoryItems, setInventoryItems] = useState([]);
   const [inventoryLoading, setInventoryLoading] = useState(false);
   const [inventoryError, setInventoryError] = useState("");
@@ -591,7 +597,13 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
   }, [clientId, selected, pageId]);
   const run = async (action, extra = {}) => {
     setBusy(true); setMessage("");
-    try { await request(action, extra); await refresh(); setMessage(`${action} completed.`); }
+    try {
+      const result = await request(action, extra);
+      await refresh();
+      if (action === "activate-item" && result?.activation_comment_posted === false) setMessage("Auction activated and closing time saved, but Facebook could not post the closing-time comment.");
+      else if (action === "activate-item" && result?.activation_comment_posted === true) setMessage("Product activated. The auction closing time was posted to Facebook.");
+      else setMessage(`${action} completed.`);
+    }
     catch (e) { setMessage(e.message); }
     finally { setBusy(false); }
   };
@@ -605,7 +617,7 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
     try {
       await request("add-item", { session_id: selected, ...item });
       await refresh();
-      setItem({ inventory_item_id: "", item_code: "", title: "", mode: item.mode, quantity: 1, unit_price: "", mine_price: "", take_price: "", lock_price: "", starting_bid: "", bid_increment: "" });
+      setItem({ inventory_item_id: "", item_code: "", title: "", mode: item.mode, quantity: 1, unit_price: "", mine_price: "", take_price: "", lock_price: "", starting_bid: "", bid_increment: "", auction_duration_minutes: 10 });
       setMessage("Product added to queue. Select the next inventory item when ready.");
     } catch (e) {
       setMessage(e.message || "Unable to add this product to the queue.");
@@ -729,6 +741,9 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
             {(item.mode === "SELLING" ? ["unit_price"] : item.mode === "MINING" ? ["mine_price", "take_price", "lock_price"] : ["starting_bid", "bid_increment"]).map((field) => <label key={field} style={{ display: "grid", gap: 6, minWidth: 0, color: "#344054", fontSize: 13, fontWeight: 600 }}>{field.replaceAll("_", " ").replace(/\b\w/g, (character) => character.toUpperCase())}
               <input type="number" min="0" step="0.01" aria-label={field.replaceAll("_", " ")} placeholder="0.00" value={item[field]} onChange={(e) => setItem({ ...item, [field]: e.target.value })} style={{ width: "100%", minWidth: 0, height: 42, boxSizing: "border-box" }} />
             </label>)}
+            {item.mode === "AUCTION" && <label style={{ display: "grid", gap: 6, minWidth: 0, color: "#344054", fontSize: 13, fontWeight: 600 }}>Auction duration (minutes)
+              <input type="number" min="1" max="1440" step="1" aria-label="Auction duration in minutes" value={item.auction_duration_minutes} onChange={(e) => setItem({ ...item, auction_duration_minutes: e.target.value })} style={{ width: "100%", minWidth: 0, height: 42, boxSizing: "border-box" }} />
+            </label>}
             <button type="button" className="secondary-button" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, minWidth: 145, height: 42, boxSizing: "border-box", whiteSpace: "nowrap" }} disabled={busy || !["DRAFT", "ACTIVE"].includes(current.status) || !item.title || !isValidLiveItemCode(item.item_code) || itemCodeAlreadyQueued} onClick={addItemToQueue}><NavIcon type="add" />Add product</button>
           </div>
           {itemCodeAlreadyQueued && <p role="status" style={{ margin: "8px 0 0", color: "#b54708", fontSize: 13 }}>This item code is already in the selected Live queue. Choose another inventory product or use a new code.</p>}
@@ -749,13 +764,13 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
             {queueCsv && <>
               <p><strong>{queueCsvName || "CSV"}</strong> · {parsedQueue.rows.length} valid product row(s) detected.</p>
               {parsedQueue.errors.length > 0 && <div role="alert" style={{ color: "#9f1239", background: "#fff1f2", padding: 10, borderRadius: 8, marginBottom: 10 }}><strong>Fix these CSV issues before uploading:</strong><ul style={{ marginBottom: 0 }}>{parsedQueue.errors.map((error, i) => <li key={`${i}-${error}`}>{error}</li>)}</ul></div>}
-              {parsedQueue.rows.length > 0 && <div className="table-wrapper"><table><thead><tr><th>Code</th><th>Product</th><th>Mode</th><th>Qty</th><th>Mode prices</th></tr></thead><tbody>{parsedQueue.rows.slice(0, 5).map((row) => <tr key={row.item_code}><td>{row.item_code}</td><td>{row.title}</td><td>{row.mode}</td><td>{row.quantity}</td><td>{row.mode === "SELLING" ? formatCurrency(row.unit_price) : row.mode === "MINING" ? `${formatCurrency(row.mine_price)} / ${formatCurrency(row.take_price)} / ${formatCurrency(row.lock_price)}` : `${formatCurrency(row.starting_bid)} / +${formatCurrency(row.bid_increment)}`}</td></tr>)}</tbody></table>{parsedQueue.rows.length > 5 && <p>Showing the first 5 of {parsedQueue.rows.length} products.</p>}</div>}
+            {parsedQueue.rows.length > 0 && <div className="table-wrapper"><table><thead><tr><th>Code</th><th>Product</th><th>Mode</th><th>Qty</th><th>Mode prices</th></tr></thead><tbody>{parsedQueue.rows.slice(0, 5).map((row) => <tr key={row.item_code}><td>{row.item_code}</td><td>{row.title}</td><td>{row.mode}</td><td>{row.quantity}</td><td>{row.mode === "SELLING" ? formatCurrency(row.unit_price) : row.mode === "MINING" ? `${formatCurrency(row.mine_price)} / ${formatCurrency(row.take_price)} / ${formatCurrency(row.lock_price)}` : `${formatCurrency(row.starting_bid)} / +${formatCurrency(row.bid_increment)} · ${row.auction_duration_minutes} min`}</td></tr>)}</tbody></table>{parsedQueue.rows.length > 5 && <p>Showing the first 5 of {parsedQueue.rows.length} products.</p>}</div>}
               <button type="button" className="primary-button" style={{ display: "inline-flex", alignItems: "center", gap: 7 }} disabled={busy || !["DRAFT", "ACTIVE"].includes(current.status) || !parsedQueue.rows.length || parsedQueue.errors.length > 0} onClick={uploadQueueCsv}><NavIcon type="upload" />Add {parsedQueue.rows.length} Products</button>
             </>}
           </section>
           {current.status === "DRAFT" && <p><button className="primary-button" type="button" style={{ display: "inline-flex", alignItems: "center", gap: 8, color: "#fff", background: "#138a5e", borderColor: "#138a5e" }} disabled={busy || !(current.eo2mate_live_items || []).length} onClick={() => run("start", { session_id: selected })}><NavIcon type="play" />Start Session</button></p>}
         </>}
-        <div className="table-wrapper" style={{ overflowX: "auto" }}><table style={{ width: "100%", minWidth: 500, tableLayout: "fixed", fontSize: 13 }}><colgroup><col style={{ width: "12%" }} /><col style={{ width: "29%" }} /><col style={{ width: "14%" }} /><col style={{ width: "14%" }} /><col style={{ width: "19%" }} /><col style={{ width: "12%" }} /></colgroup><thead><tr><th style={{ padding: "10px 8px" }}>Code</th><th style={{ padding: "10px 8px" }}>Product</th><th style={{ padding: "10px 8px" }}>Mode</th><th style={{ padding: "10px 8px" }}>Status</th><th style={{ padding: "10px 8px" }}>Accepted / Stock</th><th style={{ padding: "10px 8px" }}>Action</th></tr></thead><tbody>{visibleItems.map((it) => <tr key={it.id}><td style={{ padding: "10px 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.item_code}</td><td title={it.title} style={{ padding: "10px 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.title}</td><td style={{ padding: "10px 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.mode}</td><td style={{ padding: "10px 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.status}</td><td style={{ padding: "10px 8px", whiteSpace: "nowrap" }}>{it.claimed} / {it.quantity}</td><td style={{ padding: "8px 4px" }}>{current.status === "ACTIVE" && it.status === "QUEUED" && <button className="secondary-button" type="button" style={{ padding: "7px 9px", fontSize: 12, whiteSpace: "nowrap" }} disabled={busy} onClick={() => run("activate-item", { session_id: selected, item_id: it.id })}><NavIcon type="play" />Activate</button>}</td></tr>)}</tbody></table>{!visibleItems.length && <p>No {activeMode === "MIXED" ? "products" : `${activeMode.toLowerCase()} products`} queued yet. Add a product above.</p>}</div>
+        <div className="table-wrapper" style={{ overflowX: "auto" }}><table style={{ width: "100%", minWidth: 500, tableLayout: "fixed", fontSize: 13 }}><colgroup><col style={{ width: "12%" }} /><col style={{ width: "29%" }} /><col style={{ width: "14%" }} /><col style={{ width: "14%" }} /><col style={{ width: "19%" }} /><col style={{ width: "12%" }} /></colgroup><thead><tr><th style={{ padding: "10px 8px" }}>Code</th><th style={{ padding: "10px 8px" }}>Product</th><th style={{ padding: "10px 8px" }}>Mode</th><th style={{ padding: "10px 8px" }}>Status</th><th style={{ padding: "10px 8px" }}>Accepted / Stock</th><th style={{ padding: "10px 8px" }}>Action</th></tr></thead><tbody>{visibleItems.map((it) => <tr key={it.id}><td style={{ padding: "10px 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.item_code}</td><td title={it.title} style={{ padding: "10px 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.title}{it.mode === "AUCTION" && <div style={{ color: "#64748b", fontSize: 11 }}>{it.auction_duration_minutes || 10} min{it.auction_end_at ? ` · closes ${new Date(it.auction_end_at).toLocaleString("en-PH", { dateStyle: "short", timeStyle: "short", timeZone: "Asia/Manila" })}` : " · starts when activated"}</div>}</td><td style={{ padding: "10px 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.mode}</td><td style={{ padding: "10px 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.status}</td><td style={{ padding: "10px 8px", whiteSpace: "nowrap" }}>{it.mode === "AUCTION" ? formatCurrency(it.highest_bid || it.starting_bid) : `${it.claimed} / ${it.quantity}`}</td><td style={{ padding: "8px 4px" }}>{current.status === "ACTIVE" && it.status === "QUEUED" && <button className="secondary-button" type="button" style={{ padding: "7px 9px", fontSize: 12, whiteSpace: "nowrap" }} disabled={busy} onClick={() => run("activate-item", { session_id: selected, item_id: it.id })}><NavIcon type="play" />Activate</button>}</td></tr>)}</tbody></table>{!visibleItems.length && <p>No {activeMode === "MIXED" ? "products" : `${activeMode.toLowerCase()} products`} queued yet. Add a product above.</p>}</div>
         {current.status === "ACTIVE" && <div style={{ marginTop: 14 }}><button type="button" className="secondary-button" style={{ display: "inline-flex", alignItems: "center", gap: 8, color: "#fff", background: "#d92d20", borderColor: "#d92d20" }} disabled={busy} onClick={() => { if (window.confirm("End this EO2MATE session now? This closes the product queue and stops accepting or processing new comments. Your Facebook Live broadcast will remain live.")) { manualCloseRequests.current.add(selected); run("close", { session_id: selected }).finally(() => manualCloseRequests.current.delete(selected)); } }}><NavIcon type="stop" />End Session</button><p style={{ fontSize: 13, marginBottom: 0 }}>EO2MATE also checks Facebook Live status and closes this session automatically after the broadcast ends.</p></div>}
     </section>}
     </div>
