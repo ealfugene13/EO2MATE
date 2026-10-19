@@ -1478,17 +1478,24 @@ export default function FacebookPostPage({
     return images.find((image) => image.is_primary === true) || images[0] || null;
   }
 
-  async function inventoryImageToPostFile(inventory) {
-    const image = getInventoryPrimaryImage(inventory);
-    if (!image?.signed_url) return null;
-    const response = await fetch(image.signed_url);
-    if (!response.ok) throw new Error("Unable to load the selected Inventory image.");
-    const blob = await response.blob();
-    const extension = blob.type === "image/png" ? "png" : blob.type === "image/webp" ? "webp" : "jpg";
-    return new File([blob], `${inventory.item_code || "inventory-item"}.${extension}`, {
-      type: blob.type || "image/jpeg",
-      lastModified: Date.now(),
-    });
+  async function inventoryImageToPostFiles(inventory, { all = false } = {}) {
+    const images = Array.isArray(inventory?.images) ? inventory.images : [];
+    const ordered = [...images].sort((a, b) => Number(Boolean(b.is_primary)) - Number(Boolean(a.is_primary)));
+    const selected = (all ? ordered : [ordered[0]]).filter((image) => image?.signed_url || image?.url).slice(0, MAX_IMAGES);
+    const files = [];
+    for (let index = 0; index < selected.length; index++) {
+      const image = selected[index];
+      const response = await fetch(image.signed_url || image.url);
+      if (!response.ok) throw new Error(`Unable to load Inventory photo ${index + 1}.`);
+      const blob = await response.blob();
+      const extension = blob.type === "image/png" ? "png" : blob.type === "image/webp" ? "webp" : "jpg";
+      const file = new File([blob], `${inventory.item_code || "inventory-item"}-${index + 1}.${extension}`, {
+        type: blob.type || "image/jpeg",
+        lastModified: Date.now(),
+      });
+      files.push({ file, inventoryImageId: image.inventory_image_id || image.id || null, src: image.signed_url || image.url || "" });
+    }
+    return files;
   }
 
   async function selectSingleInventoryItem(inventoryItemId) {
@@ -1507,9 +1514,9 @@ export default function FacebookPostPage({
       return [];
     });
     try {
-      const file = await inventoryImageToPostFile(inventory);
-      if (!file) return;
-      setItems([createItem(file, 0)]);
+      const files = await inventoryImageToPostFiles(inventory, { all: true });
+      if (!files.length) return;
+      setItems(files.map((photo, index) => createItem(photo.file, index)));
     } catch (error) {
       setErrorMessage(error?.message || "Unable to load Inventory image.");
     }
@@ -1524,6 +1531,8 @@ export default function FacebookPostPage({
     updateItem(itemId, {
       itemSource: "INVENTORY",
       inventoryItemId: inventory.inventory_item_id,
+      inventoryImageId: "",
+      inventoryPhotoOptions: [],
       item: inventory.item_name || "",
       regularSalePrice: inventory.default_selling_price != null ? String(inventory.default_selling_price) : "",
       regularSaleQuantity: String(Math.max(1, inventoryAvailableQty(inventory))),
@@ -1533,18 +1542,30 @@ export default function FacebookPostPage({
     setItems((current) => current.map((entry) => {
       if (entry.id !== itemId) return entry;
       URL.revokeObjectURL(entry.previewUrl);
-      return { ...entry, file: null, previewUrl: "" };
+      return { ...entry, file: null, previewUrl: "", inventoryImageId: "", inventoryPhotoOptions: [] };
     }));
     try {
-      const file = await inventoryImageToPostFile(inventory);
-      if (!file) return;
+      const photos = await inventoryImageToPostFiles(inventory, { all: true });
+      if (!photos.length) return;
       setItems((current) => current.map((entry) => {
         if (entry.id !== itemId) return entry;
-        return { ...entry, file, previewUrl: URL.createObjectURL(file) };
+        const photo = photos[0];
+        return { ...entry, file: photo.file, previewUrl: URL.createObjectURL(photo.file), inventoryImageId: photo.inventoryImageId, inventoryPhotoOptions: photos };
       }));
     } catch (error) {
       setErrorMessage(error?.message || "Unable to load Inventory image.");
     }
+  }
+
+  function selectInventoryPhoto(itemId, inventoryImageId) {
+    const item = items.find((entry) => entry.id === itemId);
+    const photo = item?.inventoryPhotoOptions?.find((entry) => String(entry.inventoryImageId) === String(inventoryImageId));
+    if (!item || !photo) return;
+    setItems((current) => current.map((entry) => {
+      if (entry.id !== itemId) return entry;
+      URL.revokeObjectURL(entry.previewUrl);
+      return { ...entry, file: photo.file, previewUrl: URL.createObjectURL(photo.file), inventoryImageId: photo.inventoryImageId };
+    }));
   }
 
   function removeItem(id) {
@@ -2172,7 +2193,7 @@ export default function FacebookPostPage({
     if(!confirmed){setConfirmPopup({mode:"REGULAR_SALE",title:`Publish ${isMultiple?"Multiple":"Single"} Regular Sale?`,page:getPageLabel(selectedPage),type:isMultiple?"Multiple Regular Sale":"Single Regular Sale",images:items.length});return;}
     setPublishing(true); setErrorMessage(""); setFailurePopup(null);
     try {
-      const payload={client_id:client.client_id,fb_page_id:selectedPageId,ends_at:regularSaleEndDate ? new Date(regularSaleEndDate).toISOString() : null,discount_type:regularSaleDiscountType,discount_value:regularSaleDiscountType === "NONE" ? null : Number(regularSaleDiscountValue),post_type:isMultiple?"MULTIPLE":"SINGLE",main_caption:mainCaption,max_quantity_per_buyer:regularSaleMaxPerBuyer===""?null:Number(regularSaleMaxPerBuyer),...(isMultiple?{items:items.map((item)=>({item_label:item.item.trim(),item_source:item.itemSource||"MANUAL",inventory_item_id:(item.itemSource||"MANUAL")==="INVENTORY"?item.inventoryItemId:null,original_unit_price:normalizeMoney(item.regularSalePrice!==""?item.regularSalePrice:regularSalePrice),unit_price:regularSaleEffectivePrice(item.regularSalePrice!==""?item.regularSalePrice:regularSalePrice),quantity_limit:Number(item.regularSaleQuantity!==""?item.regularSaleQuantity:regularSaleQuantity),max_quantity_per_buyer:item.regularSaleMaxPerBuyer===""?null:Number(item.regularSaleMaxPerBuyer)})),photo_captions:photoCaptions}:{item:{item_label:singleItem.trim(),item_source:singleItemSource,inventory_item_id:singleItemSource==="INVENTORY"?singleInventoryItemId:null,original_unit_price:normalizeMoney(regularSalePrice),unit_price:regularSaleEffectivePrice(regularSalePrice),quantity_limit:Number(regularSaleQuantity),max_quantity_per_buyer:regularSaleMaxPerBuyer===""?null:Number(regularSaleMaxPerBuyer)}})};
+      const payload={client_id:client.client_id,fb_page_id:selectedPageId,ends_at:regularSaleEndDate ? new Date(regularSaleEndDate).toISOString() : null,discount_type:regularSaleDiscountType,discount_value:regularSaleDiscountType === "NONE" ? null : Number(regularSaleDiscountValue),post_type:isMultiple?"MULTIPLE":"SINGLE",main_caption:mainCaption,max_quantity_per_buyer:regularSaleMaxPerBuyer===""?null:Number(regularSaleMaxPerBuyer),...(isMultiple?{items:items.map((item)=>({item_label:item.item.trim(),item_source:item.itemSource||"MANUAL",inventory_item_id:(item.itemSource||"MANUAL")==="INVENTORY"?item.inventoryItemId:null,inventory_image_id:(item.itemSource||"MANUAL")==="INVENTORY"?item.inventoryImageId:null,original_unit_price:normalizeMoney(item.regularSalePrice!==""?item.regularSalePrice:regularSalePrice),unit_price:regularSaleEffectivePrice(item.regularSalePrice!==""?item.regularSalePrice:regularSalePrice),quantity_limit:Number(item.regularSaleQuantity!==""?item.regularSaleQuantity:regularSaleQuantity),max_quantity_per_buyer:item.regularSaleMaxPerBuyer===""?null:Number(item.regularSaleMaxPerBuyer)})),photo_captions:photoCaptions}:{item:{item_label:singleItem.trim(),item_source:singleItemSource,inventory_item_id:singleItemSource==="INVENTORY"?singleInventoryItemId:null,original_unit_price:normalizeMoney(regularSalePrice),unit_price:regularSaleEffectivePrice(regularSalePrice),quantity_limit:Number(regularSaleQuantity),max_quantity_per_buyer:regularSaleMaxPerBuyer===""?null:Number(regularSaleMaxPerBuyer)}})};
       const formData=new FormData(); formData.append("payload",JSON.stringify(payload)); await appendRenderedPostImages(formData, items);
       const {data,error}=await supabase.functions.invoke("meta",{headers:{"x-eo2mate-meta-route":"regular-sale-publish"},body:formData}); if(error)throw error; if(!data?.success)throw new Error(data?.message||data?.error||"Regular Sale publishing failed.");
       const successData={...data,page_name:getPageLabel(selectedPage),environment,post_type_display_name:isMultiple?"Multiple Regular Sale":"Single Regular Sale",mode_display_name:"Regular Sale"}; resetFormForNewPost({keepSuccessPopup:true}); setSuccessPopup(successData);
@@ -2189,7 +2210,7 @@ export default function FacebookPostPage({
     }
     setPublishing(true);setErrorMessage("");setFailurePopup(null);
     try{
-      const payload={client_id:client.client_id,fb_page_id:selectedPageId,post_type:isMultiple?"MULTIPLE":"SINGLE",main_caption:mainCaption,mine_price:normalizeMoney(miningMinePrice),take_price:normalizeMoney(miningTakePrice),lock_price:normalizeMoney(miningLockPrice),ends_at:phDateFromLocalInput(miningEndDate)?.toISOString(),...(isMultiple?{items:items.map(item=>({item_label:item.item.trim(),mine_price:item.miningMinePrice===""?null:normalizeMoney(item.miningMinePrice),take_price:item.miningTakePrice===""?null:normalizeMoney(item.miningTakePrice),lock_price:item.miningLockPrice===""?null:normalizeMoney(item.miningLockPrice),ends_at:item.miningEndDate?phDateFromLocalInput(item.miningEndDate)?.toISOString():null})),photo_captions:photoCaptions}:{item:{item_label:singleItem.trim()}})};
+      const payload={client_id:client.client_id,fb_page_id:selectedPageId,post_type:isMultiple?"MULTIPLE":"SINGLE",main_caption:mainCaption,mine_price:normalizeMoney(miningMinePrice),take_price:normalizeMoney(miningTakePrice),lock_price:normalizeMoney(miningLockPrice),ends_at:phDateFromLocalInput(miningEndDate)?.toISOString(),...(isMultiple?{items:items.map(item=>({item_label:item.item.trim(),item_source:item.itemSource||"MANUAL",inventory_item_id:item.itemSource==="INVENTORY"?item.inventoryItemId:null,inventory_image_id:item.itemSource==="INVENTORY"?item.inventoryImageId:null,mine_price:item.miningMinePrice===""?null:normalizeMoney(item.miningMinePrice),take_price:item.miningTakePrice===""?null:normalizeMoney(item.miningTakePrice),lock_price:item.miningLockPrice===""?null:normalizeMoney(item.miningLockPrice),ends_at:item.miningEndDate?phDateFromLocalInput(item.miningEndDate)?.toISOString():null})),photo_captions:photoCaptions}:{item:{item_label:singleItem.trim()}})};
       const formData=new FormData();formData.append("payload",JSON.stringify(payload));await appendRenderedPostImages(formData, items);
       const {data,error}=await supabase.functions.invoke("meta",{headers:{"x-eo2mate-meta-route":"mining-publish"},body:formData});if(error)throw error;if(!data?.success)throw new Error(data?.message||data?.error||"Mining publishing failed.");
       const successData={...data,page_name:getPageLabel(selectedPage),environment,post_type_display_name:isMultiple?"Multiple Mining":"Single Mining",mode_display_name:"Mining"};resetFormForNewPost({keepSuccessPopup:true});setSuccessPopup(successData);
@@ -2226,7 +2247,9 @@ export default function FacebookPostPage({
         ...(isMultiple ? {
           items: items.map((item) => ({
             item_label: item.item.trim(),
-            item_source: "MANUAL",
+            item_source: item.itemSource || "MANUAL",
+            inventory_item_id: item.itemSource === "INVENTORY" ? item.inventoryItemId : null,
+            inventory_image_id: item.itemSource === "INVENTORY" ? item.inventoryImageId : null,
             unit_price: normalizeMoney(
               item.preorderPrice !== "" ? item.preorderPrice : preorderPrice
             ),
@@ -2346,6 +2369,9 @@ export default function FacebookPostPage({
 
                         inventory_item_id:
                           inventory.inventory_item_id,
+
+                        inventory_image_id:
+                          item.inventoryImageId || null,
 
                         inventory_owner_id:
                           inventory.inventory_owner_id ||
@@ -3654,6 +3680,20 @@ export default function FacebookPostPage({
                         </select>
                       </label>
                     )}
+                    {(item.itemSource || "MANUAL") === "INVENTORY" && (item.inventoryPhotoOptions || []).length > 1 && (
+                      <div className="fb-inventory-photo-picker">
+                        <strong>Choose the photo for this item</strong>
+                        <div className="fb-inventory-photo-options">
+                          {item.inventoryPhotoOptions.map((photo, photoIndex) => (
+                            <button type="button" key={photo.inventoryImageId || photoIndex} className={String(item.inventoryImageId) === String(photo.inventoryImageId) ? "selected" : ""} onClick={() => selectInventoryPhoto(item.id, photo.inventoryImageId)} disabled={publishing} aria-pressed={String(item.inventoryImageId) === String(photo.inventoryImageId)}>
+                              <img src={photo.src} alt={`Inventory photo ${photoIndex + 1}`} />
+                              <span>{String(item.inventoryImageId) === String(photo.inventoryImageId) ? "Posting photo" : "Add to item comment"}</span>
+                            </button>
+                          ))}
+                        </div>
+                        <small>The selected photo is the item’s post photo. The others will be added as photo comments under that item.</small>
+                      </div>
+                    )}
                   </div>
                 )}
                 {postMode === "REGULAR_SALE" && isMultiple && (
@@ -3884,6 +3924,12 @@ export default function FacebookPostPage({
             <p>
               The Facebook post was created and EO2MATE automation was activated successfully.
             </p>
+
+            {Array.isArray(successPopup.inventory_photo_comment_warnings) && successPopup.inventory_photo_comment_warnings.length > 0 && (
+              <div className="eo2-photo-error-text" role="status">
+                Some extra Inventory photos could not be added to item comments: {successPopup.inventory_photo_comment_warnings.join("; ")}
+              </div>
+            )}
 
             <p>
               <strong>Page:</strong>{" "}

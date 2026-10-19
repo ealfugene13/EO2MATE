@@ -4090,3 +4090,21 @@ button.post-type-card:hover { transform: translateY(-2px); border-color: #bcdcc3
 @media (max-width: 900px) {
   .fb-caption-helpers { width: 100%; max-height: 260px; }
 }
+.photo-gallery-backdrop{position:fixed;z-index:3000;inset:0;display:grid;place-items:center;padding:24px;background:rgba(8,14,12,.88);backdrop-filter:blur(5px)}
+.photo-gallery-viewer{position:relative;width:min(1100px,100%);max-height:calc(100vh - 48px);padding:16px;border:1px solid #ffffff28;border-radius:18px;background:#111815;color:#fff;box-shadow:0 24px 80px #0008}
+.photo-gallery-close{position:absolute;z-index:2;top:23px;right:23px;width:42px;height:42px;border:1px solid #ffffff55;border-radius:50%;background:#111b;color:#fff;font-size:28px;line-height:1;cursor:pointer}
+.photo-gallery-stage{position:relative;display:grid;place-items:center;min-height:220px;height:min(76vh,780px);overflow:hidden;border-radius:11px;background:#080b0a}
+.photo-gallery-stage>img{display:block;max-width:100%;max-height:100%;object-fit:contain}
+.photo-gallery-nav{position:absolute;z-index:1;top:50%;width:46px;height:56px;transform:translateY(-50%);border:1px solid #ffffff55;border-radius:12px;background:#111b;color:#fff;font-size:36px;line-height:1;cursor:pointer}
+.photo-gallery-nav:disabled{opacity:.35;cursor:default}.photo-gallery-nav.previous{left:12px}.photo-gallery-nav.next{right:12px}
+.photo-gallery-caption{display:flex;justify-content:space-between;gap:16px;padding:13px 4px 2px;color:#e6eee9;font-size:13px}.photo-gallery-caption span{color:#a9b9b0}
+.showroom-product-photo .showroom-photo-open{position:absolute;inset:0}
+@media(max-width:600px){.photo-gallery-backdrop{padding:10px}.photo-gallery-viewer{max-height:calc(100vh - 20px);padding:8px;border-radius:12px}.photo-gallery-stage{height:min(77vh,720px)}.photo-gallery-close{top:14px;right:14px}.photo-gallery-caption{padding-inline:4px;font-size:12px}}
+.fb-inventory-photo-picker{display:grid;gap:8px;margin-top:10px;padding:10px;border:1px solid #d8e3db;border-radius:10px;background:#f8fbf8}
+.fb-inventory-photo-picker>strong{font-size:12px;color:#293c31}
+.fb-inventory-photo-picker>small{color:#627469;font-size:11px;line-height:1.45}
+.fb-inventory-photo-options{display:flex;gap:8px;overflow-x:auto;padding:2px 1px 7px}
+.fb-inventory-photo-options>button{position:relative;flex:0 0 88px;width:88px;padding:4px;border:2px solid #d8e1da;border-radius:9px;background:white;text-align:left;cursor:pointer}
+.fb-inventory-photo-options>button.selected{border-color:#21885a;box-shadow:0 0 0 2px #21885a24}
+.fb-inventory-photo-options img{display:block;width:76px;height:64px;border-radius:5px;object-fit:cover}
+.fb-inventory-photo-options span{display:block;margin-top:4px;color:#526357;font-size:9px;font-weight:700;line-height:1.2}

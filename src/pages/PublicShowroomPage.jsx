@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../supabase";
+import PhotoGalleryViewer from "../components/PhotoGalleryViewer";
 import "./PublicShowroomPage.css";
 import "./PublicShowroomCards.css";
 
@@ -24,6 +25,15 @@ export default function PublicShowroomPage({ storeToken }) {
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("featured");
+  const [photoViewer, setPhotoViewer] = useState(null);
+
+  function openProductPhotos(item, startIndex = 0) {
+    const photos = (item?.images || []).map((image) => ({
+      src: image.url || image.signed_url || "",
+      alt: image.original_file_name || item.item_name || "Product photo",
+    })).filter((image) => image.src);
+    if (photos.length) setPhotoViewer({ photos, index: startIndex, title: item.item_name || "Product photos" });
+  }
 
   async function loadShowroom() {
     setLoading(true);
@@ -92,7 +102,7 @@ export default function PublicShowroomPage({ storeToken }) {
           {featuredItems.length ? featuredItems.map((item, index) => {
             const image = item.images?.find((entry) => entry.is_primary)?.url || item.images?.[0]?.url;
             return <a className="showroom-playing-card" href="#collection" key={item.id} style={{ "--card-index": index }} aria-label={`View ${item.item_name}`}>
-              <div className="showroom-playing-card-image">{image ? <img src={image} alt="" /> : <span>{(item.item_name || "E").slice(0, 1).toUpperCase()}</span>}<small>AVAILABLE</small></div>
+              <div className="showroom-playing-card-image">{image ? <img src={image} alt="" onClick={(event) => { event.preventDefault(); event.stopPropagation(); openProductPhotos(item, Math.max(0, item.images.findIndex((entry) => entry.url === image))); }} /> : <span>{(item.item_name || "E").slice(0, 1).toUpperCase()}</span>}<small>AVAILABLE</small></div>
               <div className="showroom-playing-card-info"><span>{item.item_code}</span><strong>{item.item_name}</strong><b>{formatPrice(item.price)}</b></div>
             </a>;
           }) : <div className="showroom-card-fan-empty"><span>✦</span><strong>New finds are on the way</strong><small>In-stock Page items will appear here.</small></div>}
@@ -123,7 +133,7 @@ export default function PublicShowroomPage({ storeToken }) {
           : items.length ? <div className="showroom-product-grid">{items.map((item) => {
             const cover = item.images?.find((image) => image.is_primary)?.url || item.images?.[0]?.url;
             return <article className="showroom-product-card" key={item.id}>
-              <div className="showroom-product-photo">{cover ? <img src={cover} alt={item.item_name} loading="lazy"/> : <div className="showroom-no-photo"><span>{page.name?.slice(0, 1) || "S"}</span><small>Product photo</small></div>}<span className="showroom-available"><i/>{item.available} available</span></div>
+              <div className="showroom-product-photo">{cover ? <button type="button" className="showroom-photo-open" aria-label={`View all photos of ${item.item_name}`} onClick={() => openProductPhotos(item, Math.max(0, item.images.findIndex((image) => image.is_primary)))}><img src={cover} alt={item.item_name} loading="lazy"/>{item.images?.length > 1 && <span className="showroom-photo-count">{item.images.length} photos</span>}</button> : <div className="showroom-no-photo"><span>{page.name?.slice(0, 1) || "S"}</span><small>Product photo</small></div>}<span className="showroom-available"><i/>{item.available} available</span></div>
               <div className="showroom-product-info"><div className="showroom-product-code">{item.item_code}</div><h3>{item.item_name}</h3>{item.description && <p>{item.description}</p>}<div className="showroom-product-bottom"><strong>{formatPrice(item.price)}</strong><a href={messengerUrl} target="_blank" rel="noreferrer">Ask about item <StoreIcon kind="arrow"/></a></div></div>
             </article>;
           })}</div> : <div className="showroom-state showroom-empty"><span className="showroom-empty-icon"><StoreIcon kind="bag"/></span><strong>{search ? "No matching items" : "More items coming soon"}</strong><p>{search ? "Try a different search." : "There are no available inventory items to display right now. Check back later or message the Page."}</p>{search && <button type="button" onClick={() => setSearch("")}>Clear search</button>}</div>}
@@ -135,5 +145,6 @@ export default function PublicShowroomPage({ storeToken }) {
     </section>
 
     <footer className="showroom-footer"><a className="showroom-wordmark" href="#top">{page.picture ? <img src={page.picture} alt=""/> : <span className="showroom-wordmark-mark">S</span>}<span>{page.name || "Facebook Page"}</span></a><span>Public inventory showroom</span><a href={pageUrl} target="_blank" rel="noreferrer">Follow on Facebook <StoreIcon kind="arrow"/></a></footer>
+    {photoViewer && <PhotoGalleryViewer photos={photoViewer.photos} index={photoViewer.index} title={photoViewer.title} onIndexChange={(index) => setPhotoViewer((current) => current ? { ...current, index } : current)} onClose={() => setPhotoViewer(null)} />}
   </main>;
 }
