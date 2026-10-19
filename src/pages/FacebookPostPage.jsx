@@ -3728,6 +3728,19 @@ export default function FacebookPostPage({
               {fieldErrors.images}
             </small>
           )}
+        {isMultiple && items.length > 0 && (
+          <div className="fb-add-photos-actions">
+            <button
+              type="button"
+              className="secondary-button fb-add-photos-button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={publishing || processingFiles || items.length >= MAX_IMAGES}
+            >
+              {processingFiles ? "Adding photos…" : "＋ Add More Photos"}
+            </button>
+            <small>{items.length} of {MAX_IMAGES} photos added</small>
+          </div>
+        )}
       </section>
 
       <section className="dashboard-panel fb-posting-panel">

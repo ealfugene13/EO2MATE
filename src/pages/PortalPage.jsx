@@ -67,7 +67,7 @@ function PortalPageContent({ page, homePage = "dashboard", backLabel = "Back to 
 }
 
 
-function FloatingMetaMessenger({ clientId }) {
+function FloatingMetaMessenger({ clientId, onHide }) {
   const [pages, setPages] = useState([]);
   const [unread, setUnread] = useState(0);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -168,12 +168,14 @@ function FloatingMetaMessenger({ clientId }) {
         {Number(page.unread_count || 0) > 0 && <b>{Number(page.unread_count) > 99 ? "99+" : page.unread_count}</b>}
       </button>)}
     </div>}
+    <button type="button" className="floating-widget-dismiss meta-messenger-float-dismiss" aria-label="Hide floating Messenger button" title="Hide floating Messenger button" onMouseDown={(event) => event.stopPropagation()} onClick={(event) => { event.preventDefault(); event.stopPropagation(); onHide?.(); }}>×</button>
     <button
       type="button"
       className="meta-messenger-float"
       aria-label={unread ? `Open Meta Messenger, ${unread} unread messages` : "Open Meta Messenger"}
-      title="Open Meta Messenger"
-      onMouseDown={(e) => { const r = e.currentTarget.getBoundingClientRect(); dragGestureRef.current = { active: true, moved: false, startX: e.clientX, startY: e.clientY }; setDrag({ dx: e.clientX-r.left, dy: e.clientY-r.top }); }}
+      title="Open Meta Messenger · right-click to hide"
+      onContextMenu={(event) => { event.preventDefault(); onHide?.(); }}
+      onMouseDown={(e) => { if (e.button !== 0) return; const r = e.currentTarget.getBoundingClientRect(); dragGestureRef.current = { active: true, moved: false, startX: e.clientX, startY: e.clientY }; setDrag({ dx: e.clientX-r.left, dy: e.clientY-r.top }); }}
       onTouchStart={(e) => { const p=e.touches[0], r=e.currentTarget.getBoundingClientRect(); dragGestureRef.current = { active: true, moved: false, startX: p.clientX, startY: p.clientY }; setDrag({ dx:p.clientX-r.left, dy:p.clientY-r.top }); }}
       onClick={(e) => { if (dragGestureRef.current.moved) { e.preventDefault(); e.stopPropagation(); dragGestureRef.current.moved = false; return; } activate(); }}
     >
@@ -183,28 +185,11 @@ function FloatingMetaMessenger({ clientId }) {
   </div>;
 }
 
-function FloatingLiveNotifications({ clientId, fbPageId, pageName, navigateTo }) {
+function FloatingLiveNotifications({ clientId, fbPageId, pageName, onOpenNotification, onHide }) {
   const [notifications, setNotifications] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
   const [error, setError] = useState("");
-  const panelRef = useRef(null);
   const unreadCount = notifications.filter((entry) => !entry.read_at).length;
-
-  useEffect(() => {
-    if (!isOpen) return undefined;
-    const closeOnOutsideClick = (event) => {
-      if (!panelRef.current?.contains(event.target)) setIsOpen(false);
-    };
-    const closeOnEscape = (event) => {
-      if (event.key === "Escape") setIsOpen(false);
-    };
-    document.addEventListener("pointerdown", closeOnOutsideClick);
-    document.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.removeEventListener("pointerdown", closeOnOutsideClick);
-      document.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [isOpen]);
 
   async function request(action, extra = {}) {
     if (!clientId) return null;
@@ -271,7 +256,7 @@ function FloatingLiveNotifications({ clientId, fbPageId, pageName, navigateTo })
   }
 
   if (!clientId) return null;
-  return <div className="portal-notification-float-wrap" ref={panelRef}>
+  return <div className="portal-notification-float-wrap">
     {isOpen && <section className="portal-notification-panel" aria-label="Notification history">
       <header className="portal-notification-header">
         <div><strong>Notifications</strong><span>{pageName ? `${pageName} · ` : ""}{unreadCount ? `${unreadCount} unread` : "Recent Live activity"}</span></div>
@@ -280,16 +265,19 @@ function FloatingLiveNotifications({ clientId, fbPageId, pageName, navigateTo })
       {error && <p className="portal-notification-error" role="status">{error}</p>}
       <div className="portal-notification-list">
         {!notifications.length && !error && <p className="portal-notification-empty">No notifications yet. Accepted Live claims and ended sessions will appear here.</p>}
-        {notifications.map((entry) => <button key={entry.id} type="button" className={`portal-notification-entry${entry.read_at ? " is-read" : " is-unread"}`} onClick={() => !entry.read_at && markRead(entry.id)}>
+        {notifications.map((entry) => <article key={entry.id} className={`portal-notification-entry${entry.read_at ? " is-read" : " is-unread"}`}>
           <span className="portal-notification-dot" aria-hidden="true" />
-          <span className="portal-notification-copy"><strong>{entry.title}</strong><span>{entry.message}</span><time>{entry.created_at ? new Date(entry.created_at).toLocaleString("en-PH", { timeZone: "Asia/Manila", dateStyle: "medium", timeStyle: "short" }) : ""}</time></span>
-        </button>)}
+          <div className="portal-notification-copy"><strong>{entry.title}</strong><span>{entry.message}</span><time>{entry.created_at ? new Date(entry.created_at).toLocaleString("en-PH", { timeZone: "Asia/Manila", dateStyle: "medium", timeStyle: "short" }) : ""}</time>
+            <div className="portal-notification-item-actions">
+              <button type="button" className="portal-notification-view" onClick={() => onOpenNotification?.(entry.id)}>View this item in Notification Center <span aria-hidden="true">→</span></button>
+              {!entry.read_at && <button type="button" className="portal-notification-mark-read" onClick={() => markRead(entry.id)}>Mark read</button>}
+            </div>
+          </div>
+        </article>)}
       </div>
-      <footer className="portal-notification-footer">
-        <button type="button" onClick={() => { setIsOpen(false); navigateTo?.("notifications"); }}>Open Notification Center</button>
-      </footer>
     </section>}
-    <button type="button" className="portal-notification-float" aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ""}`} aria-expanded={isOpen} title="Notifications" onClick={() => { setIsOpen((open) => !open); if (!isOpen) refresh(); }}>
+    <button type="button" className="floating-widget-dismiss portal-notification-float-dismiss" aria-label="Hide floating notification button" title="Hide floating notification button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); onHide?.(); }}>×</button>
+    <button type="button" className="portal-notification-float" aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ""}`} aria-expanded={isOpen} title="Notifications · right-click to hide" onContextMenu={(event) => { event.preventDefault(); onHide?.(); }} onClick={() => { setIsOpen((open) => !open); if (!isOpen) refresh(); }}>
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg>
       {unreadCount > 0 && <span className="meta-messenger-badge">{unreadCount > 99 ? "99+" : unreadCount}</span>}
     </button>
@@ -600,9 +588,24 @@ export default function PortalPage({ session }) {
   const [onboardingStatus, setOnboardingStatus] = useState(null);
 
   const [page, setPage] = useState("dashboard");
+  const [notificationFocusId, setNotificationFocusId] = useState("");
+  const [floatingWidgetSettings, setFloatingWidgetSettings] = useState({ messenger: true, notifications: true });
   const [setupSection, setSetupSection] = useState("configuration");
   const [accountSecuritySection, setAccountSecuritySection] = useState("security");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    if (!client?.client_id) {
+      setFloatingWidgetSettings({ messenger: true, notifications: true });
+      return;
+    }
+    try {
+      const stored = JSON.parse(localStorage.getItem(`eo2mate-floating-widgets-${client.client_id}`) || "{}");
+      setFloatingWidgetSettings({ messenger: stored.messenger !== false, notifications: stored.notifications !== false });
+    } catch {
+      setFloatingWidgetSettings({ messenger: true, notifications: true });
+    }
+  }, [client?.client_id]);
 
   useEffect(() => {
     setMobileMenuOpen(false);
@@ -900,6 +903,22 @@ export default function PortalPage({ session }) {
   function navigateTo(nextPage) {
     setPage(nextPage);
     setMobileMenuOpen(false);
+  }
+
+  function openNotification(notificationId) {
+    setNotificationFocusId(String(notificationId || ""));
+    navigateTo("notifications");
+  }
+
+  function setFloatingWidgetVisible(widget, visible) {
+    setFloatingWidgetSettings((current) => {
+      const next = { ...current, [widget]: Boolean(visible) };
+      if (client?.client_id) {
+        try { localStorage.setItem(`eo2mate-floating-widgets-${client.client_id}`, JSON.stringify(next)); }
+        catch { /* Keep this session's preference even when storage is unavailable. */ }
+      }
+      return next;
+    });
   }
 
   async function handleLogout() {
@@ -1213,9 +1232,9 @@ export default function PortalPage({ session }) {
 
         {(page === "post-mining") && <MiningPage key={`mining-${effectivePageId}`} selectedFbPageId={effectivePageId} client={client} metaConnected={metaConnected} miningWorkspaceTab={miningWorkspaceTab} navigateTo={navigateTo} page={page} setMiningWorkspaceTab={setMiningWorkspaceTab} />}
 
-        {(page === "dashboard") && <DashboardPage selectedFbPageId={effectivePageId} selectedFbPageName={availablePages.find((p) => String(p.fb_page_id) === String(effectivePageId))?.page_name || ""} client={client} facebookStatus={facebookStatus} goToAuctions={goToAuctions} goToDeliveries={goToDeliveries} goToOrders={goToOrders} goToPayments={goToPayments} navigateTo={navigateTo} onboardingChecked={onboardingChecked} openDelivery={openDelivery} openFacebookSetup={openFacebookSetup} page={page} paymentAccountLoading={paymentAccountLoading} paymentAccountMessage={paymentAccountMessage} paymentAccountStatus={paymentAccountStatus} setErrorMessage={setErrorMessage} setPage={setPage} />}
+        {(page === "dashboard") && <DashboardPage selectedFbPageId={effectivePageId} selectedFbPageName={availablePages.find((p) => String(p.fb_page_id) === String(effectivePageId))?.page_name || ""} client={client} facebookStatus={facebookStatus} goToAuctions={goToAuctions} goToDeliveries={goToDeliveries} goToOrders={goToOrders} goToPayments={goToPayments} navigateTo={navigateTo} onboardingChecked={onboardingChecked} openDelivery={openDelivery} openFacebookSetup={openFacebookSetup} page={page} paymentAccountLoading={paymentAccountLoading} paymentAccountMessage={paymentAccountMessage} paymentAccountStatus={paymentAccountStatus} setErrorMessage={setErrorMessage} setPage={setPage} floatingWidgetSettings={floatingWidgetSettings} onFloatingWidgetSettingChange={setFloatingWidgetVisible} />}
 
-        {(page === "notifications") && <NotificationCenterPage key={`notifications-${effectivePageId}`} client={client} selectedFbPageId={effectivePageId} selectedFbPageName={availablePages.find((p) => String(p.fb_page_id) === String(effectivePageId))?.page_name || ""} />}
+        {(page === "notifications") && <NotificationCenterPage key={`notifications-${effectivePageId}`} client={client} selectedFbPageId={effectivePageId} selectedFbPageName={availablePages.find((p) => String(p.fb_page_id) === String(effectivePageId))?.page_name || ""} focusNotificationId={notificationFocusId} />}
 
         {(page === "auctions" || page === "auction-detail") && <AuctionPage selectedFbPageId={effectivePageId} navigationFilter={navigationFilter} auctionWorkspaceTab={auctionWorkspaceTab} client={client} detailRequest={detailRequest} navigateTo={navigateTo} page={page} setAuctionWorkspaceTab={setAuctionWorkspaceTab} setErrorMessage={setErrorMessage} setPage={setPage} />}
 
@@ -1283,8 +1302,8 @@ export default function PortalPage({ session }) {
         </PortalPageContent>
 
       </main>
-      <FloatingLiveNotifications clientId={client?.client_id} fbPageId={effectivePageId} pageName={availablePages.find((entry) => String(entry.fb_page_id) === String(effectivePageId))?.page_name || ""} navigateTo={navigateTo} />
-      <FloatingMetaMessenger clientId={client?.client_id} />
+      {floatingWidgetSettings.notifications && <FloatingLiveNotifications clientId={client?.client_id} fbPageId={effectivePageId} pageName={availablePages.find((entry) => String(entry.fb_page_id) === String(effectivePageId))?.page_name || ""} onOpenNotification={openNotification} onHide={() => setFloatingWidgetVisible("notifications", false)} />}
+      {floatingWidgetSettings.messenger && <FloatingMetaMessenger clientId={client?.client_id} onHide={() => setFloatingWidgetVisible("messenger", false)} />}
     </div>
   );
 }

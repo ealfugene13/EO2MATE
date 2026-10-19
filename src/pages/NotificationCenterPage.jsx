@@ -5,13 +5,10 @@ const MODE_GROUPS = {
   AUCTION: { label: "Auction", order: 1 },
   MINING: { label: "Mining", order: 2 },
   SELLING: { label: "Live Selling", order: 3 },
-  LIVE_SELLING: { label: "Live Selling", order: 3 },
-  LIVE_MINING: { label: "Live Mining", order: 4 },
-  LIVE_AUCTION: { label: "Live Auction", order: 5 },
-  REGULAR_SALE: { label: "Regular Sale", order: 6 },
-  PREORDER: { label: "Pre-order", order: 7 },
-  LIVE_SESSION: { label: "Live Session", order: 8 },
-  MIXED: { label: "Mixed Live", order: 9 },
+  REGULAR_SALE: { label: "Regular Sale", order: 4 },
+  PREORDER: { label: "Pre-order", order: 5 },
+  LIVE_SESSION: { label: "Live Session", order: 6 },
+  MIXED: { label: "Mixed Live", order: 7 },
   OTHER: { label: "Other", order: 99 },
 };
 
@@ -34,7 +31,7 @@ function formatDate(value) {
   return Number.isNaN(date.getTime()) ? "" : date.toLocaleString("en-PH", { timeZone: "Asia/Manila", dateStyle: "medium", timeStyle: "short" });
 }
 
-export default function NotificationCenterPage({ client, selectedFbPageId, selectedFbPageName }) {
+export default function NotificationCenterPage({ client, selectedFbPageId, selectedFbPageName, focusNotificationId = "" }) {
   const [notifications, setNotifications] = useState([]);
   const [filter, setFilter] = useState("ALL");
   const [loading, setLoading] = useState(true);
@@ -68,6 +65,13 @@ export default function NotificationCenterPage({ client, selectedFbPageId, selec
     document.addEventListener("visibilitychange", onVisible);
     return () => { window.clearInterval(timer); document.removeEventListener("visibilitychange", onVisible); };
   }, [refresh]);
+
+  useEffect(() => {
+    if (!focusNotificationId || loading) return;
+    const target = document.getElementById(`notification-center-item-${encodeURIComponent(String(focusNotificationId))}`);
+    if (!target) return;
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [focusNotificationId, loading, notifications]);
 
   async function markRead(id) {
     const previous = notifications;
@@ -143,9 +147,9 @@ export default function NotificationCenterPage({ client, selectedFbPageId, selec
         {grouped.map(([mode, items]) => <section className="notification-mode-group" key={mode}>
           <header><div className={`notification-mode-badge mode-${mode.toLowerCase()}`}><span /><h3>{modeInfo(mode).label}</h3></div><span>{items.length} {items.length === 1 ? "update" : "updates"}</span></header>
           <div className="notification-mode-list">
-            {items.map((item) => <article className={`notification-center-item${item.read_at ? " is-read" : " is-unread"}`} key={item.id}>
+            {items.map((item) => <article id={`notification-center-item-${encodeURIComponent(String(item.id))}`} className={`notification-center-item${item.read_at ? " is-read" : " is-unread"}${String(item.id) === String(focusNotificationId) ? " is-focused" : ""}`} key={item.id}>
               <span className="notification-center-item-dot" aria-hidden="true" />
-              <div className="notification-center-item-copy"><div><h4>{item.title}</h4>{!item.read_at && <span className="notification-new-label">NEW</span>}</div><p>{item.message}</p>{(item.post_id || item.fb_post_id || item.item_label || item.post_caption) && <div className="notification-post-details">{item.item_label && <span><b>Item:</b> {item.item_label}</span>}{item.post_id && <span><b>Post ID:</b> {item.post_id}</span>}{item.fb_post_id && <span><b>Facebook post:</b> {item.fb_post_id}</span>}{item.post_caption && <details><summary>View post caption</summary><p>{item.post_caption}</p></details>}</div>}<time>{formatDate(item.created_at)}</time></div>
+              <div className="notification-center-item-copy"><div><h4>{item.title}</h4>{!item.read_at && <span className="notification-new-label">NEW</span>}</div><p>{item.message}</p><time>{formatDate(item.created_at)}</time></div>
               {!item.read_at && <button type="button" className="notification-mark-read" aria-label={`Mark ${item.title} as read`} title="Mark as read" onClick={() => markRead(item.id)}><CheckIcon /></button>}
             </article>)}
           </div>

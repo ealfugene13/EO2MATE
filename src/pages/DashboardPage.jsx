@@ -233,7 +233,7 @@ function onlySelectedPage(rows, pageId) {
   );
 }
 
-function DashboardCommunicationPanel({ client, selectedFbPageId, selectedFbPageName, facebookStatus, openFacebookSetup, navigateTo }) {
+function DashboardCommunicationPanel({ client, selectedFbPageId, selectedFbPageName, facebookStatus, openFacebookSetup, navigateTo, floatingWidgetSettings, onFloatingWidgetSettingChange }) {
   const [notifications, setNotifications] = useState([]);
   const [notificationsError, setNotificationsError] = useState("");
   const [messengerUnread, setMessengerUnread] = useState(0);
@@ -346,8 +346,15 @@ function DashboardCommunicationPanel({ client, selectedFbPageId, selectedFbPageN
 
   const unreadNotifications = notifications.filter((entry) => !entry.read_at);
   const displayedNotifications = unreadNotifications.slice(0, 5);
+  const messengerFloatVisible = floatingWidgetSettings?.messenger !== false;
+  const notificationsFloatVisible = floatingWidgetSettings?.notifications !== false;
   return <section className="dashboard-panel dashboard-communications-panel">
     <div className="panel-header"><div><h2>Notifications &amp; Messenger</h2><p>Review saved Live activity and open the selected Facebook Page inbox.</p></div><button type="button" className="dashboard-notifications-page-link" onClick={() => navigateTo?.("notifications")}>Open Notification Center <span aria-hidden="true">→</span></button></div>
+    <div className="dashboard-floating-controls">
+      <div className="dashboard-floating-controls-copy"><strong>Floating buttons</strong><span>Right-click or use the × on a floating button to hide it. Turn it back on here.</span></div>
+      <label className="dashboard-floating-toggle"><input type="checkbox" checked={messengerFloatVisible} onChange={(event) => onFloatingWidgetSettingChange?.("messenger", event.target.checked)} /><span>Messenger button</span><b>{messengerFloatVisible ? "On" : "Off"}</b></label>
+      <label className="dashboard-floating-toggle"><input type="checkbox" checked={notificationsFloatVisible} onChange={(event) => onFloatingWidgetSettingChange?.("notifications", event.target.checked)} /><span>Notification button</span><b>{notificationsFloatVisible ? "On" : "Off"}</b></label>
+    </div>
     <div className="dashboard-communications-grid">
       <div className="dashboard-communication-card">
         <div className="dashboard-communication-heading">
@@ -381,7 +388,7 @@ function DashboardCommunicationPanel({ client, selectedFbPageId, selectedFbPageN
   </section>;
 }
 
-export default function DashboardPage({ client, facebookStatus, goToAuctions, goToDeliveries, goToOrders, goToPayments, navigateTo, onboardingChecked, openDelivery, openFacebookSetup, page, paymentAccountLoading, paymentAccountMessage, paymentAccountStatus, setErrorMessage, setPage , selectedFbPageId, selectedFbPageName }) {
+export default function DashboardPage({ client, facebookStatus, goToAuctions, goToDeliveries, goToOrders, goToPayments, navigateTo, onboardingChecked, openDelivery, openFacebookSetup, page, paymentAccountLoading, paymentAccountMessage, paymentAccountStatus, setErrorMessage, setPage , selectedFbPageId, selectedFbPageName, floatingWidgetSettings, onFloatingWidgetSettingChange }) {
   const activePageLabel = String(selectedFbPageName || "").trim();
   const welcomeName = activePageLabel || client?.name || "Business overview";
   const pageChangedLabel = activePageLabel ? `Active Facebook Page: ${activePageLabel}` : "Client workspace overview";
@@ -485,7 +492,7 @@ export default function DashboardPage({ client, facebookStatus, goToAuctions, go
               </section>
             )}
 
-            <DashboardCommunicationPanel client={client} selectedFbPageId={selectedFbPageId} selectedFbPageName={selectedFbPageName} facebookStatus={facebookStatus} openFacebookSetup={openFacebookSetup} navigateTo={navigateTo} />
+            <DashboardCommunicationPanel client={client} selectedFbPageId={selectedFbPageId} selectedFbPageName={selectedFbPageName} facebookStatus={facebookStatus} openFacebookSetup={openFacebookSetup} navigateTo={navigateTo} floatingWidgetSettings={floatingWidgetSettings} onFloatingWidgetSettingChange={onFloatingWidgetSettingChange} />
 
             <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 14, marginBottom: 20 }}>
               {[

@@ -2330,6 +2330,41 @@ textarea:focus {
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
 }
 
+.fb-add-photos-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 20px 18px;
+}
+
+.fb-add-photos-button {
+  min-height: 38px;
+  padding: 8px 13px;
+  border: 1px solid #cfe2d5;
+  border-radius: 9px;
+  color: #087f5b;
+  background: #f5fbf7;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.fb-add-photos-button:hover:not(:disabled) {
+  border-color: #8bc6a0;
+  background: #ecf8ef;
+}
+
+.fb-add-photos-button:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+.fb-add-photos-actions small {
+  color: #718096;
+  font-size: 11px;
+}
+
 .fb-photo-card {
   overflow: hidden;
   border: 1px solid #dfe6ee;
@@ -3116,9 +3151,34 @@ button.post-type-card:hover { transform: translateY(-2px); border-color: #bcdcc3
 .portal-notification-float-wrap {
   position: fixed;
   z-index: 10050;
+  width: 58px;
+  height: 58px;
   right: 92px;
   bottom: 24px;
 }
+.floating-widget-dismiss {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  z-index: 4;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid #fff;
+  border-radius: 50%;
+  color: #fff;
+  background: #475569;
+  box-shadow: 0 2px 7px rgba(15, 23, 42, .3);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+.floating-widget-dismiss:hover { background: #b42318; }
+.meta-messenger-float-dismiss { pointer-events: auto; }
 .portal-notification-float {
   position: relative;
   width: 58px;
@@ -3155,7 +3215,7 @@ button.post-type-card:hover { transform: translateY(-2px); border-color: #bcdcc3
 .portal-notification-header button { border: 0; padding: 7px 9px; border-radius: 8px; color: #087f5b; background: #ecfdf5; font: inherit; font-size: 12px; font-weight: 700; white-space: nowrap; cursor: pointer; }
 .portal-notification-header button:disabled { color: #94a3b8; background: #f1f5f9; cursor: default; }
 .portal-notification-list { overflow-y: auto; overscroll-behavior: contain; }
-.portal-notification-entry { display: grid; grid-template-columns: 10px minmax(0, 1fr); align-items: start; gap: 10px; width: 100%; padding: 13px 15px; border: 0; border-bottom: 1px solid #edf1f5; text-align: left; cursor: pointer; }
+.portal-notification-entry { display: grid; grid-template-columns: 10px minmax(0, 1fr); align-items: start; gap: 10px; width: 100%; padding: 13px 15px; border: 0; border-bottom: 1px solid #edf1f5; text-align: left; }
 .portal-notification-entry.is-read { background: #fff; cursor: default; }
 .portal-notification-entry.is-unread { background: #f0fdf8; }
 .portal-notification-dot { width: 8px; height: 8px; margin-top: 5px; border-radius: 50%; background: transparent; }
@@ -3165,11 +3225,12 @@ button.post-type-card:hover { transform: translateY(-2px); border-color: #bcdcc3
 .portal-notification-copy strong { margin-bottom: 3px; color: #172b4d; font-size: 13px; }
 .portal-notification-copy span { color: #475569; font-size: 13px; line-height: 1.4; }
 .portal-notification-copy time { margin-top: 6px; color: #8492a6; font-size: 11px; }
+.portal-notification-item-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 9px; }
+.portal-notification-view,.portal-notification-mark-read { border: 0; padding: 0; color: #087f5b; background: transparent; font: inherit; font-size: 11px; font-weight: 750; text-align: left; cursor: pointer; }
+.portal-notification-view:hover,.portal-notification-mark-read:hover { color: #065f46; text-decoration: underline; }
+.portal-notification-mark-read { color: #64748b; font-weight: 600; }
 .portal-notification-empty { margin: 0; padding: 24px; color: #64748b; text-align: center; font-size: 13px; }
 .portal-notification-error { margin: 0; padding: 10px 14px; color: #9f1239; background: #fff1f2; font-size: 12px; }
-.portal-notification-footer { padding: 10px 14px; border-top: 1px solid #e7edf3; background: #fff; }
-.portal-notification-footer button { width: 100%; min-height: 38px; padding: 9px 12px; border: 1px solid #d8e9df; border-radius: 9px; color: #087f5b; background: #f7fcf9; font: inherit; font-size: 12px; font-weight: 750; cursor: pointer; }
-.portal-notification-footer button:hover { border-color: #a8d9bc; background: #eef9f2; }
 .dashboard-communications-panel { margin: 0 0 20px; }
 .dashboard-communications-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(260px, .85fr); gap: 14px; }
 .dashboard-communication-card { min-width: 0; overflow: hidden; border: 1px solid #e5ebf1; border-radius: 15px; background: #fff; }
@@ -3234,6 +3295,8 @@ button.post-type-card:hover { transform: translateY(-2px); border-color: #bcdcc3
 .notification-mode-badge.mode-live_session > span { background: #df5555; }
 .notification-mode-list { display: grid; }
 .notification-center-item { display: grid; grid-template-columns: 10px minmax(0,1fr) 34px; align-items: start; gap: 12px; padding: 15px 15px; border-bottom: 1px solid #f0f2f0; }
+.notification-center-item { scroll-margin: 28px; transition: box-shadow .18s ease, background-color .18s ease; }
+.notification-center-item.is-focused { outline: 2px solid #0b8c5c; outline-offset: -2px; border-radius: 8px; box-shadow: 0 0 0 4px rgba(11, 140, 92, .12); }
 .notification-center-item:last-child { border-bottom: 0; }
 .notification-center-item.is-unread { background: #fbfefc; }
 .notification-center-item-dot { width: 8px; height: 8px; margin-top: 6px; border-radius: 50%; background: transparent; }
@@ -3244,12 +3307,6 @@ button.post-type-card:hover { transform: translateY(-2px); border-color: #bcdcc3
 .notification-new-label { padding: 3px 6px; border-radius: 5px; color: #087b51; background: #e9f7ef; font-size: 8px; font-weight: 850; letter-spacing: .07em; }
 .notification-center-item-copy p { margin: 5px 0 7px; color: #68766d; font-size: 12px; line-height: 1.5; }
 .notification-center-item-copy time { color: #99a39c; font-size: 10px; }
-.notification-post-details { display: grid; gap: 4px; margin: 8px 0; color: #64746a; font-size: 11px; line-height: 1.45; overflow-wrap: anywhere; }
-.notification-post-details b { color: #44594b; font-weight: 700; }
-.notification-post-details details { margin-top: 2px; }
-.notification-post-details summary { color: #087f5b; cursor: pointer; font-weight: 700; }
-.notification-post-details details p { margin: 5px 0 0; padding: 8px; border-radius: 7px; background: #f4f8f5; white-space: pre-wrap; overflow-wrap: anywhere; }
-
 .notification-mark-read { width: 30px; height: 30px; display: grid; place-items: center; border: 1px solid #dcebe1; border-radius: 8px; color: #168255; background: #fff; cursor: pointer; }
 .notification-mark-read:hover { color: #fff; background: #128a5b; border-color: #128a5b; }
 .notification-mark-read svg { width: 16px; height: 16px; }
@@ -3283,6 +3340,29 @@ button.post-type-card:hover { transform: translateY(-2px); border-color: #bcdcc3
   width: 58px;
   height: 58px;
   pointer-events: none;
+}
+
+.dashboard-floating-controls {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) repeat(2, minmax(190px, .7fr));
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border: 1px solid #e3ebe6;
+  border-radius: 12px;
+  background: #f8fbf9;
+}
+.dashboard-floating-controls-copy { display: grid; gap: 3px; }
+.dashboard-floating-controls-copy strong { color: #243b30; font-size: 12px; }
+.dashboard-floating-controls-copy span { color: #718096; font-size: 10px; line-height: 1.4; }
+.dashboard-floating-toggle { display: flex; align-items: center; gap: 8px; min-width: 0; color: #34445a; font-size: 11px; cursor: pointer; }
+.dashboard-floating-toggle input { width: 16px; height: 16px; flex: 0 0 auto; accent-color: #087f5b; }
+.dashboard-floating-toggle span { flex: 1; }
+.dashboard-floating-toggle b { color: #087f5b; font-size: 10px; }
+@media (max-width: 760px) {
+  .dashboard-floating-controls { grid-template-columns: 1fr 1fr; }
+  .dashboard-floating-controls-copy { grid-column: 1 / -1; }
 }
 
 .meta-messenger-float {
