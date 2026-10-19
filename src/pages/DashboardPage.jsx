@@ -352,8 +352,16 @@ function DashboardCommunicationPanel({ client, selectedFbPageId, selectedFbPageN
     <div className="panel-header"><div><h2>Notifications &amp; Messenger</h2><p>Review saved Live activity and open the selected Facebook Page inbox.</p></div><button type="button" className="dashboard-notifications-page-link" onClick={() => navigateTo?.("notifications")}>Open Notification Center <span aria-hidden="true">→</span></button></div>
     <div className="dashboard-floating-controls">
       <div className="dashboard-floating-controls-copy"><strong>Floating buttons</strong><span>Right-click or use the × on a floating button to hide it. Turn it back on here.</span></div>
-      <label className="dashboard-floating-toggle"><input type="checkbox" checked={messengerFloatVisible} onChange={(event) => onFloatingWidgetSettingChange?.("messenger", event.target.checked)} /><span>Messenger button</span><b>{messengerFloatVisible ? "On" : "Off"}</b></label>
-      <label className="dashboard-floating-toggle"><input type="checkbox" checked={notificationsFloatVisible} onChange={(event) => onFloatingWidgetSettingChange?.("notifications", event.target.checked)} /><span>Notification button</span><b>{notificationsFloatVisible ? "On" : "Off"}</b></label>
+      <label className="dashboard-floating-toggle">
+        <input type="checkbox" role="switch" aria-label="Show Messenger floating button" checked={messengerFloatVisible} onChange={(event) => onFloatingWidgetSettingChange?.("messenger", event.target.checked)} />
+        <span className="dashboard-floating-toggle-switch" aria-hidden="true"><span /></span>
+        <span className="dashboard-floating-toggle-label"><strong>Messenger button</strong><small>{messengerFloatVisible ? "On · visible on dashboard" : "Off · hidden from dashboard"}</small></span>
+      </label>
+      <label className="dashboard-floating-toggle">
+        <input type="checkbox" role="switch" aria-label="Show Notification floating button" checked={notificationsFloatVisible} onChange={(event) => onFloatingWidgetSettingChange?.("notifications", event.target.checked)} />
+        <span className="dashboard-floating-toggle-switch" aria-hidden="true"><span /></span>
+        <span className="dashboard-floating-toggle-label"><strong>Notification button</strong><small>{notificationsFloatVisible ? "On · visible on dashboard" : "Off · hidden from dashboard"}</small></span>
+      </label>
     </div>
     <div className="dashboard-communications-grid">
       <div className="dashboard-communication-card">

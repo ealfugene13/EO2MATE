@@ -3356,10 +3356,16 @@ button.post-type-card:hover { transform: translateY(-2px); border-color: #bcdcc3
 .dashboard-floating-controls-copy { display: grid; gap: 3px; }
 .dashboard-floating-controls-copy strong { color: #243b30; font-size: 12px; }
 .dashboard-floating-controls-copy span { color: #718096; font-size: 10px; line-height: 1.4; }
-.dashboard-floating-toggle { display: flex; align-items: center; gap: 8px; min-width: 0; color: #34445a; font-size: 11px; cursor: pointer; }
-.dashboard-floating-toggle input { width: 16px; height: 16px; flex: 0 0 auto; accent-color: #087f5b; }
-.dashboard-floating-toggle span { flex: 1; }
-.dashboard-floating-toggle b { color: #087f5b; font-size: 10px; }
+.dashboard-floating-toggle { display: flex; align-items: center; gap: 10px; min-width: 0; color: #34445a; font-size: 11px; cursor: pointer; }
+.dashboard-floating-toggle input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.dashboard-floating-toggle-switch { box-sizing: border-box; display: block; position: relative; width: 48px; height: 28px; flex: 0 0 48px; padding: 3px; border-radius: 999px; background: #cbd2dc; transition: background .18s ease; }
+.dashboard-floating-toggle-switch > span { display: block; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 2px 7px rgba(15,23,42,.22); transition: transform .18s ease; }
+.dashboard-floating-toggle input:checked + .dashboard-floating-toggle-switch { background: #249447; }
+.dashboard-floating-toggle input:checked + .dashboard-floating-toggle-switch > span { transform: translateX(20px); }
+.dashboard-floating-toggle input:focus-visible + .dashboard-floating-toggle-switch { outline: 3px solid rgba(36,148,71,.2); outline-offset: 2px; }
+.dashboard-floating-toggle-label { display: grid; gap: 3px; min-width: 0; }
+.dashboard-floating-toggle-label strong { color: #26354a; font-size: 11px; }
+.dashboard-floating-toggle-label small { color: #738096; font-size: 9px; line-height: 1.35; }
 @media (max-width: 760px) {
   .dashboard-floating-controls { grid-template-columns: 1fr 1fr; }
   .dashboard-floating-controls-copy { grid-column: 1 / -1; }
