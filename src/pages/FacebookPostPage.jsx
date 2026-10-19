@@ -942,6 +942,8 @@ export default function FacebookPostPage({
     ...DEFAULT_RULES,
   });
   const [items, setItems] = useState([]);
+  const [multipleItemSource, setMultipleItemSource] = useState("MANUAL");
+  const [newInventoryItemId, setNewInventoryItemId] = useState("");
   const [draggingId, setDraggingId] = useState(null);
   const [showPreview, setShowPreview] = useState(true);
   const [publishing, setPublishing] = useState(false);
@@ -1554,6 +1556,41 @@ export default function FacebookPostPage({
       }));
     } catch (error) {
       setErrorMessage(error?.message || "Unable to load Inventory image.");
+    }
+  }
+
+  async function addInventoryItemToMultiple(inventoryItemId = newInventoryItemId) {
+    const inventory = pageInventoryItems.find((row) => String(row.inventory_item_id) === String(inventoryItemId));
+    if (!inventory) {
+      setErrorMessage("Select an Inventory item first.");
+      return;
+    }
+    if (items.length >= MAX_IMAGES) {
+      setErrorMessage(`Maximum ${MAX_IMAGES} items per Facebook post.`);
+      return;
+    }
+    setProcessingFiles(true);
+    setErrorMessage("");
+    try {
+      const photos = await inventoryImageToPostFiles(inventory, { all: true });
+      if (!photos.length) throw new Error("This Inventory item has no photos to post.");
+      const primary = photos[0];
+      const item = {
+        ...createItem(primary.file, items.length),
+        item: inventory.item_name || "",
+        itemSource: "INVENTORY",
+        inventoryItemId: inventory.inventory_item_id,
+        inventoryImageId: primary.inventoryImageId,
+        inventoryPhotoOptions: photos,
+        regularSalePrice: inventory.default_selling_price != null ? String(inventory.default_selling_price) : "",
+        regularSaleQuantity: String(Math.max(1, inventoryAvailableQty(inventory))),
+      };
+      setItems((current) => [...current, item]);
+      setNewInventoryItemId("");
+    } catch (error) {
+      setErrorMessage(error?.message || "Unable to load Inventory photos.");
+    } finally {
+      setProcessingFiles(false);
     }
   }
 
@@ -3597,6 +3634,32 @@ export default function FacebookPostPage({
             </p>
           </div>
         </div>
+
+        {isMultiple && (
+          <div className="fb-item-editor" style={{ margin: "0 0 16px", padding: 14, border: "1px solid var(--border-color, #dbe2ea)", borderRadius: 12 }}>
+            <label>New item source
+              <select value={multipleItemSource} onChange={(event) => setMultipleItemSource(event.target.value)} disabled={publishing || processingFiles}>
+                <option value="MANUAL">Manual</option>
+                <option value="INVENTORY">From Inventory</option>
+              </select>
+            </label>
+            {multipleItemSource === "INVENTORY" ? (
+              <div style={{ display: "flex", gap: 10, alignItems: "end", flexWrap: "wrap", marginTop: 10 }}>
+                <label style={{ flex: "1 1 260px" }}>Inventory item
+                  <select value={newInventoryItemId} onChange={(event) => setNewInventoryItemId(event.target.value)} disabled={publishing || processingFiles}>
+                    <option value="">Select Inventory item</option>
+                    {pageInventoryItems.map((row) => <option key={row.inventory_item_id} value={row.inventory_item_id}>{row.item_code ? `${row.item_code} · ` : ""}{row.item_name}</option>)}
+                  </select>
+                </label>
+                <button type="button" className="secondary-button" onClick={() => addInventoryItemToMultiple()} disabled={publishing || processingFiles || !newInventoryItemId || items.length >= MAX_IMAGES}>
+                  {processingFiles ? "Loading photos…" : "＋ Add inventory item"}
+                </button>
+              </div>
+            ) : (
+              <small>Upload photos below to create manual items. Each photo becomes one item.</small>
+            )}
+          </div>
+        )}
 
         <input
           key={fileInputKey}

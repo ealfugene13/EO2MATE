@@ -2729,22 +2729,24 @@ export default function InventoryPage({
                               }
                               className="inventory-item-card"
                             >
-                              <div className="inventory-item-image">
+                              <button
+                                type="button"
+                                className="inventory-item-image inventory-item-image-clickable"
+                                onClick={() => { if (image?.signed_url || image?.url) openPhotoGallery(item, image); }}
+                                disabled={!(image?.signed_url || image?.url)}
+                                aria-label={image?.signed_url || image?.url ? `Open all photos for ${item.item_name}` : undefined}
+                                style={{ width: "100%", padding: 0, border: 0, color: "inherit", font: "inherit", textAlign: "inherit", cursor: image?.signed_url || image?.url ? "zoom-in" : "default" }}
+                              >
                                 {
                                   (image?.signed_url || image?.url)
                                     ? (
-                                      <button
-                                        type="button"
-                                        className="inventory-photo-open"
-                                        onClick={() => openPhotoGallery(item, image)}
-                                        aria-label={`View photos for ${item.item_name}`}
-                                      >
+                                      <div className="inventory-photo-open" aria-hidden="true">
                                         <img
                                           src={image.signed_url || image.url}
                                           alt={item.item_name}
                                         />
                                         {(item.images || []).filter((entry) => entry.signed_url || entry.url).length > 1 && <span>View photos · {(item.images || []).length}</span>}
-                                      </button>
+                                      </div>
                                     )
                                     : (
                                       <div className="inventory-image-placeholder">
@@ -2758,7 +2760,7 @@ export default function InventoryPage({
                                       </div>
                                     )
                                 }
-                              </div>
+                              </button>
 
                               <div className="inventory-item-body">
                                 <div className="inventory-item-title">
