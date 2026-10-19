@@ -393,7 +393,7 @@ function LivePopupNotifications({ notifications, onDismiss }) {
   </div>;
 }
 
-function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", section = "SESSIONS", setSection }) {
+function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", section = "SESSIONS", setSection, refreshActionRef }) {
   const clientId = client?.client_id;
   const [sessions, setSessions] = useState([]);
   const [selected, setSelected] = useState("");
@@ -530,6 +530,11 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
     catch (error) { setMessage(error.message || "Unable to refresh Live sessions."); }
     finally { setBusy(false); }
   };
+  useEffect(() => {
+    if (!refreshActionRef) return undefined;
+    refreshActionRef.current = refreshSessions;
+    return () => { if (refreshActionRef.current === refreshSessions) refreshActionRef.current = null; };
+  }, [refreshActionRef, refreshSessions]);
   useEffect(() => {
     liveSnapshots.current = { clientId, pageId, initialized: false, sessions: new Map() };
     setPopupNotifications([]);
@@ -788,6 +793,7 @@ const LIVE_PAGE = {
 
 export default function LiveSellingPage({ metaConnected, page, client, selectedFbPageId }) {
   const [section, setSection] = useState("SUMMARY");
+  const refreshActionRef = useRef(null);
   if (page !== "live-selling") return null;
   const current = LIVE_PAGE;
   const sections = [
@@ -803,6 +809,9 @@ export default function LiveSellingPage({ metaConnected, page, client, selectedF
         <h1>Live Selling</h1>
         <p>Manage Live Selling in one workspace. Choose Selling, Mining, or Auction for each queued product.</p>
       </div>
+      <button type="button" className="icon-button refresh-icon-button" onClick={() => refreshActionRef.current?.()} title="Refresh" aria-label="Refresh">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v5h-5" /><path d="M4 18v-5h5" /><path d="M6.1 9a7 7 0 0 1 11.3-2.1L20 9" /><path d="M4 15l2.6 2.1A7 7 0 0 0 17.9 15" /></svg>
+      </button>
     </header>
     <section className="selling-workspace-tabs" style={{ marginBottom: 18 }}>
       <div className="selling-workspace-tablist selling-workspace-nav" role="tablist" aria-label="Live selling sections">
@@ -813,7 +822,7 @@ export default function LiveSellingPage({ metaConnected, page, client, selectedF
     </section>
     <section className="dashboard-panel" style={{ marginBottom: 18 }}>
       <div className="panel-header"><div><h2>{current.label}</h2><p>{current.description} Buyer command: <strong>{current.command}</strong>.</p></div></div>
-      <MixedLiveManager key={current.key} activeMode={current.key} client={client} selectedFbPageId={selectedFbPageId} section={section} setSection={setSection} />
+      <MixedLiveManager key={current.key} activeMode={current.key} client={client} selectedFbPageId={selectedFbPageId} section={section} setSection={setSection} refreshActionRef={refreshActionRef} />
     </section>
     {!metaConnected && <section className="dashboard-panel"><div className="panel-header"><div><h2>Facebook Page required</h2><p>Connect an authorized Facebook Page before starting a real livestream. Simulated Pages cannot publish to Meta.</p></div></div></section>}
   </>;

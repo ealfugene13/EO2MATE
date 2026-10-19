@@ -325,6 +325,7 @@ function SellingPostDetailPanel({ detail, loading, error, onClose }) {
 }
 
 export default function RegularSalePage({ selectedFbPageId, client, metaConnected, page, regularSaleWorkspaceTab, setRegularSaleWorkspaceTab }) {
+  const [refreshVersion, setRefreshVersion] = useState(0);
   const [sellingPostRows, setSellingPostRows] = useState({ REGULAR_SALE: [], MINING: [] });
 
   const [sellingPostLoading, setSellingPostLoading] = useState(false);
@@ -487,7 +488,7 @@ export default function RegularSalePage({ selectedFbPageId, client, metaConnecte
 
     loadSellingPostRows();
     return () => { cancelled = true; };
-  }, [client?.client_id, selectedFbPageId]);
+  }, [client?.client_id, selectedFbPageId, refreshVersion]);
   return (<>
     {metaConnected && page === "regular-sale" && (
           (sellingPostDetailLoading || sellingPostDetailError || sellingPostDetail?.mode_code === "REGULAR_SALE") ? (
@@ -501,6 +502,9 @@ export default function RegularSalePage({ selectedFbPageId, client, metaConnecte
                   <h1>Regular Sales</h1>
                   <p>Manage fixed-price Facebook sales, posts and selling performance from one workspace.</p>
                 </div>
+                <button type="button" className="icon-button refresh-icon-button" onClick={() => setRefreshVersion((version) => version + 1)} disabled={sellingPostLoading} title="Refresh" aria-label="Refresh">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v5h-5" /><path d="M4 18v-5h5" /><path d="M6.1 9a7 7 0 0 1 11.3-2.1L20 9" /><path d="M4 15l2.6 2.1A7 7 0 0 0 17.9 15" /></svg>
+                </button>
               </header>
 
               <section className="selling-workspace-tabs selling-workspace-tabs-with-action">

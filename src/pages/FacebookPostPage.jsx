@@ -3695,6 +3695,10 @@ export default function FacebookPostPage({
             <p className="fb-upload-inventory-hint">Loading the selected Inventory photos…</p>
           ) : (
           <>
+            {((singleItemSource === "INVENTORY" && selectedSingleInventory && !hasSelectedInventoryPhotos(selectedSingleInventory)) ||
+              (isMultiple && multipleItemSource === "INVENTORY" && selectedMultipleInventory && !hasSelectedInventoryPhotos(selectedMultipleInventory))) && (
+              <p className="fb-upload-inventory-hint">No image</p>
+            )}
             <button
               ref={uploadButtonRef}
               type="button"
