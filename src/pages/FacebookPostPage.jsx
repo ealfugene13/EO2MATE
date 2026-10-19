@@ -943,7 +943,7 @@ export default function FacebookPostPage({
   });
   const [items, setItems] = useState([]);
   const [multipleItemSource, setMultipleItemSource] = useState("MANUAL");
-  const [newInventoryItemId, setNewInventoryItemId] = useState("");
+  const [newInventoryItemIds, setNewInventoryItemIds] = useState([]);
   const [draggingId, setDraggingId] = useState(null);
   const [showPreview, setShowPreview] = useState(true);
   const [publishing, setPublishing] = useState(false);
@@ -1239,9 +1239,11 @@ export default function FacebookPostPage({
     }),
     [inventoryItems, selectedPageId]
   );
-  const selectedSingleInventory = pageInventoryItems.find((row) => String(row.inventory_item_id) === String(singleInventoryItemId));
-  const selectedMultipleInventory = pageInventoryItems.find((row) => String(row.inventory_item_id) === String(newInventoryItemId));
   const hasSelectedInventoryPhotos = (inventory) => Array.isArray(inventory?.images) && inventory.images.some((image) => image?.signed_url || image?.url);
+  const selectedSingleInventory = pageInventoryItems.find((row) => String(row.inventory_item_id) === String(singleInventoryItemId));
+  const selectedMultipleInventory = pageInventoryItems.find((row) =>
+    newInventoryItemIds.some((id) => String(id) === String(row.inventory_item_id)) && !hasSelectedInventoryPhotos(row)
+  );
 
   const insertCaptionText = (text, asNewLine = false) => {
     const textarea = sellerCaptionRef.current;
@@ -1473,6 +1475,9 @@ export default function FacebookPostPage({
         });
         return [...current, ...added];
       });
+      if (useSelectedInventoryForFirstUpload && accepted.length) {
+        setNewInventoryItemIds((current) => current.filter((id) => String(id) !== String(selectedMultipleInventory.inventory_item_id)));
+      }
 
       if (errors.length) {
         setErrorMessage(
@@ -1572,36 +1577,64 @@ export default function FacebookPostPage({
     }
   }
 
-  async function addInventoryItemToMultiple(inventoryItemId = newInventoryItemId) {
-    const inventory = pageInventoryItems.find((row) => String(row.inventory_item_id) === String(inventoryItemId));
-    if (!inventory) {
-      setErrorMessage("Select an Inventory item first.");
+  async function addSelectedInventoryItems() {
+    const selectedIds = [...new Set(newInventoryItemIds.map(String))];
+    if (!selectedIds.length) {
+      setErrorMessage("Select one or more Inventory items first.");
       return;
     }
-    if (items.length >= MAX_IMAGES) {
+    const alreadyAdded = new Set(items.filter((item) => item.itemSource === "INVENTORY" && item.inventoryItemId).map((item) => String(item.inventoryItemId)));
+    const selectedRows = selectedIds.map((id) => pageInventoryItems.find((row) => String(row.inventory_item_id) === id)).filter(Boolean);
+    const newRows = selectedRows.filter((row) => !alreadyAdded.has(String(row.inventory_item_id)));
+    if (!newRows.length) {
+      setErrorMessage("Those Inventory items are already added to this post.");
+      return;
+    }
+    const capacity = Math.max(0, MAX_IMAGES - items.length);
+    if (!capacity) {
       setErrorMessage(`Maximum ${MAX_IMAGES} items per Facebook post.`);
       return;
     }
     setProcessingFiles(true);
     setErrorMessage("");
+    const readyItems = [];
+    const noPhotoIds = [];
+    const failedIds = [];
     try {
-      const photos = await inventoryImageToPostFiles(inventory, { all: true });
-      if (!photos.length) throw new Error("This Inventory item has no photos to post.");
-      const primary = photos[0];
-      const item = {
-        ...createItem(primary.file, items.length),
-        item: inventory.item_name || "",
-        itemSource: "INVENTORY",
-        inventoryItemId: inventory.inventory_item_id,
-        inventoryImageId: primary.inventoryImageId,
-        inventoryPhotoOptions: photos,
-        regularSalePrice: inventory.default_selling_price != null ? String(inventory.default_selling_price) : "",
-        regularSaleQuantity: String(Math.max(1, inventoryAvailableQty(inventory))),
-      };
-      setItems((current) => [...current, item]);
-      setNewInventoryItemId("");
-    } catch (error) {
-      setErrorMessage(error?.message || "Unable to load Inventory photos.");
+      for (const inventory of newRows.slice(0, capacity)) {
+        try {
+          const photos = await inventoryImageToPostFiles(inventory, { all: true });
+          if (!photos.length) {
+            noPhotoIds.push(String(inventory.inventory_item_id));
+            continue;
+          }
+          readyItems.push({ inventory, photos });
+        } catch (error) {
+          failedIds.push(String(inventory.inventory_item_id));
+          setErrorMessage(error?.message || `Unable to load photos for ${inventory.item_name || "an Inventory item"}.`);
+        }
+      }
+      const deferredIds = newRows.slice(capacity).map((row) => String(row.inventory_item_id));
+      setItems((current) => [
+        ...current,
+        ...readyItems.map(({ inventory, photos }, index) => {
+          const primary = photos[0];
+          return {
+            ...createItem(primary.file, current.length + index),
+            item: inventory.item_name || "",
+            itemSource: "INVENTORY",
+            inventoryItemId: inventory.inventory_item_id,
+            inventoryImageId: primary.inventoryImageId,
+            inventoryPhotoOptions: photos,
+            regularSalePrice: inventory.default_selling_price != null ? String(inventory.default_selling_price) : "",
+            regularSaleQuantity: String(Math.max(1, inventoryAvailableQty(inventory))),
+          };
+        }),
+      ]);
+      const keepIds = [...new Set([...noPhotoIds, ...failedIds, ...deferredIds])];
+      setNewInventoryItemIds(keepIds);
+      if (noPhotoIds.length) setErrorMessage("No image for one or more selected items. Upload a post photo for each item to continue.");
+      else if (deferredIds.length) setErrorMessage(`Only ${capacity} more item${capacity === 1 ? "" : "s"} fit in this post. The remaining selections are still selected.`);
     } finally {
       setProcessingFiles(false);
     }
@@ -2183,7 +2216,7 @@ export default function FacebookPostPage({
     setSingleItemSource("MANUAL");
     setSingleInventoryItemId("");
     setMultipleItemSource("MANUAL");
-    setNewInventoryItemId("");
+    setNewInventoryItemIds([]);
     setPreorderPrice("");
     setPreorderDownPayment("");
     setPreorderDownPaymentType("FIXED");
@@ -3531,26 +3564,31 @@ export default function FacebookPostPage({
         {isMultiple && (
           <div className="fb-post-setup-grid">
             <label>New Item Source
-              <select value={multipleItemSource} onChange={(event) => setMultipleItemSource(event.target.value)} disabled={publishing || processingFiles}>
+              <select value={multipleItemSource} onChange={(event) => { const value = event.target.value; setMultipleItemSource(value); if (value === "MANUAL") setNewInventoryItemIds([]); }} disabled={publishing || processingFiles}>
                 <option value="MANUAL">Manual</option>
                 <option value="INVENTORY">Master Inventory</option>
               </select>
             </label>
             {multipleItemSource === "INVENTORY" && (
-              <label>Inventory Item
-                <select value={newInventoryItemId} onChange={(event) => {
-                  const id = event.target.value;
-                  setNewInventoryItemId(id);
-                  if (id) addInventoryItemToMultiple(id);
+              <label>Inventory Items *
+                <select multiple size={Math.min(Math.max(pageInventoryItems.length, 3), 7)} value={newInventoryItemIds.map(String)} onChange={(event) => {
+                  setNewInventoryItemIds(Array.from(event.target.selectedOptions, (option) => option.value));
                 }} disabled={publishing || processingFiles || items.length >= MAX_IMAGES}>
-                  <option value="">Select inventory item</option>
                   {pageInventoryItems.map((row) => (
-                    <option key={row.inventory_item_id} value={row.inventory_item_id}>
+                    <option key={row.inventory_item_id} value={row.inventory_item_id} disabled={items.some((item) => item.itemSource === "INVENTORY" && String(item.inventoryItemId) === String(row.inventory_item_id))}>
                       {row.item_code ? `${row.item_code} — ` : ""}{row.item_name} ({inventoryAvailableQty(row)} available)
                     </option>
                   ))}
                 </select>
               </label>
+            )}
+            {multipleItemSource === "INVENTORY" && (
+              <div className="fb-inventory-multi-select-actions">
+                <button type="button" className="secondary-button" onClick={addSelectedInventoryItems} disabled={publishing || processingFiles || !newInventoryItemIds.length || items.length >= MAX_IMAGES}>
+                  {processingFiles ? "Adding inventory items…" : `＋ Add ${newInventoryItemIds.length || "selected"} inventory item${newInventoryItemIds.length === 1 ? "" : "s"}`}
+                </button>
+                <small>Select multiple records with Command-click on Mac or Ctrl-click on Windows. Inventory photos will be loaded for each item.</small>
+              </div>
             )}
           </div>
         )}
