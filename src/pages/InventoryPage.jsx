@@ -8,6 +8,7 @@ import {
 import {
   supabase,
 } from "../supabase";
+import PhotoGalleryViewer from "../components/PhotoGalleryViewer";
 
 
 const EMPTY_ITEM = {
@@ -128,11 +129,9 @@ function primaryImage(
       ) =>
         image
           .is_primary ===
-        true,
+        true && Boolean(image?.signed_url || image?.url),
     ) ||
-    images[
-      0
-    ] ||
+    images.find((image) => image?.signed_url || image?.url) ||
     null
   );
 }
@@ -327,6 +326,8 @@ export default function InventoryPage({
     useState(
       null,
     );
+
+  const [photoViewer, setPhotoViewer] = useState(null);
 
   const [
     stockModal,
@@ -1075,6 +1076,24 @@ export default function InventoryPage({
     setImageModal(
       true,
     );
+  }
+
+  function openPhotoGallery(item, startImage = null) {
+    const sourceImages = (item?.images || [])
+      .map((image) => ({
+        src: image.signed_url || image.url || "",
+        alt: image.original_file_name || item.item_name || "Inventory photo",
+        id: image.inventory_image_id || image.inventory_image_upload_item_id || image.id || "",
+      }))
+      .filter((image) => image.src);
+    if (!sourceImages.length) return;
+    const targetId = startImage?.inventory_image_id || startImage?.inventory_image_upload_item_id || startImage?.id || "";
+    const targetIndex = targetId ? sourceImages.findIndex((image) => image.id === targetId) : 0;
+    setPhotoViewer({
+      photos: sourceImages,
+      index: targetIndex >= 0 ? targetIndex : 0,
+      title: `${item.item_code ? `${item.item_code} · ` : ""}${item.item_name || "Inventory photos"}`,
+    });
   }
 
 
@@ -1929,6 +1948,34 @@ export default function InventoryPage({
           overflow: hidden;
         }
 
+        .inventory-photo-open {
+          position: relative;
+          display: block;
+          width: 100%;
+          height: 100%;
+          padding: 0;
+          border: 0;
+          background: transparent;
+          cursor: zoom-in;
+        }
+
+        .inventory-photo-open:focus-visible {
+          outline: 3px solid #21885a;
+          outline-offset: -3px;
+        }
+
+        .inventory-photo-open > span {
+          position: absolute;
+          right: 10px;
+          bottom: 10px;
+          padding: 5px 9px;
+          border-radius: 999px;
+          background: rgba(15, 23, 42, .78);
+          color: #fff;
+          font-size: 12px;
+          font-weight: 700;
+        }
+
         .inventory-item-image img {
           display: block;
           width: 100%;
@@ -2684,19 +2731,20 @@ export default function InventoryPage({
                             >
                               <div className="inventory-item-image">
                                 {
-                                  image
-                                    ?.signed_url
+                                  (image?.signed_url || image?.url)
                                     ? (
-                                      <img
-                                        src={
-                                          image
-                                            .signed_url
-                                        }
-                                        alt={
-                                          item
-                                            .item_name
-                                        }
-                                      />
+                                      <button
+                                        type="button"
+                                        className="inventory-photo-open"
+                                        onClick={() => openPhotoGallery(item, image)}
+                                        aria-label={`View photos for ${item.item_name}`}
+                                      >
+                                        <img
+                                          src={image.signed_url || image.url}
+                                          alt={item.item_name}
+                                        />
+                                        {(item.images || []).filter((entry) => entry.signed_url || entry.url).length > 1 && <span>View photos · {(item.images || []).length}</span>}
+                                      </button>
                                     )
                                     : (
                                       <div className="inventory-image-placeholder">
@@ -3817,7 +3865,7 @@ export default function InventoryPage({
                       {image.signed_url ? (
                         <div className="inventory-image-assignment-preview" style={{ marginBottom: 10 }}>
                           <img
-                            src={image.signed_url}
+                                          src={image.signed_url || image.url}
                             alt={image.original_file_name || "Inventory upload preview"}
                             style={{ width: "100%", height: 220, display: "block", objectFit: "contain", background: "#f4f6f8" }}
                           />
@@ -4004,21 +4052,19 @@ export default function InventoryPage({
                         className="inventory-image-tile"
                       >
                         {
-                          image
-                            .signed_url
+                          (image.signed_url || image.url)
                             ? (
-                              <img
-                                src={
-                                  image
-                                    .signed_url
-                                }
-                                alt={
-                                  image
-                                    .original_file_name ||
-                                  selectedItem
-                                    .item_name
-                                }
-                              />
+                              <button
+                                type="button"
+                                className="inventory-photo-open inventory-photo-open-tile"
+                                onClick={() => openPhotoGallery(selectedItem, image)}
+                                aria-label={`View ${image.original_file_name || selectedItem.item_name} larger`}
+                              >
+                                <img
+                                  src={image.signed_url || image.url}
+                                  alt={image.original_file_name || selectedItem.item_name}
+                                />
+                              </button>
                             )
                             : (
                               <div className="inventory-image-placeholder">
@@ -4302,6 +4348,14 @@ export default function InventoryPage({
 
  
 
+
+      {photoViewer && <PhotoGalleryViewer
+        photos={photoViewer.photos}
+        index={photoViewer.index}
+        title={photoViewer.title}
+        onIndexChange={(index) => setPhotoViewer((current) => current ? { ...current, index } : current)}
+        onClose={() => setPhotoViewer(null)}
+      />}
 
       {
         processing &&
