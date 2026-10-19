@@ -1239,6 +1239,9 @@ export default function FacebookPostPage({
     }),
     [inventoryItems, selectedPageId]
   );
+  const selectedSingleInventory = pageInventoryItems.find((row) => String(row.inventory_item_id) === String(singleInventoryItemId));
+  const selectedMultipleInventory = pageInventoryItems.find((row) => String(row.inventory_item_id) === String(newInventoryItemId));
+  const hasSelectedInventoryPhotos = (inventory) => Array.isArray(inventory?.images) && inventory.images.some((image) => image?.signed_url || image?.url);
 
   const insertCaptionText = (text, asNewLine = false) => {
     const textarea = sellerCaptionRef.current;
@@ -1450,16 +1453,26 @@ export default function FacebookPostPage({
         );
       }
 
-      setItems((current) => [
-        ...current,
-        ...accepted.map(
-          (file, index) =>
-            createItem(
-              file,
-              current.length + index
-            )
-        ),
-      ]);
+      const useSelectedInventoryForFirstUpload = isMultiple && multipleItemSource === "INVENTORY" &&
+        selectedMultipleInventory && !hasSelectedInventoryPhotos(selectedMultipleInventory);
+      setItems((current) => {
+        const added = accepted.map((file, index) => {
+          const nextItem = createItem(file, current.length + index);
+          if (useSelectedInventoryForFirstUpload && index === 0) {
+            return {
+              ...nextItem,
+              item: selectedMultipleInventory.item_name || "",
+              itemSource: "INVENTORY",
+              inventoryItemId: selectedMultipleInventory.inventory_item_id,
+              inventoryImageId: null,
+              regularSalePrice: selectedMultipleInventory.default_selling_price != null ? String(selectedMultipleInventory.default_selling_price) : "",
+              regularSaleQuantity: String(Math.max(1, inventoryAvailableQty(selectedMultipleInventory))),
+            };
+          }
+          return nextItem;
+        });
+        return [...current, ...added];
+      });
 
       if (errors.length) {
         setErrorMessage(
@@ -2169,6 +2182,8 @@ export default function FacebookPostPage({
     setSingleItem("");
     setSingleItemSource("MANUAL");
     setSingleInventoryItemId("");
+    setMultipleItemSource("MANUAL");
+    setNewInventoryItemId("");
     setPreorderPrice("");
     setPreorderDownPayment("");
     setPreorderDownPaymentType("FIXED");
@@ -3513,6 +3528,33 @@ export default function FacebookPostPage({
           </>
         )}
 
+        {isMultiple && (
+          <div className="fb-post-setup-grid">
+            <label>New Item Source
+              <select value={multipleItemSource} onChange={(event) => setMultipleItemSource(event.target.value)} disabled={publishing || processingFiles}>
+                <option value="MANUAL">Manual</option>
+                <option value="INVENTORY">Master Inventory</option>
+              </select>
+            </label>
+            {multipleItemSource === "INVENTORY" && (
+              <label>Inventory Item
+                <select value={newInventoryItemId} onChange={(event) => {
+                  const id = event.target.value;
+                  setNewInventoryItemId(id);
+                  if (id) addInventoryItemToMultiple(id);
+                }} disabled={publishing || processingFiles || items.length >= MAX_IMAGES}>
+                  <option value="">Select inventory item</option>
+                  {pageInventoryItems.map((row) => (
+                    <option key={row.inventory_item_id} value={row.inventory_item_id}>
+                      {row.item_code ? `${row.item_code} — ` : ""}{row.item_name} ({inventoryAvailableQty(row)} available)
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+          </div>
+        )}
+
         {postMode === "REGULAR_SALE" ? (
           <>
             <h3>Regular Sale rules</h3>
@@ -3635,32 +3677,6 @@ export default function FacebookPostPage({
           </div>
         </div>
 
-        {isMultiple && (
-          <div className="fb-item-editor" style={{ margin: "0 0 16px", padding: 14, border: "1px solid var(--border-color, #dbe2ea)", borderRadius: 12 }}>
-            <label>New item source
-              <select value={multipleItemSource} onChange={(event) => setMultipleItemSource(event.target.value)} disabled={publishing || processingFiles}>
-                <option value="MANUAL">Manual</option>
-                <option value="INVENTORY">From Inventory</option>
-              </select>
-            </label>
-            {multipleItemSource === "INVENTORY" ? (
-              <div style={{ display: "flex", gap: 10, alignItems: "end", flexWrap: "wrap", marginTop: 10 }}>
-                <label style={{ flex: "1 1 260px" }}>Inventory item
-                  <select value={newInventoryItemId} onChange={(event) => setNewInventoryItemId(event.target.value)} disabled={publishing || processingFiles}>
-                    <option value="">Select Inventory item</option>
-                    {pageInventoryItems.map((row) => <option key={row.inventory_item_id} value={row.inventory_item_id}>{row.item_code ? `${row.item_code} · ` : ""}{row.item_name}</option>)}
-                  </select>
-                </label>
-                <button type="button" className="secondary-button" onClick={() => addInventoryItemToMultiple()} disabled={publishing || processingFiles || !newInventoryItemId || items.length >= MAX_IMAGES}>
-                  {processingFiles ? "Loading photos…" : "＋ Add inventory item"}
-                </button>
-              </div>
-            ) : (
-              <small>Upload photos below to create manual items. Each photo becomes one item.</small>
-            )}
-          </div>
-        )}
-
         <input
           key={fileInputKey}
           ref={fileInputRef}
@@ -3674,6 +3690,10 @@ export default function FacebookPostPage({
         />
 
         {!items.length ? (
+          ((singleItemSource === "INVENTORY" && hasSelectedInventoryPhotos(selectedSingleInventory)) ||
+            (isMultiple && multipleItemSource === "INVENTORY" && hasSelectedInventoryPhotos(selectedMultipleInventory))) ? (
+            <p className="fb-upload-inventory-hint">Loading the selected Inventory photos…</p>
+          ) : (
           <>
             <button
               ref={uploadButtonRef}
@@ -3701,6 +3721,7 @@ export default function FacebookPostPage({
               </small>
             )}
           </>
+          )
         ) : (
           <div className="fb-photo-grid">
             {items.map((item, index) => (
@@ -3831,7 +3852,7 @@ export default function FacebookPostPage({
               {fieldErrors.images}
             </small>
           )}
-        {isMultiple && items.length > 0 && (
+        {((isMultiple && items.length > 0) || singleItemSource === "INVENTORY" || (isMultiple && multipleItemSource === "INVENTORY" && !hasSelectedInventoryPhotos(selectedMultipleInventory))) && (
           <div className="fb-add-photos-actions">
             <button
               type="button"
