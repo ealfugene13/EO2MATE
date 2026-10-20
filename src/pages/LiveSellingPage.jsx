@@ -218,6 +218,7 @@ function NavIcon({ type }) {
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../supabase";
+import RecordPagination, { useRecordPagination } from "../components/RecordPagination";
 
 
 function formatCurrency(value) {
@@ -307,7 +308,9 @@ function parseLiveQueueCsv(text, existingItems = [], forcedMode = "") {
     const get = (name) => index[name] === undefined ? "" : String(cells[index[name]] || "").trim();
     const item_code = get("item_code").toUpperCase();
     const title = get("title");
-    const mode = (forcedMode || get("mode") || "SELLING").toUpperCase();
+    // A mode supplied by the CSV must win so mixed SELLING/MINING/AUCTION
+    // batches keep their per-row mode even when uploaded from a mode tab.
+    const mode = (get("mode") || forcedMode || "SELLING").toUpperCase();
     const quantityText = get("quantity");
     const quantity = quantityText ? Number(quantityText.replaceAll(",", "")) : 1;
     const rowErrors = [];
@@ -336,11 +339,13 @@ function parseLiveQueueCsv(text, existingItems = [], forcedMode = "") {
     else {
       codes.add(item_code);
       const auctionDurationText = get("auction_duration_minutes");
-      const auction_duration_minutes = auctionDurationText ? Number(auctionDurationText) : 10;
+      const auction_duration_minutes = !auctionDurationText || auctionDurationText.toLowerCase() === "null" ? 0 : Number(auctionDurationText);
       if (mode === "AUCTION" && (!Number.isInteger(auction_duration_minutes) || auction_duration_minutes < 1 || auction_duration_minutes > 1440)) {
         errors.push(`Row ${line}: auction_duration_minutes must be a whole number from 1 to 1440.`);
+      } else if (mode !== "AUCTION" && (!Number.isInteger(auction_duration_minutes) || auction_duration_minutes !== 0)) {
+        errors.push(`Row ${line}: auction_duration_minutes must be 0 for non-auction products.`);
       } else {
-        rows.push({ item_code, title, mode, quantity, ...(mode === "AUCTION" ? { auction_duration_minutes } : {}), ...fields });
+        rows.push({ item_code, title, mode, quantity, auction_duration_minutes, ...fields });
       }
     }
   });
@@ -349,9 +354,9 @@ function parseLiveQueueCsv(text, existingItems = [], forcedMode = "") {
 
 function downloadLiveQueueTemplate(mode = "MIXED") {
   const rows = {
-    SELLING: ["A12,Test sale item,SELLING,2,1,,,,,"],
-    MINING: ["B15,Test mining item,MINING,1,,100,200,300,,"],
-    AUCTION: ["C18,Test auction item,AUCTION,1,,,,,100,10,10"],
+    SELLING: ["A12,Test sale item,SELLING,2,1,,,,,,0"],
+    MINING: ["B15,Test mining item,MINING,1,,100,200,300,,,0"],
+    AUCTION: ["C18,Test auction item,AUCTION,1,,,,,100,10,1"],
   };
   const examples = mode === "MIXED" ? [rows.SELLING[0], rows.MINING[0], rows.AUCTION[0]] : rows[mode] || rows.SELLING;
   const csv = ["item_code,title,mode,quantity,unit_price,mine_price,take_price,lock_price,starting_bid,bid_increment,auction_duration_minutes", ...examples].join("\n");
@@ -404,7 +409,7 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
   const [popupNotifications, setPopupNotifications] = useState([]);
   const pageId = selectedFbPageId || "";
   const [videoInput, setVideoInput] = useState("");
-  const [item, setItem] = useState({ inventory_item_id: "", item_code: "", title: "", mode: activeMode === "MIXED" ? "SELLING" : activeMode, quantity: 1, unit_price: "", mine_price: "", take_price: "", lock_price: "", starting_bid: "", bid_increment: "", auction_duration_minutes: 10 });
+  const [item, setItem] = useState({ inventory_item_id: "", item_code: "", title: "", mode: activeMode === "MIXED" ? "SELLING" : activeMode, quantity: 1, unit_price: "", mine_price: "", take_price: "", lock_price: "", starting_bid: "", bid_increment: "", auction_duration_minutes: 1 });
   const [inventoryItems, setInventoryItems] = useState([]);
   const [inventoryLoading, setInventoryLoading] = useState(false);
   const [inventoryError, setInventoryError] = useState("");
@@ -424,6 +429,10 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
   const reportItems = visibleSessions.flatMap((session) => (session.eo2mate_live_items || [])
     .filter((entry) => activeMode === "MIXED" || String(entry.mode || "").toUpperCase() === activeMode)
     .map((entry) => ({ ...entry, session_status: session.status, fb_video_id: session.fb_video_id })));
+  const sessionsPagination = useRecordPagination(visibleSessions, activeMode);
+  const activityPagination = useRecordPagination(reportItems, `${activeMode}|activity`);
+  const reportPagination = useRecordPagination(reportItems, `${activeMode}|report`);
+  const queuePagination = useRecordPagination(visibleItems, `${selected || ""}|${activeMode}`);
   const totals = {
     sessions: visibleSessions.length,
     active: visibleSessions.filter((session) => session.status === "ACTIVE").length,
@@ -622,7 +631,7 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
     try {
       await request("add-item", { session_id: selected, ...item });
       await refresh();
-      setItem({ inventory_item_id: "", item_code: "", title: "", mode: item.mode, quantity: 1, unit_price: "", mine_price: "", take_price: "", lock_price: "", starting_bid: "", bid_increment: "", auction_duration_minutes: 10 });
+      setItem({ inventory_item_id: "", item_code: "", title: "", mode: item.mode, quantity: 1, unit_price: "", mine_price: "", take_price: "", lock_price: "", starting_bid: "", bid_increment: "", auction_duration_minutes: 1 });
       setMessage("Product added to queue. Select the next inventory item when ready.");
     } catch (e) {
       setMessage(e.message || "Unable to add this product to the queue.");
@@ -653,11 +662,11 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
     {section === "ACTIVITY" && <>
       <div className="panel-header"><div><h2>{activeMode === "AUCTION" ? "Bid Activity & Buyer Totals" : "Activity & Buyer Claims"}</h2><p>Current item status, accepted quantities, and stock limits across the selected Page.</p></div><button type="button" className="secondary-button" onClick={() => refresh().catch((e) => setMessage(e.message))} disabled={busy}><NavIcon type="refresh" />Refresh</button></div>
       <p>Buyer names are not included in the Live data currently returned to this page; claimed quantities are shown for each product.</p>
-      <div className="table-wrapper"><table><thead><tr><th>Session</th><th>Code</th><th>Product</th><th>Status</th><th>Claimed units</th><th>Stock limit</th></tr></thead><tbody>{reportItems.map((entry) => <tr key={entry.id}><td>{entry.fb_video_id} · {entry.session_status}</td><td>{entry.item_code}</td><td>{entry.title}</td><td>{entry.status}</td><td>{entry.claimed}</td><td>{entry.quantity}</td></tr>)}</tbody></table>{!reportItems.length && <p>No live activity or buyer claim totals are available for this mode.</p>}</div>
+      <div className="table-wrapper"><table><thead><tr><th>Session</th><th>Code</th><th>Product</th><th>Status</th><th>Claimed units</th><th>Stock limit</th></tr></thead><tbody>{activityPagination.visibleRecords.map((entry) => <tr key={entry.id}><td>{entry.fb_video_id} · {entry.session_status}</td><td>{entry.item_code}</td><td>{entry.title}</td><td>{entry.status}</td><td>{entry.claimed}</td><td>{entry.quantity}</td></tr>)}</tbody></table>{!reportItems.length && <p>No live activity or buyer claim totals are available for this mode.</p>}<RecordPagination pagination={activityPagination} label="activity records" /></div>
     </>}
     {section === "REPORTS" && <>
       <div className="panel-header"><div><h2>Live Report</h2><p>Export session and product totals for the selected Page.</p></div><button type="button" className="primary-button" onClick={() => downloadLiveReport(visibleSessions, activeMode)} disabled={!reportItems.length}><NavIcon type="download" />Download CSV</button></div>
-      <div className="table-wrapper"><table><thead><tr><th>Session</th><th>Code</th><th>Product</th><th>Mode</th><th>Status</th><th>Claimed / Stock</th></tr></thead><tbody>{reportItems.map((entry) => <tr key={entry.id}><td>{entry.fb_video_id} · {entry.session_status}</td><td>{entry.item_code}</td><td>{entry.title}</td><td>{entry.mode}</td><td>{entry.status}</td><td>{entry.claimed} / {entry.quantity}</td></tr>)}</tbody></table>{!reportItems.length && <p>No report data is available yet.</p>}</div>
+      <div className="table-wrapper"><table><thead><tr><th>Session</th><th>Code</th><th>Product</th><th>Mode</th><th>Status</th><th>Claimed / Stock</th></tr></thead><tbody>{reportPagination.visibleRecords.map((entry) => <tr key={entry.id}><td>{entry.fb_video_id} · {entry.session_status}</td><td>{entry.item_code}</td><td>{entry.title}</td><td>{entry.mode}</td><td>{entry.status}</td><td>{entry.claimed} / {entry.quantity}</td></tr>)}</tbody></table>{!reportItems.length && <p>No report data is available yet.</p>}<RecordPagination pagination={reportPagination} label="report records" /></div>
     </>}
     {message && <p role="status">{message}</p>}
     <LivePopupNotifications notifications={popupNotifications} onDismiss={(id) => setPopupNotifications((previous) => previous.filter((entry) => entry.id !== id))} />
@@ -680,7 +689,7 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
     <section aria-labelledby="live-previous-posts-title" style={{ boxSizing: "border-box", minWidth: 0, padding: 26, margin: 0, border: "1px solid #e1e8f0", borderRadius: 18, background: "#fff", boxShadow: "0 5px 16px rgba(15, 23, 42, 0.035)" }}>
       <div className="panel-header" style={{ padding: "0 0 18px", margin: "0 0 20px", borderBottom: "1px solid #e7edf3" }}><div><h3 id="live-previous-posts-title" style={{ margin: 0 }}>Previous Live posts</h3><p style={{ margin: "6px 0 0" }}>Select a post to view its product queue beside this list.</p></div></div>
       <div className="table-wrapper" style={{ marginTop: 18, borderRadius: 14, overflow: "auto" }}><table style={{ width: "100%", minWidth: 500, tableLayout: "fixed", fontSize: 12 }}><colgroup><col style={{ width: "30%" }} /><col style={{ width: "24%" }} /><col style={{ width: "14%" }} /><col style={{ width: "12%" }} /><col style={{ width: "12%" }} /><col style={{ width: "8%" }} /></colgroup><thead><tr><th style={{ padding: "9px 6px" }}>Post caption</th><th style={{ padding: "9px 6px" }}>Created</th><th style={{ padding: "9px 6px" }}>Status</th><th style={{ padding: "9px 6px" }}>Products</th><th style={{ padding: "9px 6px" }}>Claimed</th><th aria-label="Actions" style={{ padding: "9px 4px" }}></th></tr></thead><tbody>
-        {visibleSessions.map((session) => {
+        {sessionsPagination.visibleRecords.map((session) => {
           const items = (session.eo2mate_live_items || []).filter((entry) => activeMode === "MIXED" || String(entry.mode || "").toUpperCase() === activeMode);
           const claimed = items.reduce((sum, entry) => sum + (Number(entry.claimed) || 0), 0);
           return <tr key={session.id} className={selected === session.id ? "selected-table-row" : "clickable-row"} onClick={() => setSelected(session.id)}>
@@ -691,7 +700,7 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
           </tr>;
         })}
         {!visibleSessions.length && <tr><td colSpan="6" className="empty-table-cell">No previous Live posts for this Facebook Page yet. Connect a Live video above to create the first session.</td></tr>}
-      </tbody></table></div>
+      </tbody></table></div><RecordPagination pagination={sessionsPagination} label="Live sessions" />
     </section>
 
     {current && <section aria-labelledby="live-product-queue-title" style={{ boxSizing: "border-box", minWidth: 0, padding: 26, margin: 0, border: "1px solid #e1e8f0", borderRadius: 18, background: "#fff", boxShadow: "0 5px 16px rgba(15, 23, 42, 0.035)" }}>
@@ -775,7 +784,7 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
           </section>
           {current.status === "DRAFT" && <p><button className="primary-button" type="button" style={{ display: "inline-flex", alignItems: "center", gap: 8, color: "#fff", background: "#138a5e", borderColor: "#138a5e" }} disabled={busy || !(current.eo2mate_live_items || []).length} onClick={() => run("start", { session_id: selected })}><NavIcon type="play" />Start Session</button></p>}
         </>}
-        <div className="table-wrapper" style={{ overflowX: "auto" }}><table style={{ width: "100%", minWidth: 500, tableLayout: "fixed", fontSize: 13 }}><colgroup><col style={{ width: "12%" }} /><col style={{ width: "29%" }} /><col style={{ width: "14%" }} /><col style={{ width: "14%" }} /><col style={{ width: "19%" }} /><col style={{ width: "12%" }} /></colgroup><thead><tr><th style={{ padding: "10px 8px" }}>Code</th><th style={{ padding: "10px 8px" }}>Product</th><th style={{ padding: "10px 8px" }}>Mode</th><th style={{ padding: "10px 8px" }}>Status</th><th style={{ padding: "10px 8px" }}>Accepted / Stock</th><th style={{ padding: "10px 8px" }}>Action</th></tr></thead><tbody>{visibleItems.map((it) => <tr key={it.id}><td style={{ padding: "10px 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.item_code}</td><td title={it.title} style={{ padding: "10px 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.title}{it.mode === "AUCTION" && <div style={{ color: "#64748b", fontSize: 11 }}>{it.auction_duration_minutes || 10} min{it.auction_end_at ? ` · closes ${new Date(it.auction_end_at).toLocaleString("en-PH", { dateStyle: "short", timeStyle: "short", timeZone: "Asia/Manila" })}` : " · starts when activated"}</div>}</td><td style={{ padding: "10px 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.mode}</td><td style={{ padding: "10px 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.status}</td><td style={{ padding: "10px 8px", whiteSpace: "nowrap" }}>{it.mode === "AUCTION" ? formatCurrency(it.highest_bid || it.starting_bid) : `${it.claimed} / ${it.quantity}`}</td><td style={{ padding: "8px 4px" }}>{current.status === "ACTIVE" && ["QUEUED", "DRAFT"].includes(String(it.status || "").toUpperCase()) && <button className="secondary-button" type="button" style={{ padding: "7px 9px", fontSize: 12, whiteSpace: "nowrap" }} disabled={busy} onClick={() => run("activate-item", { session_id: selected, item_id: it.id })}><NavIcon type="play" />Activate</button>}</td></tr>)}</tbody></table>{!visibleItems.length && <p>No {activeMode === "MIXED" ? "products" : `${activeMode.toLowerCase()} products`} queued yet. Add a product above.</p>}</div>
+        <div className="table-wrapper" style={{ overflowX: "auto" }}><table style={{ width: "100%", minWidth: 500, tableLayout: "fixed", fontSize: 13 }}><colgroup><col style={{ width: "12%" }} /><col style={{ width: "29%" }} /><col style={{ width: "14%" }} /><col style={{ width: "14%" }} /><col style={{ width: "19%" }} /><col style={{ width: "12%" }} /></colgroup><thead><tr><th style={{ padding: "10px 8px" }}>Code</th><th style={{ padding: "10px 8px" }}>Product</th><th style={{ padding: "10px 8px" }}>Mode</th><th style={{ padding: "10px 8px" }}>Status</th><th style={{ padding: "10px 8px" }}>Accepted / Stock</th><th style={{ padding: "10px 8px" }}>Action</th></tr></thead><tbody>{queuePagination.visibleRecords.map((it) => <tr key={it.id}><td style={{ padding: "10px 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.item_code}</td><td title={it.title} style={{ padding: "10px 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.title}{it.mode === "AUCTION" && <div style={{ color: "#64748b", fontSize: 11 }}>{Number(it.auction_duration_minutes || 0) > 0 ? `${it.auction_duration_minutes} min` : "Duration missing"}{it.auction_end_at ? ` · closes ${new Date(it.auction_end_at).toLocaleString("en-PH", { dateStyle: "short", timeStyle: "short", timeZone: "Asia/Manila" })}` : Number(it.auction_duration_minutes || 0) > 0 ? " · starts when activated" : ""}</div>}</td><td style={{ padding: "10px 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.mode}</td><td style={{ padding: "10px 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.status}</td><td style={{ padding: "10px 8px", whiteSpace: "nowrap" }}>{it.mode === "AUCTION" ? formatCurrency(it.highest_bid || it.starting_bid) : `${it.claimed} / ${it.quantity}`}</td><td style={{ padding: "8px 4px" }}>{current.status === "ACTIVE" && it.status === "QUEUED" && <button className="secondary-button" type="button" style={{ padding: "7px 9px", fontSize: 12, whiteSpace: "nowrap" }} disabled={busy} onClick={() => run("activate-item", { session_id: selected, item_id: it.id })}><NavIcon type="play" />Activate</button>}</td></tr>)}</tbody></table>{!visibleItems.length && <p>No {activeMode === "MIXED" ? "products" : `${activeMode.toLowerCase()} products`} queued yet. Add a product above.</p>}<RecordPagination pagination={queuePagination} label="queued products" /></div>
         {current.status === "ACTIVE" && <div style={{ marginTop: 14 }}><button type="button" className="secondary-button" style={{ display: "inline-flex", alignItems: "center", gap: 8, color: "#fff", background: "#d92d20", borderColor: "#d92d20" }} disabled={busy} onClick={() => { if (window.confirm("End this EO2MATE session now? This closes the product queue and stops accepting or processing new comments. Your Facebook Live broadcast will remain live.")) { manualCloseRequests.current.add(selected); run("close", { session_id: selected }).finally(() => manualCloseRequests.current.delete(selected)); } }}><NavIcon type="stop" />End Session</button><p style={{ fontSize: 13, marginBottom: 0 }}>EO2MATE also checks Facebook Live status and closes this session automatically after the broadcast ends.</p></div>}
     </section>}
     </div>
