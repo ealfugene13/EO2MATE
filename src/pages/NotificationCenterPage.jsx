@@ -34,6 +34,12 @@ function formatDate(value) {
 export default function NotificationCenterPage({ client, selectedFbPageId, selectedFbPageName, focusNotificationId = "" }) {
   const [notifications, setNotifications] = useState([]);
   const [filter, setFilter] = useState("ALL");
+  const [pageSize, setPageSize] = useState(() => {
+    try {
+      const saved = window.localStorage.getItem("eo2mate.notification-page-size.v1");
+      return [10, 25, 50, 100, "ALL"].includes(saved === "ALL" ? saved : Number(saved)) ? (saved === "ALL" ? "ALL" : Number(saved)) : 10;
+    } catch { return 10; }
+  });
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -121,6 +127,12 @@ export default function NotificationCenterPage({ client, selectedFbPageId, selec
     return [...groups.entries()].sort(([a], [b]) => modeInfo(a).order - modeInfo(b).order || modeInfo(a).label.localeCompare(modeInfo(b).label));
   }, [visibleNotifications]);
 
+  function changePageSize(event) {
+    const value = event.target.value === "ALL" ? "ALL" : Number(event.target.value);
+    setPageSize(value);
+    try { window.localStorage.setItem("eo2mate.notification-page-size.v1", String(value)); } catch { /* Keep the in-memory setting if storage is unavailable. */ }
+  }
+
   return <main className="notification-center-page">
     <header className="notification-center-hero">
       <div className="notification-center-title-wrap">
@@ -140,14 +152,19 @@ export default function NotificationCenterPage({ client, selectedFbPageId, selec
           <button type="button" className={filter === "ALL" ? "active" : ""} onClick={() => setFilter("ALL")}>All <span>{notifications.length}</span></button>
           <button type="button" className={filter === "UNREAD" ? "active" : ""} onClick={() => setFilter("UNREAD")}>Unread <span>{unreadCount}</span></button>
         </div>
+        <label className="notification-center-page-size">Per mode
+          <select aria-label="Notifications to show per mode" value={pageSize} onChange={changePageSize}>
+            <option value="10">10</option><option value="25">25</option><option value="50">50</option><option value="100">100</option><option value="ALL">All</option>
+          </select>
+        </label>
       </div>
 
       {error && <div className="notification-center-error" role="status">{error}<button type="button" onClick={refresh}>Try again</button></div>}
       {loading ? <div className="notification-center-state">Loading notifications…</div> : !visibleNotifications.length ? <div className="notification-center-empty"><span><BellIcon /></span><strong>{filter === "UNREAD" ? "You’re all caught up" : "No notifications yet"}</strong><p>{filter === "UNREAD" ? "There are no unread updates for this Page." : "Accepted Live claims and ended sessions will appear here."}</p></div> : <div className="notification-center-groups">
         {grouped.map(([mode, items]) => <section className="notification-mode-group" key={mode}>
-          <header><div className={`notification-mode-badge mode-${mode.toLowerCase()}`}><span /><h3>{modeInfo(mode).label}</h3></div><span>{items.length} {items.length === 1 ? "update" : "updates"}</span></header>
+          <header><div className={`notification-mode-badge mode-${mode.toLowerCase()}`}><span /><h3>{modeInfo(mode).label}</h3></div><span>Showing {pageSize === "ALL" ? items.length : Math.min(items.length, pageSize)} of {items.length}</span></header>
           <div className="notification-mode-list">
-            {items.map((item) => <article id={`notification-center-item-${encodeURIComponent(String(item.id))}`} className={`notification-center-item${item.read_at ? " is-read" : " is-unread"}${String(item.id) === String(focusNotificationId) ? " is-focused" : ""}`} key={item.id}>
+            {(pageSize === "ALL" ? items : items.slice(0, pageSize)).map((item) => <article id={`notification-center-item-${encodeURIComponent(String(item.id))}`} className={`notification-center-item${item.read_at ? " is-read" : " is-unread"}${String(item.id) === String(focusNotificationId) ? " is-focused" : ""}`} key={item.id}>
               <span className="notification-center-item-dot" aria-hidden="true" />
               <div className="notification-center-item-copy"><div><h4>{item.title}</h4>{!item.read_at && <span className="notification-new-label">NEW</span>}</div><p>{item.message}</p><time>{formatDate(item.created_at)}</time></div>
               {!item.read_at && <button type="button" className="notification-mark-read" aria-label={`Mark ${item.title} as read`} title="Mark as read" onClick={() => markRead(item.id)}><CheckIcon /></button>}

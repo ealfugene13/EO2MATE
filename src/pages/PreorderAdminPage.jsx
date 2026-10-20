@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../supabase";
 import { facebookPostUrl } from "../facebookPostUrl";
+import RecordPagination, { useRecordPagination } from "../components/RecordPagination";
 
 const fmtDate = (v) => v ? new Date(v).toLocaleString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }) : "—";
 const money = (v) => v == null ? "—" : `₱${Number(v).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -50,6 +51,7 @@ export default function PreorderAdminPage({ client, onCreatePost, selectedFbPage
       return bv-av;
     });
   },[posts,postSearch,postFilter,postSort]);
+  const postPagination=useRecordPagination(visiblePosts,`${postSearch}|${postFilter}|${postSort}|${selectedFbPageId||""}`);
 
   const tabs=["DASHBOARD","POSTS"];
 
@@ -85,7 +87,7 @@ export default function PreorderAdminPage({ client, onCreatePost, selectedFbPage
         <select className="filter-select" value={postFilter} onChange={e=>setPostFilter(e.target.value)}><option value="ALL">Filter: All statuses</option><option value="ACTIVE">Active</option><option value="DRAFT">Draft / Scheduled</option><option value="COMPLETED">Completed / Closed</option><option value="CANCELLED">Cancelled</option></select>
         <select className="filter-select" value={postSort} onChange={e=>setPostSort(e.target.value)}><option value="NEWEST">Sort: Newest</option><option value="OLDEST">Sort: Oldest</option><option value="UPDATED">Recently updated</option><option value="STATUS">Status</option></select>
       </section>
-      <section className="dashboard-panel preorder-panel"><div className="panel-header"><div><h2>Pre-Order posts</h2><p>{posts.length} post{posts.length===1?"":"s"} · select a post to review reservations</p></div></div><div className="table-wrapper"><table><thead><tr><th>Type</th><th>Status</th><th>Ordering deadline</th><th>Closure</th><th>Items</th><th></th></tr></thead><tbody>{visiblePosts.map(p=><tr key={p.post_id} className={selected?.post_id===p.post_id?"selected-table-row":""}><td><strong>{pretty(p.post_type_code)}</strong></td><td><Badge value={p.status}/></td><td>{fmtDate(p.ends_at)}</td><td>{p.eo2mate_preorder_settings?.ordering_close_reason?<Badge value={p.eo2mate_preorder_settings.ordering_close_reason}/>:<span className="table-muted">—</span>}</td><td>{p.eo2mate_post_items?.length||0}</td><td><button className="table-action-button" type="button" onClick={()=>open(p)}>View</button></td></tr>)}{!loading&&posts.length===0&&<tr><td colSpan="6" className="empty-table-cell">No Pre-Orders yet.</td></tr>}</tbody></table></div></section></>}
+      <section className="dashboard-panel preorder-panel"><div className="panel-header"><div><h2>Pre-Order posts</h2><p>{posts.length} post{posts.length===1?"":"s"} · select a post to review reservations</p></div></div><div className="table-wrapper"><table><thead><tr><th>Type</th><th>Status</th><th>Ordering deadline</th><th>Closure</th><th>Items</th><th></th></tr></thead><tbody>{postPagination.visibleRecords.map(p=><tr key={p.post_id} className={selected?.post_id===p.post_id?"selected-table-row":""}><td><strong>{pretty(p.post_type_code)}</strong></td><td><Badge value={p.status}/></td><td>{fmtDate(p.ends_at)}</td><td>{p.eo2mate_preorder_settings?.ordering_close_reason?<Badge value={p.eo2mate_preorder_settings.ordering_close_reason}/>:<span className="table-muted">—</span>}</td><td>{p.eo2mate_post_items?.length||0}</td><td><button className="table-action-button" type="button" onClick={()=>open(p)}>View</button></td></tr>)}{!loading&&posts.length===0&&<tr><td colSpan="6" className="empty-table-cell">No Pre-Orders yet.</td></tr>}</tbody></table></div><RecordPagination pagination={postPagination} label="Pre-Order posts" /></section></>}
 
     {workspaceTab==="POSTS" && selected && (()=>{
       const items=selected.eo2mate_post_items||[];

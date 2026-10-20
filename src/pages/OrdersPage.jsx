@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../supabase";
 import Eo2DatePicker from "../components/Eo2DatePicker";
+import RecordPagination, { useRecordPagination } from "../components/RecordPagination";
 import "./OrdersPage.css";
 
 const normalized = value => String(value || "").toUpperCase();
@@ -281,6 +282,8 @@ export default function OrdersPage({ client, detailRequest, page, setErrorMessag
     const matchingGroupIds = new Set(filteredOrders.map(order => order.order_group_id).filter(Boolean));
     return orderGroups.filter(group => matchingGroupIds.has(group.order_group_id));
   }, [orderGroups, filteredOrders]);
+  const orderPagination = useRecordPagination(filteredOrders, `${orderStatusFilter}|${orderSearch}|${channel}|${from}|${to}|${selectedFbPageId || ""}`);
+  const groupPagination = useRecordPagination(filteredGroups, `${orderStatusFilter}|${orderSearch}|${channel}|${from}|${to}|${selectedFbPageId || ""}`);
   const summaryRows = useMemo(() => {
     const map = new Map();
     for (const order of activeOrders) {
@@ -412,13 +415,14 @@ export default function OrdersPage({ client, detailRequest, page, setErrorMessag
               )}
 
               {activeTab === "ORDERS" && (
+                <>
                 <div className="table-wrapper">
                   <table>
                     <thead>
                       <tr><th>Created</th><th>Order / group</th><th>Buyer / item</th><th>Channel</th><th>Total</th><th>Status</th></tr>
                     </thead>
                     <tbody>
-                      {filteredOrders.map((order) => (
+                      {orderPagination.visibleRecords.map((order) => (
                         <tr key={order.order_id} className="clickable-row" onClick={() => openOrder(order.order_id)}>
                           <td>{orderDay(order.created_at) || "-"}<small className="orders-table-subtext">{formatTime(order.created_at)}</small></td>
                           <td>
@@ -446,16 +450,19 @@ export default function OrdersPage({ client, detailRequest, page, setErrorMessag
                     </tbody>
                   </table>
                 </div>
+                <RecordPagination pagination={orderPagination} label="orders" />
+                </>
               )}
 
               {activeTab === "GROUPS" && (
+                <>
                 <div className="table-wrapper">
                   <table>
                     <thead>
                       <tr><th>Created</th><th>Group</th><th>Buyer</th><th>Items</th><th>Total</th><th>Status</th></tr>
                     </thead>
                     <tbody>
-                      {filteredGroups.map((group) => (
+                      {groupPagination.visibleRecords.map((group) => (
                         <tr key={group.order_group_id}>
                           <td>{orderDay(group.created_at) || "-"}<small className="orders-table-subtext">{formatTime(group.created_at)}</small></td>
                           <td>{group.group_number || group.order_group_id}<small className="orders-table-subtext">{group.order_group_id}</small></td>
@@ -469,6 +476,8 @@ export default function OrdersPage({ client, detailRequest, page, setErrorMessag
                     </tbody>
                   </table>
                 </div>
+                <RecordPagination pagination={groupPagination} label="groups" />
+                </>
               )}
             </section>
           </>

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../supabase";
 import Eo2DatePicker from "../components/Eo2DatePicker";
+import RecordPagination, { useRecordPagination } from "../components/RecordPagination";
 import "./ReportsPage.css";
 
 
@@ -275,6 +276,8 @@ export default function ReportsPage({ client, page, setErrorMessage , selectedFb
     rows = rows.slice(0,500);
     return { filteredOrders, filteredPayments, filteredAuctions, filteredDeliveries, mining, regular, paid, pending, gross, paidValue, buyers: buyers.size, rows, start, end };
   }, [orders, payments, auctions, deliveries, sellingPostRows, reportDateRange, reportCustomFrom, reportCustomTo, reportPageFilter, reportChannelFilter, reportStatusFilter, reportSortBy, selectedReport]);
+  const reportTableRows = generatedReport?.data?.rows || reportData.rows;
+  const reportPagination = useRecordPagination(reportTableRows, `${selectedReport}|${reportDateRange}|${reportPageFilter}|${reportChannelFilter}|${reportStatusFilter}|${reportSortBy}`);
 
   function currentReportParameters() {
     return {
@@ -596,12 +599,15 @@ export default function ReportsPage({ client, page, setErrorMessage , selectedFb
                   </div>
 
                   {reportGeneratedAt && (
+                    <>
                     <div className="table-wrapper" style={{ marginTop: 18 }}>
                       <table><thead><tr><th>Date</th><th>Reference</th><th>Channel</th><th>Buyer</th><th>Status</th><th>Amount</th></tr></thead><tbody>
-                        {displayData.rows.map((r, i) => <tr key={`${r.Reference}-${i}`}><td>{formatDateTime(r.Date)}</td><td>{r.Reference}</td><td>{r.Channel}</td><td>{r.Buyer}</td><td><StatusBadge status={r.Status} /></td><td>{formatCurrency(r.Amount)}</td></tr>)}
+                        {reportPagination.visibleRecords.map((r, i) => <tr key={`${r.Reference}-${i}`}><td>{formatDateTime(r.Date)}</td><td>{r.Reference}</td><td>{r.Channel}</td><td>{r.Buyer}</td><td><StatusBadge status={r.Status} /></td><td>{formatCurrency(r.Amount)}</td></tr>)}
                         {!displayData.rows.length && <tr><td colSpan="6" className="empty-table-cell">No records match the selected report filters.</td></tr>}
                       </tbody></table>
                     </div>
+                    <RecordPagination pagination={reportPagination} label="report records" />
+                    </>
                   )}
                   {reportMessage && <div className="info-banner" style={{ marginTop: 12 }}>{reportMessage}</div>}
 

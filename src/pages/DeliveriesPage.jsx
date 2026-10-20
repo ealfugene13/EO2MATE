@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../supabase";
+import RecordPagination, { useRecordPagination } from "../components/RecordPagination";
 
 
 function formatCurrency(value) {
@@ -397,6 +398,7 @@ export default function DeliveriesPage({ client, detailRequest, goToDeliveries, 
       return matchesStatus && matchesSearch;
     });
   }, [deliveries, deliveryStatusFilter, deliverySearch]);
+  const deliveryPagination = useRecordPagination(filteredDeliveries, `${deliveryStatusFilter}|${deliverySearch}|${selectedFbPageId || ""}`);
 
 
   const [pageDataLoading, setPageDataLoading] = useState(true);
@@ -471,7 +473,7 @@ export default function DeliveriesPage({ client, detailRequest, goToDeliveries, 
                     <tr><th>Order</th><th>Item</th><th>Recipient</th><th>Courier</th><th>Tracking</th><th>Status</th><th>Shipping fee</th><th>Created</th></tr>
                   </thead>
                   <tbody>
-                    {filteredDeliveries.map((delivery) => (
+                    {deliveryPagination.visibleRecords.map((delivery) => (
                       <tr key={delivery.delivery_id} className="clickable-row" onClick={() => openDelivery(delivery.delivery_id)}>
                         <td>{delivery.order_number}</td>
                         <td>{delivery.item_label}</td>
@@ -486,6 +488,7 @@ export default function DeliveriesPage({ client, detailRequest, goToDeliveries, 
                   </tbody>
                 </table>
               </div>
+              <RecordPagination pagination={deliveryPagination} label="deliveries" />
             </section>
           </>
         )}

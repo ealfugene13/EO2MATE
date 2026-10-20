@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../supabase";
+import RecordPagination, { useRecordPagination } from "../components/RecordPagination";
 
 
 function formatCurrency(value) {
@@ -198,6 +199,8 @@ export default function PaymentsPage({ client, detailRequest, page, paymentAccou
       return matchesStatus && matchesSearch;
     });
   }, [paymentGroups, paymentGroupStatusFilter, paymentGroupSearch]);
+  const paymentGroupsPagination = useRecordPagination(filteredPaymentGroups, `${paymentGroupStatusFilter}|${paymentGroupSearch}|${selectedFbPageId || ""}`);
+  const paymentsPagination = useRecordPagination(filteredPayments, `${paymentStatusFilter}|${paymentSearch}|${selectedFbPageId || ""}`);
 
   const isPaymentAdmin = ["ADMIN", "OWNER", "SUPER_ADMIN"].includes(
     String(client?.role || "").toUpperCase(),
@@ -332,7 +335,7 @@ export default function PaymentsPage({ client, detailRequest, page, paymentAccou
                   <tbody>
                     {filteredPaymentGroups.length === 0 ? (
                       <tr><td colSpan="8" className="empty-table-cell">No payment groups found.</td></tr>
-                    ) : filteredPaymentGroups.map((group) => {
+                    ) : paymentGroupsPagination.visibleRecords.map((group) => {
                       const effectiveDeadline = group.payment_reopen_deadline_at || group.payment_deadline_at;
                       const expired = Boolean(group.payment_expired_at);
 
@@ -369,6 +372,7 @@ export default function PaymentsPage({ client, detailRequest, page, paymentAccou
                   </tbody>
                 </table>
               </div>
+              <RecordPagination pagination={paymentGroupsPagination} label="payment groups" />
             </section>
 
             {reopenGroup && (
@@ -443,7 +447,7 @@ export default function PaymentsPage({ client, detailRequest, page, paymentAccou
                     <tr><th>Order</th><th>Item</th><th>Buyer</th><th>Amount</th><th>Provider</th><th>Status</th><th>Paid at</th><th>Created</th></tr>
                   </thead>
                   <tbody>
-                    {filteredPayments.map((payment) => (
+                    {paymentsPagination.visibleRecords.map((payment) => (
                       <tr key={payment.payment_id} className="clickable-row" onClick={() => openPayment(payment.payment_id)}>
                         <td>{payment.order_number}</td>
                         <td>{payment.item_label}</td>
@@ -458,6 +462,7 @@ export default function PaymentsPage({ client, detailRequest, page, paymentAccou
                   </tbody>
                 </table>
               </div>
+              <RecordPagination pagination={paymentsPagination} label="payment transactions" />
             </section>
           </>
         )}

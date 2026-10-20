@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../supabase";
 import { facebookPostUrl } from "../facebookPostUrl";
+import RecordPagination, { useRecordPagination } from "../components/RecordPagination";
 
 
 function NavIcon({ type }) {
@@ -345,6 +346,10 @@ export default function AuctionPage({ auctionWorkspaceTab, client, detailRequest
       return matchesStatus && matchesSearch;
     });
   }, [periodAuctions, auctionStatusFilter, auctionSearch]);
+  const winners = useMemo(() => auctions.filter((auction) => auction.highest_bidder_name && ["COMPLETED_WITH_WINNER", "COMPLETED", "CLOSED"].includes(String(auction.ui_status || "").toUpperCase())), [auctions]);
+  const auctionPagination = useRecordPagination(filteredAuctions, `${auctionDateFilter}|${auctionStatusFilter}|${auctionSearch}|${selectedFbPageId || ""}`);
+  const bidsPagination = useRecordPagination(auctionBids, selectedFbPageId || "");
+  const winnersPagination = useRecordPagination(winners, selectedFbPageId || "");
 
 
   const [pageDataLoading, setPageDataLoading] = useState(true);
@@ -457,17 +462,17 @@ export default function AuctionPage({ auctionWorkspaceTab, client, detailRequest
                 </section>
                 <section className="dashboard-panel">
                   <div className="panel-header"><div><h2>Auction list</h2><p>{filteredAuctions.length} record(s)</p></div></div>
-                  <div className="table-wrapper"><table><thead><tr><th>Item</th><th>Status</th><th>Highest bid</th><th>Bidder</th><th>Valid bidders</th><th>Ends</th><th>Payment</th><th>Action</th></tr></thead><tbody>{filteredAuctions.map((auction) => (<tr key={auction.auction_item_id}><td>{auction.item_label}</td><td><StatusBadge status={auction.ui_status} /></td><td>{formatCurrency(auction.highest_bid)}</td><td>{auction.highest_bidder_name || "-"}</td><td>{auction.valid_bidder_count}/{auction.min_bidder_count}</td><td>{formatDateTime(auction.auction_end_dt)}</td><td>{auction.payment_status || "-"}</td><td><button className="table-action-button" type="button" onClick={() => openAuction(auction.auction_item_id)}>Details</button></td></tr>))}</tbody></table></div>
+                  <div className="table-wrapper"><table><thead><tr><th>Item</th><th>Status</th><th>Highest bid</th><th>Bidder</th><th>Valid bidders</th><th>Ends</th><th>Payment</th><th>Action</th></tr></thead><tbody>{auctionPagination.visibleRecords.map((auction) => (<tr key={auction.auction_item_id}><td>{auction.item_label}</td><td><StatusBadge status={auction.ui_status} /></td><td>{formatCurrency(auction.highest_bid)}</td><td>{auction.highest_bidder_name || "-"}</td><td>{auction.valid_bidder_count}/{auction.min_bidder_count}</td><td>{formatDateTime(auction.auction_end_dt)}</td><td>{auction.payment_status || "-"}</td><td><button className="table-action-button" type="button" onClick={() => openAuction(auction.auction_item_id)}>Details</button></td></tr>))}</tbody></table></div><RecordPagination pagination={auctionPagination} label="auctions" />
                 </section>
               </>
             )}
 
             {auctionWorkspaceTab === "BIDS" && (
-              <section className="dashboard-panel"><div className="panel-header"><div><h2>Bid activity</h2><p>Validated bid history across your auction items.</p></div></div><div className="table-wrapper"><table><thead><tr><th>Auction</th><th>Bidder</th><th>Bid</th><th>Validity</th><th>Facebook Comment</th><th>Time</th></tr></thead><tbody>{auctionBids.map((bid) => { const auction=auctions.find(a=>a.auction_item_id===bid.auction_item_id); return <tr key={bid.bid_id || `${bid.auction_item_id}-${bid.fb_comment_id || bid.commented_at}`} className="clickable-row" onClick={()=>openAuction(bid.auction_item_id)}><td><strong>{auction?.item_label || bid.item_label || "Auction"}</strong></td><td>{bid.fb_user_name || bid.fb_user_id || "—"}</td><td>{formatCurrency(bid.bid_amt)}</td><td><StatusBadge status={bid.is_valid ? "VALID" : "INVALID"}/></td><td>{bid.fb_comment_id || bid.comment_text || "—"}</td><td>{formatDateTime(bid.commented_at)}</td></tr>})}{!auctionBids.length&&<tr><td colSpan="6" className="empty-table-cell">No bid records found.</td></tr>}</tbody></table></div></section>
+              <section className="dashboard-panel"><div className="panel-header"><div><h2>Bid activity</h2><p>Validated bid history across your auction items.</p></div></div><div className="table-wrapper"><table><thead><tr><th>Auction</th><th>Bidder</th><th>Bid</th><th>Validity</th><th>Facebook Comment</th><th>Time</th></tr></thead><tbody>{bidsPagination.visibleRecords.map((bid) => { const auction=auctions.find(a=>a.auction_item_id===bid.auction_item_id); return <tr key={bid.bid_id || `${bid.auction_item_id}-${bid.fb_comment_id || bid.commented_at}`} className="clickable-row" onClick={()=>openAuction(bid.auction_item_id)}><td><strong>{auction?.item_label || bid.item_label || "Auction"}</strong></td><td>{bid.fb_user_name || bid.fb_user_id || "—"}</td><td>{formatCurrency(bid.bid_amt)}</td><td><StatusBadge status={bid.is_valid ? "VALID" : "INVALID"}/></td><td>{bid.fb_comment_id || bid.comment_text || "—"}</td><td>{formatDateTime(bid.commented_at)}</td></tr>})}{!auctionBids.length&&<tr><td colSpan="6" className="empty-table-cell">No bid records found.</td></tr>}</tbody></table></div><RecordPagination pagination={bidsPagination} label="bids" /></section>
             )}
 
             {auctionWorkspaceTab === "WINNERS" && (
-              <section className="dashboard-panel"><div className="panel-header"><div><h2>Auction winners</h2><p>Winner, winning amount and downstream payment/order status.</p></div></div><div className="table-wrapper"><table><thead><tr><th>Auction</th><th>Winner</th><th>Winning amount</th><th>Order</th><th>Payment</th><th>Completed</th></tr></thead><tbody>{auctions.filter((a) => a.highest_bidder_name && ["COMPLETED_WITH_WINNER", "COMPLETED", "CLOSED"].includes(String(a.ui_status || "").toUpperCase())).map((a) => (<tr key={a.auction_item_id} className="clickable-row" onClick={() => openAuction(a.auction_item_id)}><td>{a.item_label}</td><td><button className="table-link-button" type="button" onClick={(event)=>{event.stopPropagation();openAuction(a.auction_item_id)}}>{a.highest_bidder_name}</button></td><td>{formatCurrency(a.highest_bid)}</td><td>{a.order_status || "-"}</td><td>{a.payment_status || "-"}</td><td>{formatDateTime(a.auction_end_dt)}</td></tr>))}</tbody></table></div></section>
+              <section className="dashboard-panel"><div className="panel-header"><div><h2>Auction winners</h2><p>Winner, winning amount and downstream payment/order status.</p></div></div><div className="table-wrapper"><table><thead><tr><th>Auction</th><th>Winner</th><th>Winning amount</th><th>Order</th><th>Payment</th><th>Completed</th></tr></thead><tbody>{winnersPagination.visibleRecords.map((a) => (<tr key={a.auction_item_id} className="clickable-row" onClick={() => openAuction(a.auction_item_id)}><td>{a.item_label}</td><td><button className="table-link-button" type="button" onClick={(event)=>{event.stopPropagation();openAuction(a.auction_item_id)}}>{a.highest_bidder_name}</button></td><td>{formatCurrency(a.highest_bid)}</td><td>{a.order_status || "-"}</td><td>{a.payment_status || "-"}</td><td>{formatDateTime(a.auction_end_dt)}</td></tr>))}</tbody></table></div><RecordPagination pagination={winnersPagination} label="winners" /></section>
             )}
           </>
         )}

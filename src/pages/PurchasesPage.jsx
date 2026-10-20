@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../supabase";
+import RecordPagination, { useRecordPagination } from "../components/RecordPagination";
 import Eo2DatePicker from "../components/Eo2DatePicker";
 import "./PurchasesPage.css";
 
@@ -401,8 +402,7 @@ export default function PurchasesPage({ client }) {
   const [search, setSearch] = useState(""),
     [status, setStatus] = useState("ALL"),
     [from, setFrom] = useState(""),
-    [to, setTo] = useState(""),
-    [page, setPage] = useState(1);
+    [to, setTo] = useState("");
   const [modal, setModal] = useState(null),
     [modalError, setModalError] = useState(""),
     [form, setForm] = useState(newPurchase),
@@ -495,7 +495,6 @@ export default function PurchasesPage({ client }) {
       version.current++;
     };
   }, [clientId]);
-  useEffect(() => setPage(1), [search, status, from, to, tab]);
   useEffect(() => {
     if (!modal) return;
     focus.current = document.activeElement;
@@ -522,10 +521,9 @@ export default function PurchasesPage({ client }) {
       ),
     [purchases, search, status, from, to, tab],
   );
-  const active = filtered.filter((p) => p.status !== "CANCELLED"),
-    pages = Math.max(1, Math.ceil(filtered.length / 25)),
-    current = Math.min(page, pages),
-    shown = filtered.slice((current - 1) * 25, current * 25);
+  const active = filtered.filter((p) => p.status !== "CANCELLED");
+  const pagination = useRecordPagination(filtered, `${search}|${status}|${from}|${to}|${tab}`);
+  const shown = pagination.visibleRecords;
   const previewErrors = useMemo(
       () => validatePurchases(preview, suppliers, items, purchases),
       [preview, suppliers, items, purchases],
@@ -854,29 +852,7 @@ export default function PurchasesPage({ client }) {
           )}
         </tbody>
       </table>
-      <div className="purchase-pagination">
-        <span>
-          Page {current} of {pages}
-        </span>
-        <div className="purchase-actions">
-          <button
-            type="button"
-            className="secondary-button"
-            disabled={current <= 1}
-            onClick={() => setPage(current - 1)}
-          >
-            Previous
-          </button>
-          <button
-            type="button"
-            className="secondary-button"
-            disabled={current >= pages}
-            onClick={() => setPage(current + 1)}
-          >
-            Next
-          </button>
-        </div>
-      </div>
+      <RecordPagination pagination={pagination} label="purchases" className="purchase-pagination" />
     </div>
   );
   return (

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../supabase";
 import Eo2DatePicker from "../components/Eo2DatePicker";
+import RecordPagination, { useRecordPagination } from "../components/RecordPagination";
 
 function dt(value) {
   if (!value) return "-";
@@ -65,6 +66,7 @@ export default function AdminClientsPage() {
         .some((value) => String(value).toLowerCase().includes(q))
     );
   }, [clients, search]);
+  const clientsPagination = useRecordPagination(filtered, search);
 
   function editClient(client) {
     setEditing(client);
@@ -158,7 +160,7 @@ export default function AdminClientsPage() {
           <table>
             <thead><tr><th>Client</th><th>Onboarding</th><th>Subscription</th><th>Manual Payment</th><th>Automation</th><th>Pages</th><th>End</th><th>Admin</th></tr></thead>
             <tbody>
-              {filtered.map((client) => (
+              {clientsPagination.visibleRecords.map((client) => (
                 <tr key={client.client_id}>
                   <td><strong>{client.name}</strong><div className="table-muted">{client.contact_email || client.client_id}</div></td>
                   <td><Badge value={client.onboarding_status} /></td>
@@ -174,6 +176,7 @@ export default function AdminClientsPage() {
             </tbody>
           </table>
         </div>
+        <RecordPagination pagination={clientsPagination} label="clients" />
       </section>
     </>
   );
