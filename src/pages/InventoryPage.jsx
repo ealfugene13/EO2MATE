@@ -3063,7 +3063,7 @@ export default function InventoryPage({
                 <label>
                   Inventory Scope
                   <select value={itemForm.page_scope_mode || "ALL"} onChange={(event) => setItemForm((current) => ({ ...current, page_scope_mode: event.target.value, page_ids: event.target.value === "ALL" ? [] : current.page_ids }))}>
-                    <option value="ALL">All Client Pages</option>
+                    <option value="ALL">All Client Inventory (not assigned to a Page)</option>
                     <option value="SELECTED">Selected Facebook Pages</option>
                   </select>
                 </label>
