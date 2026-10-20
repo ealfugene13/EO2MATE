@@ -407,6 +407,7 @@ function LivePopupNotifications({ notifications, onDismiss }) {
 function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", section = "SESSIONS", setSection, refreshActionRef }) {
   const clientId = client?.client_id;
   const [sessions, setSessions] = useState([]);
+  const [auctionBids, setAuctionBids] = useState([]);
   const [selected, setSelected] = useState("");
   const [postCaptions, setPostCaptions] = useState({});
   const captionRequests = useRef(new Set());
@@ -435,8 +436,11 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
   const reportItems = visibleSessions.flatMap((session) => (session.eo2mate_live_items || [])
     .filter((entry) => activeMode === "MIXED" || String(entry.mode || "").toUpperCase() === activeMode)
     .map((entry) => ({ ...entry, session_status: session.status, fb_video_id: session.fb_video_id })));
+  const activityRows = activeMode === "AUCTION"
+    ? auctionBids.filter((bid) => visibleSessions.some((session) => session.id === bid.session_id))
+    : reportItems;
   const sessionsPagination = useRecordPagination(visibleSessions, activeMode);
-  const activityPagination = useRecordPagination(reportItems, `${activeMode}|activity`);
+  const activityPagination = useRecordPagination(activityRows, `${activeMode}|activity`);
   const reportPagination = useRecordPagination(reportItems, `${activeMode}|report`);
   const queuePagination = useRecordPagination(visibleItems, `${selected || ""}|${activeMode}`);
   const totals = {
@@ -494,6 +498,7 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
   const refresh = async () => {
     const result = await request("list", pageId ? { fb_page_id: pageId } : {});
     const nextSessions = result.sessions || [];
+    setAuctionBids(result.auction_bids || []);
     const previousSnapshot = liveSnapshots.current;
     const sameScope = previousSnapshot.clientId === clientId && previousSnapshot.pageId === pageId;
     const nextSnapshot = new Map();
@@ -671,8 +676,13 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
     </>}
     {section === "ACTIVITY" && <>
       <div className="panel-header"><div><h2>{activeMode === "AUCTION" ? "Bid Activity & Buyer Totals" : "Activity & Buyer Claims"}</h2><p>Current item status, accepted quantities, and stock limits across the selected Page.</p></div><button type="button" className="secondary-button" onClick={() => refresh().catch((e) => setMessage(e.message))} disabled={busy}><NavIcon type="refresh" />Refresh</button></div>
-      <p>Buyer names are not included in the Live data currently returned to this page; claimed quantities are shown for each product.</p>
-      <div className="table-wrapper"><table><thead><tr><th>Session</th><th>Code</th><th>Product</th><th>Status</th><th>Claimed units</th><th>Stock limit</th></tr></thead><tbody>{activityPagination.visibleRecords.map((entry) => <tr key={entry.id}><td>{entry.fb_video_id} · {entry.session_status}</td><td>{entry.item_code}</td><td>{entry.title}</td><td>{entry.status}</td><td>{entry.claimed}</td><td>{entry.quantity}</td></tr>)}</tbody></table>{!reportItems.length && <p>No live activity or buyer claim totals are available for this mode.</p>}<RecordPagination pagination={activityPagination} label="activity records" /></div>
+      {activeMode === "AUCTION" ? <>
+        <p>Each accepted bid is listed below. The table shows Facebook user IDs because the Live bid record does not include buyer display names.</p>
+        <div className="table-wrapper" style={{ overflowX: "auto" }}><table><thead><tr><th>Time</th><th>Item</th><th>Bidder ID</th><th>Bid</th><th>Comment</th></tr></thead><tbody>{activityPagination.visibleRecords.map((entry) => <tr key={entry.fb_comment_id}><td>{entry.created_time ? new Date(entry.created_time).toLocaleString("en-PH", { dateStyle: "short", timeStyle: "short", timeZone: "Asia/Manila" }) : "-"}</td><td>{entry.item_code} · {entry.title}</td><td>{entry.fb_user_id || "-"}</td><td>{formatCurrency(entry.amount)}</td><td>{entry.message || "-"}</td></tr>)}</tbody></table>{!activityRows.length && <p>No accepted Live Auction bids are available for this Page.</p>}<RecordPagination pagination={activityPagination} label="accepted bids" /></div>
+      </> : <>
+        <p>Claimed quantities are shown for each product.</p>
+        <div className="table-wrapper"><table><thead><tr><th>Session</th><th>Code</th><th>Product</th><th>Status</th><th>Claimed units</th><th>Stock limit</th></tr></thead><tbody>{activityPagination.visibleRecords.map((entry) => <tr key={entry.id}><td>{entry.fb_video_id} · {entry.session_status}</td><td>{entry.item_code}</td><td>{entry.title}</td><td>{entry.status}</td><td>{entry.claimed}</td><td>{entry.quantity}</td></tr>)}</tbody></table>{!activityRows.length && <p>No live activity or buyer claim totals are available for this mode.</p>}<RecordPagination pagination={activityPagination} label="activity records" /></div>
+      </>}
     </>}
     {section === "REPORTS" && <>
       <div className="panel-header"><div><h2>Live Report</h2><p>Export session and product totals for the selected Page.</p></div><button type="button" className="primary-button" onClick={() => downloadLiveReport(visibleSessions, activeMode)} disabled={!reportItems.length}><NavIcon type="download" />Download CSV</button></div>
