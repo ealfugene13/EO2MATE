@@ -1394,10 +1394,7 @@ export default function FacebookPostPage({
   }, [isMultiple, postMode, items, captionTemplates, sharedRules, preorderPrice, preorderQuantity, preorderMaxPerBuyer, preorderDownPayment, preorderDownPaymentType, preorderDeadline, preorderPaymentDeadline, preorderParticipationCommands, miningParticipationCommands, miningMinePrice, miningTakePrice, miningLockPrice, miningEndDate, regularSaleParticipationCommands, regularSalePrice, regularSaleQuantity, regularSaleMaxPerBuyer]);
 
   function changePostType(nextType) {
-    setPostType(nextType);
-    setMessage("");
-    setErrorMessage("");
-    setFieldErrors({});
+    resetFormForNewPost({ nextPostType: nextType, keepSelectedPage: true });
   }
 
   async function addFiles(fileList) {
@@ -2199,6 +2196,9 @@ export default function FacebookPostPage({
 
   function resetFormForNewPost({
     keepSuccessPopup = false,
+    nextPostMode = postMode,
+    nextPostType = "",
+    keepSelectedPage = false,
   } = {}) {
     itemsRef.current.forEach(
       (item) => {
@@ -2208,8 +2208,10 @@ export default function FacebookPostPage({
       }
     );
 
-    const resetTypes = postMode === "PREORDER" ? preorderPostTypes : postMode === "MINING" ? miningPostTypes : postMode === "REGULAR_SALE" ? regularSalePostTypes : postTypes;
-    setPostType(resetTypes.length ? String(resetTypes[0].post_type_code).toUpperCase() : "");
+    const resetMode = String(nextPostMode || postMode).toUpperCase();
+    if (resetMode !== postMode) setPostMode(resetMode);
+    const resetTypes = resetMode === "PREORDER" ? preorderPostTypes : resetMode === "MINING" ? miningPostTypes : resetMode === "REGULAR_SALE" ? regularSalePostTypes : postTypes;
+    setPostType(nextPostType || (resetTypes.length ? String(resetTypes[0].post_type_code).toUpperCase() : ""));
 
     setSellerCaption("");
     setSingleItem("");
@@ -2218,6 +2220,7 @@ export default function FacebookPostPage({
     setMultipleItemSource("MANUAL");
     setNewInventoryItemIds([]);
     setPreorderPrice("");
+    setPreorderPaymentRequirement("DOWN_PAYMENT");
     setPreorderDownPayment("");
     setPreorderDownPaymentType("FIXED");
     setPreorderQuantity("");
@@ -2262,7 +2265,7 @@ export default function FacebookPostPage({
       fileInputRef.current.value = "";
     }
 
-    if (pages.length) {
+    if (!keepSelectedPage && pages.length) {
       setSelectedPageId(
         String(
           pages[0].fb_page_id
@@ -3374,10 +3377,8 @@ export default function FacebookPostPage({
           <label>
             Post Mode *
             <select value={postMode} onChange={(e) => {
-              const mode = e.target.value; setPostMode(mode); setFieldErrors({});
-              const rows = mode === "PREORDER" ? preorderPostTypes : mode === "MINING" ? miningPostTypes : mode === "REGULAR_SALE" ? regularSalePostTypes : postTypes;
-              setPostType(rows.length ? String(rows[0].post_type_code).toUpperCase() : "");
-            }} disabled={loading || publishing}>
+              resetFormForNewPost({ nextPostMode: e.target.value, keepSelectedPage: true });
+            }} disabled={loading || publishing || processingFiles}>
               <option value="AUCTION">Auction</option>
               <option value="PREORDER">Pre-Order</option>
               <option value="MINING">Mining</option>
@@ -3396,6 +3397,7 @@ export default function FacebookPostPage({
               disabled={
                 loading ||
                 publishing ||
+                processingFiles ||
                 !activePostTypes.length
               }
             >

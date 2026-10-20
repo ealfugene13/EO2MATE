@@ -26,18 +26,32 @@ export default function PublicShowroomPage({ storeToken }) {
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("featured");
   const [photoViewer, setPhotoViewer] = useState(null);
+  const [unavailablePhotoUrls, setUnavailablePhotoUrls] = useState(() => new Set());
+
+  function getItemCover(item) {
+    const images = Array.isArray(item?.images) ? item.images : [];
+    const ordered = [...images].sort((a, b) => Number(Boolean(b.is_primary)) - Number(Boolean(a.is_primary)));
+    return ordered.find((image) => (image?.url || image?.signed_url) && !unavailablePhotoUrls.has(image.url || image.signed_url))?.url ||
+      ordered.find((image) => (image?.url || image?.signed_url) && !unavailablePhotoUrls.has(image.url || image.signed_url))?.signed_url || "";
+  }
+
+  function markPhotoUnavailable(url) {
+    if (!url) return;
+    setUnavailablePhotoUrls((current) => new Set(current).add(url));
+  }
 
   function openProductPhotos(item, startIndex = 0) {
     const photos = (item?.images || []).map((image) => ({
       src: image.url || image.signed_url || "",
       alt: image.original_file_name || item.item_name || "Product photo",
-    })).filter((image) => image.src);
+    })).filter((image) => image.src && !unavailablePhotoUrls.has(image.src));
     if (photos.length) setPhotoViewer({ photos, index: startIndex, title: item.item_name || "Product photos" });
   }
 
   async function loadShowroom() {
     setLoading(true);
     setError("");
+    setUnavailablePhotoUrls(new Set());
     try {
       const { data, error: invokeError } = await supabase.functions.invoke("eo2mate", {
         method: "POST",
@@ -100,9 +114,9 @@ export default function PublicShowroomPage({ storeToken }) {
         <div className="showroom-card-fan-heading"><span>IN STOCK · POPULAR · NEW</span><strong>Featured picks</strong></div>
         <div className="showroom-playing-cards">
           {featuredItems.length ? featuredItems.map((item, index) => {
-            const image = item.images?.find((entry) => entry.is_primary)?.url || item.images?.[0]?.url;
+            const image = getItemCover(item);
             return <a className="showroom-playing-card" href="#collection" key={item.id} style={{ "--card-index": index }} aria-label={`View ${item.item_name}`}>
-              <div className="showroom-playing-card-image">{image ? <img src={image} alt="" onClick={(event) => { event.preventDefault(); event.stopPropagation(); openProductPhotos(item, Math.max(0, item.images.findIndex((entry) => entry.url === image))); }} /> : <span>{(item.item_name || "E").slice(0, 1).toUpperCase()}</span>}<small>AVAILABLE</small></div>
+              <div className="showroom-playing-card-image">{image ? <img src={image} alt="" onError={() => markPhotoUnavailable(image)} onClick={(event) => { event.preventDefault(); event.stopPropagation(); openProductPhotos(item, Math.max(0, item.images.findIndex((entry) => (entry.url || entry.signed_url) === image))); }} /> : <div className="showroom-no-photo showroom-no-photo-featured"><strong>No image</strong><small>Add inventory photos</small></div>}<small>AVAILABLE</small></div>
               <div className="showroom-playing-card-info"><span>{item.item_code}</span><strong>{item.item_name}</strong><b>{formatPrice(item.price)}</b></div>
             </a>;
           }) : <div className="showroom-card-fan-empty"><span>✦</span><strong>New finds are on the way</strong><small>In-stock Page items will appear here.</small></div>}
@@ -131,9 +145,9 @@ export default function PublicShowroomPage({ storeToken }) {
       {loading ? <div className="showroom-state"><span className="showroom-spinner"/><strong>Opening the showroom</strong><p>Loading the latest Page details and available items…</p></div>
         : error ? <div className="showroom-state showroom-error"><strong>Showroom unavailable</strong><p>{error}</p><button type="button" onClick={loadShowroom}><StoreIcon kind="refresh"/> Try again</button></div>
           : items.length ? <div className="showroom-product-grid">{items.map((item) => {
-            const cover = item.images?.find((image) => image.is_primary)?.url || item.images?.[0]?.url;
+            const cover = getItemCover(item);
             return <article className="showroom-product-card" key={item.id}>
-              <div className="showroom-product-photo">{cover ? <button type="button" className="showroom-photo-open" aria-label={`View all photos of ${item.item_name}`} onClick={() => openProductPhotos(item, Math.max(0, item.images.findIndex((image) => image.is_primary)))}><img src={cover} alt={item.item_name} loading="lazy"/>{item.images?.length > 1 && <span className="showroom-photo-count">{item.images.length} photos</span>}</button> : <div className="showroom-no-photo"><span>{page.name?.slice(0, 1) || "S"}</span><small>Product photo</small></div>}<span className="showroom-available"><i/>{item.available} available</span></div>
+              <div className="showroom-product-photo">{cover ? <button type="button" className="showroom-photo-open" aria-label={`View all photos of ${item.item_name}`} onClick={() => openProductPhotos(item, Math.max(0, item.images.findIndex((image) => (image.url || image.signed_url) === cover)))}><img src={cover} alt={item.item_name} loading="lazy" onError={() => markPhotoUnavailable(cover)}/>{item.images?.filter((image) => (image.url || image.signed_url) && !unavailablePhotoUrls.has(image.url || image.signed_url)).length > 1 && <span className="showroom-photo-count">{item.images.filter((image) => (image.url || image.signed_url) && !unavailablePhotoUrls.has(image.url || image.signed_url)).length} photos</span>}</button> : <div className="showroom-no-photo"><strong>No image</strong><small>Add inventory photos</small></div>}<span className="showroom-available"><i/>{item.available} available</span></div>
               <div className="showroom-product-info"><div className="showroom-product-code">{item.item_code}</div><h3>{item.item_name}</h3>{item.description && <p>{item.description}</p>}<div className="showroom-product-bottom"><strong>{formatPrice(item.price)}</strong><a href={messengerUrl} target="_blank" rel="noreferrer">Ask about item <StoreIcon kind="arrow"/></a></div></div>
             </article>;
           })}</div> : <div className="showroom-state showroom-empty"><span className="showroom-empty-icon"><StoreIcon kind="bag"/></span><strong>{search ? "No matching items" : "More items coming soon"}</strong><p>{search ? "Try a different search." : "There are no available inventory items to display right now. Check back later or message the Page."}</p>{search && <button type="button" onClick={() => setSearch("")}>Clear search</button>}</div>}
