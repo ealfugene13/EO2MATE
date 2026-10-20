@@ -426,6 +426,14 @@ export default function InventoryPage({
     ],
   );
 
+  useEffect(() => {
+    const nextPage = selectedFbPageId || "ALL";
+    setPageFilter(nextPage);
+    if (client?.client_id) {
+      loadItems({ page: nextPage });
+    }
+  }, [selectedFbPageId, client?.client_id]);
+
 
   async function invoke(
     body,
