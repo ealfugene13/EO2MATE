@@ -103,20 +103,20 @@ export default function PublicShowroomPage({ storeToken }) {
           <div><span className="showroom-eyebrow">OFFICIAL PAGE SHOWROOM</span><h1>{page.name || "Facebook Page"}</h1></div>
         </div>
         {page.category && <span className="showroom-category">{page.category}</span>}
-        <p className="showroom-intro">{page.about || page.description || "Discover our latest available items. Browse the collection and message us on Facebook if you have a question."}</p>
+        <p className="showroom-intro">{page.about || page.description || "Browse this Page’s inventory and message us on Facebook if you have a question."}</p>
         <div className="showroom-hero-actions">
           <a className="showroom-follow-button" href={pageUrl} target="_blank" rel="noreferrer"><span aria-hidden="true">f</span> Follow on Facebook</a>
           {messengerUrl && <a className="showroom-message-button" href={messengerUrl} target="_blank" rel="noreferrer">Message the Page <StoreIcon kind="arrow" /></a>}
         </div>
-        <div className="showroom-trust-row"><span><i/>Current available stock</span><b>·</b><span>Updated from the Page inventory</span></div>
+        <div className="showroom-trust-row"><span><i/>Page inventory</span><b>·</b><span>Stock status shown on each item</span></div>
       </div>
-      <aside className="showroom-card-fan" aria-label="Featured available items">
+      <aside className="showroom-card-fan" aria-label="Featured Page inventory">
         <div className="showroom-card-fan-heading"><span>IN STOCK · POPULAR · NEW</span><strong>Featured picks</strong></div>
         <div className="showroom-playing-cards">
           {featuredItems.length ? featuredItems.map((item, index) => {
             const image = getItemCover(item);
             return <a className="showroom-playing-card" href="#collection" key={item.id} style={{ "--card-index": index }} aria-label={`View ${item.item_name}`}>
-              <div className="showroom-playing-card-image">{image ? <img src={image} alt="" onError={() => markPhotoUnavailable(image)} onClick={(event) => { event.preventDefault(); event.stopPropagation(); openProductPhotos(item, Math.max(0, item.images.findIndex((entry) => (entry.url || entry.signed_url) === image))); }} /> : <div className="showroom-no-photo showroom-no-photo-featured"><strong>No image</strong><small>Add inventory photos</small></div>}<small>AVAILABLE</small></div>
+              <div className="showroom-playing-card-image">{image ? <img src={image} alt="" onError={() => markPhotoUnavailable(image)} onClick={(event) => { event.preventDefault(); event.stopPropagation(); openProductPhotos(item, Math.max(0, item.images.findIndex((entry) => (entry.url || entry.signed_url) === image))); }} /> : <div className="showroom-no-photo showroom-no-photo-featured"><strong>No image</strong></div>}<small>{Number(item.available) > 0 ? "AVAILABLE" : "OUT OF STOCK"}</small></div>
               <div className="showroom-playing-card-info"><span>{item.item_code}</span><strong>{item.item_name}</strong><b>{formatPrice(item.price)}</b></div>
             </a>;
           }) : <div className="showroom-card-fan-empty"><span>✦</span><strong>New finds are on the way</strong><small>In-stock Page items will appear here.</small></div>}
@@ -134,23 +134,23 @@ export default function PublicShowroomPage({ storeToken }) {
 
     <section className="showroom-collection" id="collection">
       <header className="showroom-section-heading">
-        <div><span className="showroom-eyebrow">THE COLLECTION</span><h2>Available now</h2><p>Browse what is currently in stock. Items with no available quantity are hidden.</p></div>
-        <div className="showroom-stock-count"><StoreIcon kind="bag"/><span><strong>{showroom?.items?.length || 0}</strong><small>items available</small></span></div>
+        <div><span className="showroom-eyebrow">THE COLLECTION</span><h2>Page inventory</h2><p>Browse active items assigned to this Page. Stock availability is shown on each item.</p></div>
+        <div className="showroom-stock-count"><StoreIcon kind="bag"/><span><strong>{showroom?.items?.length || 0}</strong><small>items listed</small></span></div>
       </header>
       <div className="showroom-toolbar">
-        <label className="showroom-search"><StoreIcon kind="search"/><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search products or item codes" aria-label="Search available products"/></label>
+        <label className="showroom-search"><StoreIcon kind="search"/><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search products or item codes" aria-label="Search Page inventory"/></label>
         <label className="showroom-category-select"><span>Sort by</span><select value={sort} onChange={(event) => setSort(event.target.value)}><option value="featured">Product name</option><option value="price-low">Price: low to high</option><option value="price-high">Price: high to low</option></select></label>
       </div>
 
-      {loading ? <div className="showroom-state"><span className="showroom-spinner"/><strong>Opening the showroom</strong><p>Loading the latest Page details and available items…</p></div>
+      {loading ? <div className="showroom-state"><span className="showroom-spinner"/><strong>Opening the showroom</strong><p>Loading the latest Page details and inventory…</p></div>
         : error ? <div className="showroom-state showroom-error"><strong>Showroom unavailable</strong><p>{error}</p><button type="button" onClick={loadShowroom}><StoreIcon kind="refresh"/> Try again</button></div>
           : items.length ? <div className="showroom-product-grid">{items.map((item) => {
             const cover = getItemCover(item);
             return <article className="showroom-product-card" key={item.id}>
-              <div className="showroom-product-photo">{cover ? <button type="button" className="showroom-photo-open" aria-label={`View all photos of ${item.item_name}`} onClick={() => openProductPhotos(item, Math.max(0, item.images.findIndex((image) => (image.url || image.signed_url) === cover)))}><img src={cover} alt={item.item_name} loading="lazy" onError={() => markPhotoUnavailable(cover)}/>{item.images?.filter((image) => (image.url || image.signed_url) && !unavailablePhotoUrls.has(image.url || image.signed_url)).length > 1 && <span className="showroom-photo-count">{item.images.filter((image) => (image.url || image.signed_url) && !unavailablePhotoUrls.has(image.url || image.signed_url)).length} photos</span>}</button> : <div className="showroom-no-photo"><strong>No image</strong><small>Add inventory photos</small></div>}<span className="showroom-available"><i/>{item.available} available</span></div>
+              <div className="showroom-product-photo">{cover ? <button type="button" className="showroom-photo-open" aria-label={`View all photos of ${item.item_name}`} onClick={() => openProductPhotos(item, Math.max(0, item.images.findIndex((image) => (image.url || image.signed_url) === cover)))}><img src={cover} alt={item.item_name} loading="lazy" onError={() => markPhotoUnavailable(cover)}/>{item.images?.filter((image) => (image.url || image.signed_url) && !unavailablePhotoUrls.has(image.url || image.signed_url)).length > 1 && <span className="showroom-photo-count">{item.images.filter((image) => (image.url || image.signed_url) && !unavailablePhotoUrls.has(image.url || image.signed_url)).length} photos</span>}</button> : <div className="showroom-no-photo"><strong>No image</strong></div>}<span className={`showroom-available${Number(item.available) > 0 ? "" : " showroom-sold-out"}`}><i/>{Number(item.available) > 0 ? `${item.available} available` : "Out of stock"}</span></div>
               <div className="showroom-product-info"><div className="showroom-product-code">{item.item_code}</div><h3>{item.item_name}</h3>{item.description && <p>{item.description}</p>}<div className="showroom-product-bottom"><strong>{formatPrice(item.price)}</strong><a href={messengerUrl} target="_blank" rel="noreferrer">Ask about item <StoreIcon kind="arrow"/></a></div></div>
             </article>;
-          })}</div> : <div className="showroom-state showroom-empty"><span className="showroom-empty-icon"><StoreIcon kind="bag"/></span><strong>{search ? "No matching items" : "More items coming soon"}</strong><p>{search ? "Try a different search." : "There are no available inventory items to display right now. Check back later or message the Page."}</p>{search && <button type="button" onClick={() => setSearch("")}>Clear search</button>}</div>}
+          })}</div> : <div className="showroom-state showroom-empty"><span className="showroom-empty-icon"><StoreIcon kind="bag"/></span><strong>{search ? "No matching items" : "More items coming soon"}</strong><p>{search ? "Try a different search." : "There are no active inventory items assigned to this Page right now. Check back later or message the Page."}</p>{search && <button type="button" onClick={() => setSearch("")}>Clear search</button>}</div>}
     </section>
 
     <section className="showroom-about" id="about">
