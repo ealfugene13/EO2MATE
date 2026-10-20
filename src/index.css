@@ -4072,13 +4072,14 @@ button.post-type-card:hover { transform: translateY(-2px); border-color: #bcdcc3
 .eo2-password-rules small{overflow-wrap:anywhere}
 @media(max-width:480px){.eo2-signup-group .eo2-name-row{grid-template-columns:1fr}}
 
-/* EO2MATE caption helper: fixed-height scrollable selector (2026-10-13) */
-.fb-caption-tools-layout { align-items: start; }
+/* EO2MATE caption helper: align the selector with the caption field and keep it scrollable. */
+.fb-caption-tools-layout { align-items: stretch; }
 .fb-caption-helpers {
   box-sizing: border-box;
   min-width: 0;
   min-height: 0;
-  max-height: 320px;
+  height: 195px;
+  max-height: 195px;
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
@@ -4087,8 +4088,20 @@ button.post-type-card:hover { transform: translateY(-2px); border-color: #bcdcc3
 }
 .fb-caption-helper-grid { min-width: 0; }
 .fb-caption-insert-button { box-sizing: border-box; width: 100%; }
+.fb-caption-recent {
+  margin: 0 0 10px;
+  padding: 0 0 10px;
+  border-bottom: 1px solid #e0e7ef;
+}
+.fb-caption-recent-title {
+  margin: 0 0 6px;
+  color: #68788e;
+  font-size: 9px;
+  font-weight: 750;
+}
+.fb-caption-recent .fb-caption-helper-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 @media (max-width: 900px) {
-  .fb-caption-helpers { width: 100%; max-height: 260px; }
+  .fb-caption-helpers { width: 100%; height: 260px; max-height: 260px; }
 }
 .photo-gallery-backdrop{position:fixed;z-index:3000;inset:0;display:grid;place-items:center;padding:24px;background:rgba(8,14,12,.88);backdrop-filter:blur(5px)}
 .photo-gallery-viewer{position:relative;width:min(1100px,100%);max-height:calc(100vh - 48px);padding:16px;border:1px solid #ffffff28;border-radius:18px;background:#111815;color:#fff;box-shadow:0 24px 80px #0008}
