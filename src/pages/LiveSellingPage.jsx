@@ -295,8 +295,15 @@ function parseLiveQueueCsv(text, existingItems = [], forcedMode = "") {
   if (parsed.error) return { rows: [], errors: [parsed.error] };
   if (parsed.rows.length < 2) return { rows: [], errors: ["Choose a CSV with a header row and at least one product row."] };
   if (parsed.rows.length > 101) return { rows: [], errors: ["Upload no more than 100 products in one batch."] };
-  const headers = parsed.rows[0].map((value) => value.toLowerCase().replace(/[\s-]+/g, "_"));
+  const headers = parsed.rows[0].map((value) => value.replace(/^\uFEFF/, "").toLowerCase().replace(/[\s-]+/g, "_"));
   const index = Object.fromEntries(headers.map((value, i) => [value, i]));
+  // Accept older spreadsheet headings while keeping the canonical column in
+  // the downloaded template. Excel exports may also include a UTF-8 BOM.
+  if (index.mining_duration_minutes === undefined) {
+    for (const alias of ["mining_duration", "mining_minutes", "mine_duration_minutes", "mining_time_limit_minutes"]) {
+      if (index[alias] !== undefined) { index.mining_duration_minutes = index[alias]; break; }
+    }
+  }
   const missing = ["item_code", "title"].filter((name) => index[name] === undefined);
   if (missing.length) return { rows: [], errors: [`Missing required CSV column(s): ${missing.join(", ")}.`] };
 
@@ -345,13 +352,14 @@ function parseLiveQueueCsv(text, existingItems = [], forcedMode = "") {
           ? 0
           : Number(auctionDurationText);
       const miningDurationText = get("mining_duration_minutes");
-      const mining_duration_minutes = mode === "MINING" && miningDurationText ? Number(miningDurationText) : null;
+      const miningDurationValue = miningDurationText.match(/^\s*(\d+(?:\.0+)?)\s*(?:min|mins|minute|minutes)?\s*$/i);
+      const mining_duration_minutes = mode === "MINING" && miningDurationValue ? Number(miningDurationValue[1]) : null;
       if (mode === "AUCTION" && (!Number.isInteger(auction_duration_minutes) || auction_duration_minutes < 1 || auction_duration_minutes > 1440)) {
         errors.push(`Row ${line}: auction_duration_minutes must be a whole number from 1 to 1440.`);
       } else if (mode === "MINING" && (!Number.isInteger(mining_duration_minutes) || mining_duration_minutes < 1 || mining_duration_minutes > 1440)) {
-        errors.push(`Row ${line}: mining_duration_minutes must be a whole number from 1 to 1440.`);
+        errors.push(`Row ${line}: mining_duration_minutes must be a whole number from 1 to 1440 (read: ${miningDurationText || "blank"}).`);
       } else {
-        rows.push({ item_code, title, mode, quantity, auction_duration_minutes, ...(mode === "MINING" ? { mining_duration_minutes } : {}), ...fields });
+        rows.push({ item_code, title, mode, quantity, auction_duration_minutes, inventory_item_id: get("inventory_item_id") || null, ...(mode === "MINING" ? { mining_duration_minutes } : {}), ...fields });
       }
     }
   });
@@ -361,11 +369,11 @@ function parseLiveQueueCsv(text, existingItems = [], forcedMode = "") {
 function downloadLiveQueueTemplate(mode = "MIXED") {
   const rows = {
     SELLING: ["A12,Test sale item,SELLING,2,1,,,,,,0,"],
-    MINING: ["B15,Test mining item,MINING,1,,100,200,300,,,0,30"],
+    MINING: ["B15,Test mining item,MINING,1,,100,200,300,,,0,1"],
     AUCTION: ["C18,Test auction item,AUCTION,1,,,,,100,10,1,"],
   };
   const examples = mode === "MIXED" ? [rows.SELLING[0], rows.MINING[0], rows.AUCTION[0]] : rows[mode] || rows.SELLING;
-  const csv = ["item_code,title,mode,quantity,unit_price,mine_price,take_price,lock_price,starting_bid,bid_increment,auction_duration_minutes,mining_duration_minutes", ...examples].join("\n");
+  const csv = ["item_code,title,mode,quantity,unit_price,mine_price,take_price,lock_price,starting_bid,bid_increment,auction_duration_minutes,mining_duration_minutes,inventory_item_id", ...examples].join("\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -422,6 +430,7 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
   const [inventoryError, setInventoryError] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [messageKind, setMessageKind] = useState("success");
   const [queueCsv, setQueueCsv] = useState("");
   const [queueCsvName, setQueueCsvName] = useState("");
   const [queueFileKey, setQueueFileKey] = useState(0);
@@ -545,7 +554,7 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
     }
   };
   const refreshSessions = async () => {
-    setBusy(true); setMessage("");
+    setBusy(true); setMessage(""); setMessageKind("success");
     try { await refresh(); setMessage("Live sessions refreshed."); }
     catch (error) { setMessage(error.message || "Unable to refresh Live sessions."); }
     finally { setBusy(false); }
@@ -625,43 +634,45 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
     try {
       const result = await request(action, extra);
       await refresh();
-      if (action === "activate-item" && result?.activation_comment_posted === false) setMessage("Auction activated and closing time saved, but Facebook could not post the closing-time comment.");
-      else if (action === "activate-item" && result?.activation_comment_posted === true) setMessage("Product activated. The auction closing time was posted to Facebook.");
-      else setMessage(`${action} completed.`);
+      if (action === "activate-item" && result?.activation_comment_posted === false) { setMessageKind("warning"); setMessage("Product activated, but Facebook could not post its opening comment. Check the Page token and function logs."); }
+      else if (action === "activate-item" && result?.activation_comment_posted === true) setMessage(result.activation_comment_mode === "MINING" ? "Product activated. The Mining opening and time limit were posted to Facebook." : "Product activated. The auction opening details and closing time were posted to Facebook.");
+      else { setMessageKind("success"); setMessage(`${action} completed.`); }
     }
-    catch (e) { setMessage(e.message); }
+    catch (e) { setMessageKind("error"); setMessage(e.message); }
     finally { setBusy(false); }
   };
   const addItemToQueue = async () => {
     if (!current || !["DRAFT", "ACTIVE"].includes(current.status)) return;
     if (!isValidLiveItemCode(item.item_code)) {
-      setMessage("Item code must be 1–40 letters, numbers, or hyphens.");
+      setMessageKind("error"); setMessage("Item code must be 1–40 letters, numbers, or hyphens.");
       return;
     }
     if (item.mode === "MINING" && (!Number.isInteger(Number(item.mining_duration_minutes)) || Number(item.mining_duration_minutes) < 1 || Number(item.mining_duration_minutes) > 1440)) {
-      setMessage("Mining duration must be a whole number from 1 to 1440 minutes.");
+      setMessageKind("error"); setMessage("Mining duration must be a whole number from 1 to 1440 minutes.");
       return;
     }
-    setBusy(true); setMessage("");
+    setBusy(true); setMessage(""); setMessageKind("success");
     try {
       await request("add-item", { session_id: selected, ...item, mining_duration_minutes: item.mode === "MINING" ? Number(item.mining_duration_minutes) : null });
-      await refresh();
       setItem({ inventory_item_id: "", item_code: "", title: "", mode: item.mode, quantity: 1, unit_price: "", mine_price: "", take_price: "", lock_price: "", starting_bid: "", bid_increment: "", auction_duration_minutes: 1, mining_duration_minutes: "" });
       setMessage("Product added to queue. Select the next inventory item when ready.");
+      try { await refresh(); } catch { setMessageKind("warning"); setMessage("Product was added, but the queue could not refresh. Use Refresh to reload it."); }
     } catch (e) {
+      setMessageKind("error");
       setMessage(e.message || "Unable to add this product to the queue.");
     } finally { setBusy(false); }
   };
   const uploadQueueCsv = async () => {
     if (!current || !["DRAFT", "ACTIVE"].includes(current.status) || !parsedQueue.rows.length || parsedQueue.errors.length) return;
-    setBusy(true); setMessage("Uploading products to the queue…");
+    setBusy(true); setMessage("Uploading products to the queue…"); setMessageKind("success");
     try {
       const result = await request("add-items", { session_id: selected, items: parsedQueue.rows });
-      await refresh();
       setMessage(`${result.inserted || parsedQueue.rows.length} products added to the queue.`);
       setQueueCsv(""); setQueueCsvName(""); setQueueFileKey((key) => key + 1);
+      try { await refresh(); } catch { setMessageKind("warning"); setMessage("Products were added, but the queue could not refresh. Use Refresh to reload it."); }
     } catch (e) {
-      setMessage(e.message || "Bulk upload failed. No products were added; review the file and try again.");
+      setMessageKind("error");
+      setMessage(e.message || "Bulk upload failed; review the file and try again.");
     } finally { setBusy(false); }
   };
   if (section !== "SESSIONS") return <section className="dashboard-panel" style={{ padding: 20 }}>
@@ -688,7 +699,7 @@ function MixedLiveManager({ client, selectedFbPageId, activeMode = "MIXED", sect
       <div className="panel-header"><div><h2>Live Report</h2><p>Export session and product totals for the selected Page.</p></div><button type="button" className="primary-button" onClick={() => downloadLiveReport(visibleSessions, activeMode)} disabled={!reportItems.length}><NavIcon type="download" />Download CSV</button></div>
       <div className="table-wrapper"><table><thead><tr><th>Session</th><th>Code</th><th>Product</th><th>Mode</th><th>Status</th><th>Claimed / Stock</th></tr></thead><tbody>{reportPagination.visibleRecords.map((entry) => <tr key={entry.id}><td>{entry.fb_video_id} · {entry.session_status}</td><td>{entry.item_code}</td><td>{entry.title}</td><td>{entry.mode}</td><td>{entry.status}</td><td>{entry.claimed} / {entry.quantity}</td></tr>)}</tbody></table>{!reportItems.length && <p>No report data is available yet.</p>}<RecordPagination pagination={reportPagination} label="report records" /></div>
     </>}
-    {message && <p role="status">{message}</p>}
+    {message && <p role={messageKind === "error" ? "alert" : "status"} style={{ color: messageKind === "error" ? "#b42318" : messageKind === "warning" ? "#8a5b00" : "#147a53" }}>{message}</p>}
     <LivePopupNotifications notifications={popupNotifications} onDismiss={(id) => setPopupNotifications((previous) => previous.filter((entry) => entry.id !== id))} />
   </section>;
   return <section className="dashboard-panel" style={{ padding: 20 }}>
