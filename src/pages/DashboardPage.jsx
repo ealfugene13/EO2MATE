@@ -302,6 +302,129 @@ function OrderActivityChart({ orders }) {
   </div>;
 }
 
+function SellingModeStatusPanel({ orders, deliveries, auctions, posts, liveSessions, loading, error }) {
+  const modeDefinitions = [
+    { key: "AUCTION", label: "Auction", aliases: ["AUCTION"] },
+    { key: "MINING", label: "Mining", aliases: ["MINING", "POST_MINING"] },
+    { key: "PREORDER", label: "Pre-Order", aliases: ["PREORDER", "PRE_ORDER", "PO"] },
+    { key: "REGULAR_SALE", label: "Regular Sale", aliases: ["REGULAR_SALE", "REGULAR"] },
+    { key: "LIVE", label: "Live Selling", aliases: ["LIVE", "LIVE_SELLING", "LIVE_MINING", "LIVE_AUCTION", "SELLING"] },
+  ];
+  const activePostStatuses = new Set(["ACTIVE", "OPEN", "PUBLISHED"]);
+  const draftStatuses = new Set(["DRAFT", "SCHEDULED", "PENDING"]);
+  const closedPostStatuses = new Set(["CLOSED", "ENDED", "SOLD_OUT", "COMPLETED", "COMPLETED_WITH_WINNER"]);
+  const transitDeliveryStatuses = new Set(["BOOKED", "PICKED_UP", "DROPPED_OFF", "IN_TRANSIT", "SHIPPED"]);
+
+  function orderCountsFor(mode) {
+    const acceptedSources = new Set(mode.aliases);
+    const modeOrders = (orders || []).filter((order) => acceptedSources.has(String(order.source_type || "").toUpperCase().replaceAll("-", "_")));
+    const groupIds = new Set(modeOrders.map((order) => String(order.order_group_id || "")).filter(Boolean));
+    const modeDeliveries = (deliveries || []).filter((delivery) => groupIds.has(String(delivery.order_group_id || "")));
+    const deliveryByGroup = new Map(modeDeliveries.map((delivery) => [String(delivery.order_group_id), String(delivery.delivery_status || "").toUpperCase()]));
+    const statusOf = (order) => String(order.order_status || "").toUpperCase();
+    const cancelled = modeOrders.filter((order) => ["CANCELLED", "EXPIRED"].includes(statusOf(order)) || ["CANCELLED", "EXPIRED"].includes(String(order.payment_status || "").toUpperCase()));
+    const completed = modeOrders.filter((order) => !cancelled.includes(order) && (["DELIVERED", "COMPLETED"].includes(statusOf(order)) || deliveryByGroup.get(String(order.order_group_id || "")) === "DELIVERED"));
+    const inTransit = modeOrders.filter((order) => !cancelled.includes(order) && !completed.includes(order) && (statusOf(order) === "SHIPPED" || transitDeliveryStatuses.has(deliveryByGroup.get(String(order.order_group_id || "")))));
+    const pendingPayment = modeOrders.filter((order) => !cancelled.includes(order) && !completed.includes(order) && !inTransit.includes(order) && (statusOf(order) === "PAYMENT_PENDING" || String(order.payment_status || "").toUpperCase() === "PENDING"));
+    const pendingDelivery = modeOrders.filter((order) => !cancelled.includes(order) && !completed.includes(order) && !inTransit.includes(order) && !pendingPayment.includes(order) && ["PAID", "READY_FOR_DELIVERY"].includes(statusOf(order)));
+    return {
+      pendingPayment: pendingPayment.length,
+      pendingDelivery: pendingDelivery.length,
+      inTransit: inTransit.length,
+      completed: completed.length,
+      cancelled: cancelled.length,
+      other: Math.max(0, modeOrders.length - pendingPayment.length - pendingDelivery.length - inTransit.length - completed.length - cancelled.length),
+      total: modeOrders.length,
+    };
+  }
+
+  const cards = modeDefinitions.map((mode) => {
+    if (mode.key === "LIVE") {
+      const sessions = liveSessions || [];
+      const items = sessions.flatMap((session) => session.eo2mate_live_items || []);
+      const counts = orderCountsFor(mode);
+      const sessionStatus = (session) => String(session.status || "").toUpperCase();
+      const itemStatus = (item) => String(item.status || "").toUpperCase();
+      const knownSessionStatuses = new Set(["ACTIVE", "DRAFT", "CLOSED", "CANCELLED"]);
+      const knownItemStatuses = new Set(["ACTIVE", "QUEUED", "CLOSED", "CANCELLED"]);
+      return {
+        ...mode,
+        total: sessions.length,
+        stats: [
+          ["Active sessions", sessions.filter((session) => sessionStatus(session) === "ACTIVE").length],
+          ["Draft sessions", sessions.filter((session) => sessionStatus(session) === "DRAFT").length],
+          ["Closed sessions", sessions.filter((session) => sessionStatus(session) === "CLOSED").length],
+          ["Cancelled sessions", sessions.filter((session) => sessionStatus(session) === "CANCELLED").length],
+          ["Other session status", sessions.filter((session) => !knownSessionStatuses.has(sessionStatus(session))).length],
+          ["Queued items", items.filter((item) => itemStatus(item) === "QUEUED").length],
+          ["Active items", items.filter((item) => itemStatus(item) === "ACTIVE").length],
+          ["Closed items", items.filter((item) => itemStatus(item) === "CLOSED").length],
+          ["Other item status", items.filter((item) => !knownItemStatuses.has(itemStatus(item))).length],
+          ["Pending payment", counts.pendingPayment],
+          ["Pending delivery", counts.pendingDelivery],
+          ["In transit", counts.inTransit],
+          ["Completed", counts.completed],
+          ["Cancelled / expired", counts.cancelled],
+          ["Other orders", counts.other],
+        ],
+        subtitle: `${sessions.length} session${sessions.length === 1 ? "" : "s"} · ${counts.total} order${counts.total === 1 ? "" : "s"}`,
+      };
+    }
+
+    let postRows = (posts || []).filter((post) => String(post.mode_code || "").toUpperCase() === mode.key);
+    if (mode.key === "AUCTION") {
+      const auctionRows = (auctions || []).map((auction) => ({
+        post_id: auction.post_id,
+        status: auction.ui_status || auction.post_status || auction.item_status,
+      }));
+      const byPostId = new Map();
+      [...postRows, ...auctionRows].forEach((post, index) => byPostId.set(String(post.post_id || post.fb_post_id || `auction-${index}`), post));
+      postRows = [...byPostId.values()];
+    }
+    const postStatus = (post) => String(post.status || "").toUpperCase();
+    const counts = orderCountsFor(mode);
+    const activePosts = postRows.filter((post) => activePostStatuses.has(postStatus(post))).length;
+    const draftPosts = postRows.filter((post) => draftStatuses.has(postStatus(post))).length;
+    const closedPosts = postRows.filter((post) => closedPostStatuses.has(postStatus(post))).length;
+    const cancelledPosts = postRows.filter((post) => ["CANCELLED", "EXPIRED"].includes(postStatus(post))).length;
+    return {
+      ...mode,
+      total: postRows.length,
+      stats: [
+        ["Active posts", activePosts],
+        ["Draft / scheduled", draftPosts],
+        ["Closed / ended", closedPosts],
+        ["Pending payment", counts.pendingPayment],
+        ["Pending delivery", counts.pendingDelivery],
+        ["In transit", counts.inTransit],
+        ["Completed", counts.completed],
+        ["Cancelled / expired", cancelledPosts + counts.cancelled],
+        ["Other post status", Math.max(0, postRows.length - activePosts - draftPosts - closedPosts - cancelledPosts)],
+        ["Other orders", counts.other],
+      ],
+      subtitle: `${postRows.length} post${postRows.length === 1 ? "" : "s"} · ${counts.total} order${counts.total === 1 ? "" : "s"}`,
+    };
+  });
+
+  return <section className="dashboard-panel" style={{ marginBottom: 20 }}>
+    <div className="panel-header"><div><h2>Post mode status</h2><p>Posts, payments, and fulfillment for the selected Facebook Page.</p></div></div>
+    {error && <p role="status" style={{ margin: "0 0 12px", color: "#9a5b12", fontSize: 12 }}>{error}</p>}
+    {loading ? <div className="loading-card" style={{ padding: 16 }}>Loading post mode status…</div> : <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 12 }}>
+      {cards.map((card) => <article key={card.key} style={{ border: "1px solid #e6edf2", borderRadius: 15, padding: 15, background: "#fff" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: 8, marginBottom: 12 }}>
+          <div><h3 style={{ margin: 0, color: "#1d344a", fontSize: 16 }}>{card.label}</h3><p style={{ margin: "4px 0 0", color: "#7b8b9b", fontSize: 11 }}>{card.subtitle}</p></div>
+          <span style={{ minWidth: 30, height: 30, padding: "0 7px", borderRadius: 10, display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#218742", background: "#edf8f0", fontWeight: 800 }}>{card.total}</span>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
+          {card.stats.map(([label, value]) => <div key={label} style={{ padding: "8px 9px", borderRadius: 10, background: "#f8fafb", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 6 }}>
+            <span style={{ color: "#687b8e", fontSize: 11, lineHeight: 1.25 }}>{label}</span><strong style={{ color: "#243b50", fontSize: 13 }}>{value}</strong>
+          </div>)}
+        </div>
+      </article>)}
+    </div>}
+  </section>;
+}
+
 function DashboardCommunicationPanel({ client, selectedFbPageId, selectedFbPageName, facebookStatus, openFacebookSetup, navigateTo, floatingWidgetSettings, onFloatingWidgetSettingChange }) {
   const [notifications, setNotifications] = useState([]);
   const [notificationsError, setNotificationsError] = useState("");
@@ -470,6 +593,10 @@ export default function DashboardPage({ client, facebookStatus, goToAuctions, go
   const welcomeName = activePageLabel || client?.name || "Business overview";
   const pageChangedLabel = activePageLabel ? `Active Facebook Page: ${activePageLabel}` : "Client workspace overview";
   const [auctions, setAuctions] = useState([]);
+  const [modePosts, setModePosts] = useState([]);
+  const [liveSessions, setLiveSessions] = useState([]);
+  const [modeStatusLoading, setModeStatusLoading] = useState(false);
+  const [modeStatusError, setModeStatusError] = useState("");
 
   const [orders, setOrders] = useState([]);
 
@@ -513,6 +640,49 @@ export default function DashboardPage({ client, facebookStatus, goToAuctions, go
 
   const [pageDataLoading, setPageDataLoading] = useState(true);
   const pageLoadVersion = useRef(0);
+  useEffect(() => {
+    let cancelled = false;
+    async function loadModeStatus() {
+      setModePosts([]);
+      setLiveSessions([]);
+      setModeStatusError("");
+      if (!client?.client_id || !selectedFbPageId) {
+        setModeStatusLoading(false);
+        return;
+      }
+      setModeStatusLoading(true);
+      try {
+        const { data: pageRow, error: pageError } = await supabase.from("fb_pages")
+          .select("page_id").eq("client_id", client.client_id).eq("fb_page_id", selectedFbPageId).maybeSingle();
+        if (pageError) throw pageError;
+        if (!pageRow?.page_id) throw new Error("The selected Facebook Page could not be matched to its records.");
+
+        const [postsResult, liveResult] = await Promise.allSettled([
+          supabase.from("eo2mate_posts").select("post_id,page_id,mode_code,status,fb_post_id")
+            .eq("client_id", client.client_id).eq("page_id", pageRow.page_id)
+            .in("mode_code", ["AUCTION", "MINING", "PREORDER", "REGULAR_SALE"]),
+          supabase.functions.invoke("eo2mate", {
+            headers: { "x-eo2mate-route": "live-admin" },
+            body: { action: "list", client_id: client.client_id, fb_page_id: selectedFbPageId },
+          }),
+        ]);
+        if (cancelled) return;
+        const errors = [];
+        if (postsResult.status === "fulfilled" && !postsResult.value.error) setModePosts(postsResult.value.data || []);
+        else errors.push(postsResult.status === "rejected" ? postsResult.reason?.message : postsResult.value.error?.message);
+        if (liveResult.status === "fulfilled" && !liveResult.value.error && !liveResult.value.data?.error) setLiveSessions(liveResult.value.data?.sessions || []);
+        else errors.push(liveResult.status === "rejected" ? liveResult.reason?.message : liveResult.value.data?.detail || liveResult.value.data?.error || liveResult.value.error?.message);
+        setModeStatusError(errors.filter(Boolean).join(" "));
+      } catch (error) {
+        if (!cancelled) setModeStatusError(error.message || "Unable to load post mode status.");
+      } finally {
+        if (!cancelled) setModeStatusLoading(false);
+      }
+    }
+    loadModeStatus();
+    return () => { cancelled = true; };
+  }, [client?.client_id, selectedFbPageId]);
+
   async function loadPortal() {
     if (!client?.client_id) return;
     const version = ++pageLoadVersion.current;
@@ -609,6 +779,8 @@ export default function DashboardPage({ client, facebookStatus, goToAuctions, go
                 </div>
               </div>
             </section>
+
+            <SellingModeStatusPanel orders={orders} deliveries={deliveries} auctions={auctions} posts={modePosts} liveSessions={liveSessions} loading={modeStatusLoading} error={modeStatusError} />
 
             <section className="dashboard-panel" style={{ marginBottom: 20 }}>
               <div className="panel-header"><div><h2>Quick actions</h2><p>Jump directly to your most-used EO2MATE workspaces.</p></div></div>
