@@ -157,7 +157,7 @@ export default function OrdersPage({ client, detailRequest, page, setErrorMessag
     setManualNotice(""); setManualRequestId(newRequestId()); setManualOrderOpen(true); setManualItems([{inventory_item_id:"",quantity:"1",unit_price:""}]);
     setManualOrder({buyer_name:"",buyer_fb_user_id:"",buyer_phone:"",buyer_email:"",shipping_name:"",shipping_phone:"",shipping_address_line1:"",shipping_address_line2:"",shipping_city:"",shipping_province:"",shipping_postal_code:"",shipping_fee:"0",notes:""});
     try {
-      const {data,error}=await supabase.functions.invoke("inventory-admin",{method:"POST",body:{action:"LIST_ITEMS",client_id:client.client_id,status:"ACTIVE",fb_page_id:selectedFbPageId}});
+      const {data,error}=await supabase.functions.invoke("eo2mate",{method:"POST",headers:{"x-eo2mate-route":"inventory-admin"},body:{action:"LIST_ITEMS",client_id:client.client_id,status:"ACTIVE",fb_page_id:selectedFbPageId}});
       if(error) throw error;
       if(!data?.success) throw new Error(data?.message || "Unable to load inventory.");
       setManualInventory((data.items||[]).filter(item=>Number(item.qty_available)>0));
