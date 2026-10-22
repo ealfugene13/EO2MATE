@@ -153,10 +153,11 @@ export default function OrdersPage({ client, detailRequest, page, setErrorMessag
   },[]);
 
   async function openManualOrder() {
+    if(!selectedFbPageId) { setManualNotice("Select an active Facebook Page before creating a manual order."); return; }
     setManualNotice(""); setManualRequestId(newRequestId()); setManualOrderOpen(true); setManualItems([{inventory_item_id:"",quantity:"1",unit_price:""}]);
     setManualOrder({buyer_name:"",buyer_fb_user_id:"",buyer_phone:"",buyer_email:"",shipping_name:"",shipping_phone:"",shipping_address_line1:"",shipping_address_line2:"",shipping_city:"",shipping_province:"",shipping_postal_code:"",shipping_fee:"0",notes:""});
     try {
-      const {data,error}=await supabase.functions.invoke("inventory-admin",{method:"POST",body:{action:"LIST_ITEMS",client_id:client.client_id,status:"ACTIVE"}});
+      const {data,error}=await supabase.functions.invoke("inventory-admin",{method:"POST",body:{action:"LIST_ITEMS",client_id:client.client_id,status:"ACTIVE",fb_page_id:selectedFbPageId}});
       if(error) throw error;
       if(!data?.success) throw new Error(data?.message || "Unable to load inventory.");
       setManualInventory((data.items||[]).filter(item=>Number(item.qty_available)>0));
@@ -185,7 +186,7 @@ export default function OrdersPage({ client, detailRequest, page, setErrorMessag
     if(!window.confirm(`Create this manual order for ${manualOrder.buyer_name}? Inventory will be reserved immediately.`)) return;
     setManualBusy(true); setManualNotice("");
     try {
-      const {data,error}=await supabase.functions.invoke("eo2mate",{method:"POST",headers:{"x-eo2mate-route":"manual-order-admin"},body:{action:"CREATE",client_id:client.client_id,manual_request_id:manualRequestId,...manualOrder,shipping_fee:Number(manualOrder.shipping_fee||0),items:lines}});
+      const {data,error}=await supabase.functions.invoke("eo2mate",{method:"POST",headers:{"x-eo2mate-route":"manual-order-admin"},body:{action:"CREATE",client_id:client.client_id,fb_page_id:selectedFbPageId,manual_request_id:manualRequestId,...manualOrder,shipping_fee:Number(manualOrder.shipping_fee||0),items:lines}});
       if(error) throw error;
       if(!data?.success) throw new Error(data?.message || "Manual order could not be created.");
       setManualOrderOpen(false); setManualNotice(`Manual order ${data.order_number || "created"}. Inventory was reserved.`); await loadPortal();
