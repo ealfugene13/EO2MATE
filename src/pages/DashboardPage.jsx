@@ -233,6 +233,75 @@ function onlySelectedPage(rows, pageId) {
   );
 }
 
+function OrderActivityChart({ orders }) {
+  const [activeIndex, setActiveIndex] = useState(null);
+  const points = useMemo(() => {
+    const days = Array.from({ length: 7 }, (_, index) => {
+      const day = new Date();
+      day.setHours(0, 0, 0, 0);
+      day.setDate(day.getDate() - (6 - index));
+      return day;
+    });
+
+    return days.map((day) => {
+      const next = new Date(day);
+      next.setDate(next.getDate() + 1);
+      const dayOrders = (orders || []).filter((order) => {
+        const createdAt = new Date(order.created_at || order.order_created_at || 0);
+        return createdAt >= day && createdAt < next;
+      });
+      return {
+        day,
+        label: day.toLocaleDateString("en-PH", { weekday: "short" }),
+        orders: dayOrders,
+        count: dayOrders.length,
+        total: dayOrders.reduce((sum, order) => sum + (Number(order.total_amount) || 0), 0),
+      };
+    });
+  }, [orders]);
+
+  const max = Math.max(1, ...points.map((point) => point.count));
+  const pointY = (point) => 82 - (point.count / max) * 64;
+  const poly = points.map((point, index) => `${8 + index * (84 / 6)},${pointY(point)}`).join(" ");
+  const activePoint = activeIndex === null ? null : points[activeIndex];
+  const formatCurrency = (amount) => new Intl.NumberFormat("en-PH", {
+    style: "currency", currency: "PHP", maximumFractionDigits: 2,
+  }).format(amount);
+
+  return <div style={{ padding: "4px 4px 0" }}>
+    <div role="status" aria-live="polite" style={{ minHeight: 50, margin: "0 10px 4px", padding: "9px 12px", borderRadius: 12, background: activePoint ? "#f0f8f2" : "#f8fafb", border: `1px solid ${activePoint ? "#d8ecdd" : "#edf1f5"}`, color: "#385166", display: "flex", flexWrap: "wrap", alignItems: "center", gap: "5px 14px", fontSize: 12 }}>
+      {activePoint ? <>
+        <strong style={{ color: "#1f3448" }}>{activePoint.day.toLocaleDateString("en-PH", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}</strong>
+        <span><strong>{activePoint.count}</strong> {activePoint.count === 1 ? "order" : "orders"}</span>
+        <span>Order total: <strong>{formatCurrency(activePoint.total)}</strong></span>
+        {activePoint.orders.length > 0 && <span style={{ flexBasis: "100%", color: "#708296" }}>
+          {activePoint.orders.slice(0, 4).map((order) => order.order_number || order.buyer_name || "Order").join(" · ")}
+          {activePoint.orders.length > 4 ? ` · +${activePoint.orders.length - 4} more` : ""}
+        </span>}
+      </> : <span style={{ color: "#7b8b9b" }}>Hover or focus a chart point to see its date, order count, and total.</span>}
+    </div>
+    <svg viewBox="0 0 100 92" preserveAspectRatio="none" style={{ width: "100%", height: 230, display: "block" }} role="img" aria-label="Seven day order activity chart. Focus a point for its details.">
+      {[18, 34, 50, 66, 82].map((y) => <line key={y} x1="7" y1={y} x2="94" y2={y} stroke="#edf1f5" strokeWidth=".6" />)}
+      <polyline points={poly} fill="none" stroke="#2b9a4b" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+      {points.map((point, index) => {
+        const x = 8 + index * (84 / 6);
+        const y = pointY(point);
+        const dayLabel = point.day.toLocaleDateString("en-PH", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+        const details = `${dayLabel}: ${point.count} ${point.count === 1 ? "order" : "orders"}; total ${formatCurrency(point.total)}`;
+        return <g key={point.day.toISOString()}>
+          <circle cx={x} cy={y} r="4.5" fill="transparent" style={{ cursor: "pointer" }} tabIndex="0" role="button" aria-label={details} onMouseEnter={() => setActiveIndex(index)} onMouseLeave={() => setActiveIndex(null)} onFocus={() => setActiveIndex(index)} onBlur={() => setActiveIndex(null)}>
+            <title>{details}</title>
+          </circle>
+          <circle cx={x} cy={y} r={activeIndex === index ? "2.5" : "1.7"} fill="#2b9a4b" pointerEvents="none" />
+        </g>;
+      })}
+    </svg>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 2, padding: "0 3% 8px", color: "#7b8b9b", fontSize: 11, textAlign: "center" }}>
+      {points.map((point) => <span key={point.day.toISOString()}>{point.label}</span>)}
+    </div>
+  </div>;
+}
+
 function DashboardCommunicationPanel({ client, selectedFbPageId, selectedFbPageName, facebookStatus, openFacebookSetup, navigateTo, floatingWidgetSettings, onFloatingWidgetSettingChange }) {
   const [notifications, setNotifications] = useState([]);
   const [notificationsError, setNotificationsError] = useState("");
@@ -525,25 +594,7 @@ export default function DashboardPage({ client, facebookStatus, goToAuctions, go
                   <div><h2>Order activity</h2><p>Orders created during the last 7 days.</p></div>
                   <button className="secondary-button" type="button" onClick={() => setPage("reports")}>Full reports</button>
                 </div>
-                {(() => {
-                  const days = Array.from({ length: 7 }, (_, index) => {
-                    const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate() - (6-index)); return d;
-                  });
-                  const points = days.map((day) => {
-                    const next = new Date(day); next.setDate(next.getDate()+1);
-                    return { label: day.toLocaleDateString("en-PH", { weekday: "short" }), count: orders.filter((o) => { const d = new Date(o.created_at || o.order_created_at || 0); return d >= day && d < next; }).length };
-                  });
-                  const max = Math.max(1, ...points.map((p) => p.count));
-                  const poly = points.map((p, i) => `${8 + i*(84/6)},${82 - (p.count/max)*64}`).join(" ");
-                  return <div style={{ padding: "4px 4px 0" }}>
-                    <svg viewBox="0 0 100 92" preserveAspectRatio="none" style={{ width: "100%", height: 230, display: "block" }} aria-label="Seven day order activity chart">
-                      {[18,34,50,66,82].map((y) => <line key={y} x1="7" y1={y} x2="94" y2={y} stroke="#edf1f5" strokeWidth=".6" />)}
-                      <polyline points={poly} fill="none" stroke="#2b9a4b" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-                      {points.map((p,i) => <circle key={i} cx={8+i*(84/6)} cy={82-(p.count/max)*64} r="1.7" fill="#2b9a4b" />)}
-                    </svg>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 2, padding: "0 3% 8px", color: "#7b8b9b", fontSize: 11, textAlign: "center" }}>{points.map((p) => <span key={p.label}>{p.label}</span>)}</div>
-                  </div>;
-                })()}
+                <OrderActivityChart orders={orders} />
               </div>
 
               <div className="dashboard-panel" style={{ margin: 0 }}>
