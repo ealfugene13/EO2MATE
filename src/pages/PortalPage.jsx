@@ -2,6 +2,7 @@ import PostsPage from "./PostsPage";
 import RegularSalePage from "./RegularSalePage";
 import LiveSellingPage from "./LiveSellingPage";
 import FacebookPage from "./FacebookPage";
+import FacebookUsersPage from "./FacebookUsersPage";
 import StaffPage from "./StaffPage";
 import ReportsPage from "./ReportsPage";
 import AutomationControlPage from "./AutomationControlPage";
@@ -1082,6 +1083,14 @@ export default function PortalPage({ session }) {
                 Live Selling
               </SidebarNavButton>
 
+              <SidebarNavButton
+                icon="users"
+                className={`nav-item ${page === "facebook-users" ? "active" : ""}`}
+                onClick={() => navigateTo("facebook-users")}
+              >
+                Facebook Users
+              </SidebarNavButton>
+
             </>
           )}
 
@@ -1227,6 +1236,8 @@ export default function PortalPage({ session }) {
         {(page === "live-selling") && <LiveSellingPage selectedFbPageId={effectivePageId} client={client} liveSellingWorkspaceTab={liveSellingWorkspaceTab} metaConnected={metaConnected} page={page} setLiveSellingWorkspaceTab={setLiveSellingWorkspaceTab} />}
 
         {(page === "users-staff") && <StaffPage page={page} />}
+
+        {(page === "facebook-users") && <FacebookUsersPage key={`facebook-users-${effectivePageId}`} client={client} selectedFbPageId={effectivePageId} selectedFbPageName={availablePages.find((p) => String(p.fb_page_id) === String(effectivePageId))?.page_name || ""} />}
 
         {(page === "reports") && <ReportsPage selectedFbPageId={effectivePageId} client={client} page={page} setErrorMessage={setErrorMessage} />}
 
