@@ -262,7 +262,9 @@ function OrderActivityChart({ orders }) {
 
   const max = Math.max(1, ...points.map((point) => point.count));
   const pointY = (point) => 82 - (point.count / max) * 64;
-  const poly = points.map((point, index) => `${8 + index * (84 / 6)},${pointY(point)}`).join(" ");
+  const chartPoints = points.map((point, index) => ({ x: 8 + index * (84 / 6), y: pointY(point) }));
+  const linePath = chartPoints.map((point, index) => `${index === 0 ? "M" : "L"}${point.x},${point.y}`).join(" ");
+  const areaPath = `${linePath} L${chartPoints[chartPoints.length - 1].x},86 L${chartPoints[0].x},86 Z`;
   const activePoint = activeIndex === null ? null : points[activeIndex];
   const formatCurrency = (amount) => new Intl.NumberFormat("en-PH", {
     style: "currency", currency: "PHP", maximumFractionDigits: 2,
@@ -280,19 +282,27 @@ function OrderActivityChart({ orders }) {
         </span>}
       </> : <span style={{ color: "#7b8b9b" }}>Hover or focus a chart point to see its date, order count, and total.</span>}
     </div>
-    <svg viewBox="0 0 100 92" preserveAspectRatio="none" style={{ width: "100%", height: 230, display: "block" }} role="img" aria-label="Seven day order activity chart. Focus a point for its details.">
-      {[18, 34, 50, 66, 82].map((y) => <line key={y} x1="7" y1={y} x2="94" y2={y} stroke="#edf1f5" strokeWidth=".6" />)}
-      <polyline points={poly} fill="none" stroke="#2b9a4b" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+    <svg viewBox="0 0 100 92" preserveAspectRatio="none" style={{ width: "100%", height: 210, display: "block" }} role="img" aria-label="Seven day order activity chart. Focus a point for its details.">
+      <defs>
+        <linearGradient id="order-activity-fill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#2b9a4b" stopOpacity=".17" />
+          <stop offset="100%" stopColor="#2b9a4b" stopOpacity=".015" />
+        </linearGradient>
+      </defs>
+      {[18, 34, 50, 66, 82].map((y) => <line key={y} x1="7" y1={y} x2="94" y2={y} stroke="#edf1f5" strokeWidth=".6" vectorEffect="non-scaling-stroke" />)}
+      <path d={areaPath} fill="url(#order-activity-fill)" />
+      <path d={linePath} fill="none" stroke="#2b9a4b" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
       {points.map((point, index) => {
-        const x = 8 + index * (84 / 6);
-        const y = pointY(point);
+        const { x, y } = chartPoints[index];
         const dayLabel = point.day.toLocaleDateString("en-PH", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
         const details = `${dayLabel}: ${point.count} ${point.count === 1 ? "order" : "orders"}; total ${formatCurrency(point.total)}`;
         return <g key={point.day.toISOString()}>
+          {activeIndex === index && <line x1={x} y1="18" x2={x} y2="86" stroke="#2b9a4b" strokeOpacity=".3" strokeDasharray="3 4" strokeWidth="1" vectorEffect="non-scaling-stroke" pointerEvents="none" />}
           <circle cx={x} cy={y} r="4.5" fill="transparent" style={{ cursor: "pointer" }} tabIndex="0" role="button" aria-label={details} onMouseEnter={() => setActiveIndex(index)} onMouseLeave={() => setActiveIndex(null)} onFocus={() => setActiveIndex(index)} onBlur={() => setActiveIndex(null)}>
             <title>{details}</title>
           </circle>
-          <circle cx={x} cy={y} r={activeIndex === index ? "2.5" : "1.7"} fill="#2b9a4b" pointerEvents="none" />
+          {activeIndex === index && <circle cx={x} cy={y} r="1.5" fill="#fff" stroke="#2b9a4b" strokeWidth="1.5" vectorEffect="non-scaling-stroke" pointerEvents="none" />}
+          {activeIndex !== index && <circle cx={x} cy={y} r=".8" fill="#2b9a4b" stroke="#fff" strokeWidth=".7" vectorEffect="non-scaling-stroke" pointerEvents="none" />}
         </g>;
       })}
     </svg>
