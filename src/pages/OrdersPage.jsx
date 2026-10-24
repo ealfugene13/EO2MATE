@@ -217,7 +217,7 @@ export default function OrdersPage({ client, detailRequest, page, setErrorMessag
       const {data,error}=await supabase.functions.invoke("eo2mate",{method:"POST",headers:{"x-eo2mate-route":"manual-order-admin"},body:{action,client_id:client.client_id,order_id:orderDetail.order_id,...extra}});
       if(error) throw error;
       if(!data?.success) throw new Error(data?.message || "Manual order action failed.");
-      setManualNotice(action==="RECORD_PAYMENT"?"Manual payment recorded. Reserved stock has been deducted from inventory.":"Manual order cancelled. Reserved stock has been released.");
+      setManualNotice(action==="RECORD_PAYMENT"?"Payment recorded. The order is marked paid and ready for delivery when shipping details are complete.":"Manual order cancelled. Reserved stock has been released.");
       setManualPaymentOpen(false); await openOrder(orderDetail.order_id); await loadPortal();
     } catch(error) { setManualNotice(error.message || "Manual order action failed."); }
     finally { setManualBusy(false); }
@@ -499,8 +499,8 @@ export default function OrdersPage({ client, detailRequest, page, setErrorMessag
                   </div>
                   <div className="orders-header-actions">
                     <StatusBadge status={orderDetail.order_status} />
+                    {canUseManualActions && !orderDetail.order_group_id && orderDetail.order_status==="PAYMENT_PENDING" && normalized(orderDetail.payment_status||orderDetail.latest_payment_status)!=="PAID" && <button type="button" className="secondary-button" onClick={()=>{setManualNotice("");setManualPaymentReference("");setManualPaymentOpen(true);}}>Record payment</button>}
                     {canUseManualActions && orderDetail.source_type==="MANUAL" && orderDetail.order_status==="PAYMENT_PENDING" && <>
-                      <button type="button" className="secondary-button" onClick={()=>{setManualNotice("");setManualPaymentReference("");setManualPaymentOpen(true);}}>Record payment</button>
                       <button type="button" className="secondary-button" onClick={()=>{const reason=window.prompt("Reason for cancelling this manual order:");if(reason===null)return;if(!window.confirm("Cancel this order and release its reserved inventory?"))return;runManualOrderAction("CANCEL",{reason});}}>Cancel order</button>
                     </>}
                   </div>
@@ -603,9 +603,9 @@ export default function OrdersPage({ client, detailRequest, page, setErrorMessag
     </div>}
     {manualPaymentOpen && <div className="manual-order-overlay" role="presentation" onMouseDown={event=>{if(event.target===event.currentTarget&&!manualBusy)setManualPaymentOpen(false);}}>
       <section className="manual-order-dialog manual-send-dialog" role="dialog" aria-modal="true" aria-labelledby="manual-payment-title">
-        <header><div><p className="eyebrow">MANUAL PAYMENT</p><h2 id="manual-payment-title">Record payment</h2><p>This confirms payment, records the payment method, deducts stock and updates the order.</p></div><button type="button" aria-label="Close" onClick={()=>setManualPaymentOpen(false)} disabled={manualBusy}>×</button></header>
+        <header><div><p className="eyebrow">STAFF PAYMENT</p><h2 id="manual-payment-title">Record payment received</h2><p>Use this only after verifying the buyer’s payment. EO2MATE will record the method and update the order.</p></div><button type="button" aria-label="Close" onClick={()=>setManualPaymentOpen(false)} disabled={manualBusy}>×</button></header>
         {manualNotice && <div className="manual-order-notice" role="alert">{manualNotice}</div>}
-        <form onSubmit={event=>{event.preventDefault();if(!window.confirm(`Record ${formatCurrency(orderDetail?.total_amount)} as paid for ${orderDetail?.order_number}?`))return;runManualOrderAction("RECORD_PAYMENT",{method:manualPaymentMethod,reference:manualPaymentReference});}}>
+        <form onSubmit={event=>{event.preventDefault();if(!window.confirm(`Record ${formatCurrency(orderDetail?.total_amount)} as received for ${orderDetail?.order_number}? Continue only after verifying the funds were received.`))return;runManualOrderAction("RECORD_PAYMENT",{method:manualPaymentMethod,reference:manualPaymentReference});}}>
           <div className="manual-order-grid">
             <ManualField label="Payment method"><select value={manualPaymentMethod} onChange={e=>setManualPaymentMethod(e.target.value)}><option value="CASH">Cash</option><option value="BANK_TRANSFER">Bank transfer</option><option value="E_WALLET">E-wallet</option><option value="OTHER">Other</option></select></ManualField>
             <ManualField label="Reference or staff note"><input value={manualPaymentReference} onChange={e=>setManualPaymentReference(e.target.value)} maxLength="250"/></ManualField>
