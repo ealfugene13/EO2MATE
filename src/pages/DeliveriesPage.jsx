@@ -102,6 +102,8 @@ export default function DeliveriesPage({ client, detailRequest, goToDeliveries, 
   const [deliveryActionLoading, setDeliveryActionLoading] = useState(false);
 
   const [deliveryActionMessage, setDeliveryActionMessage] = useState("");
+  const [lalamoveQuote, setLalamoveQuote] = useState(null);
+  const [lalamoveEnvironment, setLalamoveEnvironment] = useState("SANDBOX");
 
   async function loadDeliveryDetail(deliveryId) {
     const { data, error } = await supabase
@@ -116,6 +118,11 @@ export default function DeliveriesPage({ client, detailRequest, goToDeliveries, 
     setBookingReference(data?.booking_reference || "");
     setTrackingNumber(data?.tracking_number || "");
     setTrackingUrl(data?.tracking_url || "");
+    const savedLalamove = data?.courier_response?.provider === "LALAMOVE"
+      ? data.courier_response
+      : null;
+    setLalamoveEnvironment(savedLalamove?.environment || "SANDBOX");
+    setLalamoveQuote(savedLalamove?.quotation || null);
 
     return data;
   }
@@ -167,6 +174,80 @@ export default function DeliveriesPage({ client, detailRequest, goToDeliveries, 
       }
     } catch (error) {
       setErrorMessage(error.message || "Unable to prepare courier booking.");
+    } finally {
+      setDeliveryActionLoading(false);
+    }
+  }
+
+  async function requestLalamoveQuote() {
+    if (!deliveryDetail?.delivery_id) return;
+    setDeliveryActionLoading(true);
+    setDeliveryActionMessage("");
+    setErrorMessage("");
+    try {
+      const { data, error } = await supabase.functions.invoke("create-delivery-booking", {
+        body: { delivery_id: deliveryDetail.delivery_id, action: "quote" },
+      });
+      if (error) throw error;
+      if (!data?.success || !data?.quote) throw new Error(data?.message || "Unable to get Lalamove quotation.");
+      setLalamoveQuote({
+        quotationId: data.quote.quotation_id,
+        serviceType: data.quote.service_type,
+        expiresAt: data.quote.expires_at,
+        priceBreakdown: { total: String(data.quote.total), currency: data.quote.currency },
+        distance: data.quote.distance,
+      });
+      setLalamoveEnvironment(data.environment || "SANDBOX");
+      await loadDeliveryDetail(deliveryDetail.delivery_id);
+      setDeliveryActionMessage(`Lalamove quote received: ${formatCurrency(data.quote.total)} ${data.quote.currency}.`);
+    } catch (error) {
+      setErrorMessage(error.message || "Unable to get Lalamove quotation.");
+    } finally {
+      setDeliveryActionLoading(false);
+    }
+  }
+
+  async function bookLalamoveDelivery() {
+    if (!deliveryDetail?.delivery_id) return;
+    const live = String(lalamoveEnvironment).toUpperCase() === "PRODUCTION";
+    if (live && !window.confirm("This will create a real Lalamove delivery order and charge the production wallet. Continue?")) return;
+    setDeliveryActionLoading(true);
+    setDeliveryActionMessage("");
+    setErrorMessage("");
+    try {
+      const { data, error } = await supabase.functions.invoke("create-delivery-booking", {
+        body: {
+          delivery_id: deliveryDetail.delivery_id,
+          action: "book",
+          confirm_live_booking: live,
+        },
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.message || "Unable to create Lalamove delivery order.");
+      await loadDeliveryDetail(deliveryDetail.delivery_id);
+      setDeliveryActionMessage(data.already_booked ? "This delivery is already booked." : `Lalamove order created (${data.environment || lalamoveEnvironment}).`);
+    } catch (error) {
+      setErrorMessage(error.message || "Unable to create Lalamove delivery order.");
+    } finally {
+      setDeliveryActionLoading(false);
+    }
+  }
+
+  async function syncLalamoveStatus() {
+    if (!deliveryDetail?.delivery_id) return;
+    setDeliveryActionLoading(true);
+    setDeliveryActionMessage("");
+    setErrorMessage("");
+    try {
+      const { data, error } = await supabase.functions.invoke("create-delivery-booking", {
+        body: { delivery_id: deliveryDetail.delivery_id, action: "sync" },
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.message || "Unable to refresh Lalamove delivery status.");
+      await loadDeliveryDetail(deliveryDetail.delivery_id);
+      setDeliveryActionMessage(`Lalamove status updated: ${statusLabel(data.provider_status)}.`);
+    } catch (error) {
+      setErrorMessage(error.message || "Unable to refresh Lalamove delivery status.");
     } finally {
       setDeliveryActionLoading(false);
     }
@@ -507,7 +588,7 @@ export default function DeliveriesPage({ client, detailRequest, goToDeliveries, 
                     <p>{deliveryDetail.item_label || (deliveryDetail.order_group_id ? "Consolidated shipment" : "Shipment")}</p>
                   </div>
                   <div className="header-actions">
-                    {deliveryDetail.tracking_number && (
+                    {deliveryDetail.tracking_number && String(deliveryDetail.courier_code || "").toUpperCase() !== "LALAMOVE" && (
                       <button className="secondary-button" type="button" onClick={printParcelLabel}>
                         Print Parcel Label
                       </button>
@@ -565,6 +646,31 @@ export default function DeliveriesPage({ client, detailRequest, goToDeliveries, 
 
                 {deliveryDetail.delivery_status === "READY_FOR_BOOKING" && (
                   <section className="form-card">
+                    {String(deliveryDetail.courier_code || "").toUpperCase() === "LALAMOVE" ? (
+                      <>
+                        <div className="form-card-header">
+                          <div>
+                            <h2>Lalamove delivery</h2>
+                            <p>Get a quotation first. Creating an order is a separate action and uses the selected Lalamove environment.</p>
+                          </div>
+                          <button className="secondary-button" type="button" disabled={deliveryActionLoading} onClick={requestLalamoveQuote}>
+                            {deliveryActionLoading ? "Working..." : "Get Lalamove Quote"}
+                          </button>
+                        </div>
+                        {lalamoveQuote && (
+                          <div className="detail-card">
+                            <DetailRow label="Environment" value={lalamoveEnvironment} />
+                            <DetailRow label="Service type" value={lalamoveQuote.serviceType || deliveryDetail.courier_service_type || "-"} />
+                            <DetailRow label="Quoted delivery cost" value={`${formatCurrency(lalamoveQuote.priceBreakdown?.total)} ${lalamoveQuote.priceBreakdown?.currency || "PHP"}`} />
+                            <DetailRow label="Quote expires" value={formatDateTime(lalamoveQuote.expiresAt)} />
+                            <button className="primary-button" type="button" disabled={deliveryActionLoading || (lalamoveQuote.expiresAt && new Date(lalamoveQuote.expiresAt).getTime() <= Date.now())} onClick={bookLalamoveDelivery}>
+                              {deliveryActionLoading ? "Submitting..." : lalamoveEnvironment === "PRODUCTION" ? "Create Live Lalamove Order" : "Create Sandbox Lalamove Order"}
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                    <>
                     <div className="form-card-header">
                       <div>
                         <h2>Confirm Manual Courier Booking</h2>
@@ -602,10 +708,24 @@ export default function DeliveriesPage({ client, detailRequest, goToDeliveries, 
                         </button>
                       </div>
                     </form>
+                    </>
+                    )}
                   </section>
                 )}
 
-                {deliveryDetail.delivery_status === "BOOKED" && deliveryDetail.fulfillment_method === "CLIENT_DROP_OFF" && (
+                {String(deliveryDetail.courier_code || "").toUpperCase() === "LALAMOVE" && ["BOOKED", "PICKED_UP", "DROPPED_OFF", "IN_TRANSIT"].includes(deliveryDetail.delivery_status) && (
+                  <section className="action-card">
+                    <div>
+                      <h2>Lalamove status</h2>
+                      <p>Refresh the order status from Lalamove. This only checks this delivery when you request it.</p>
+                    </div>
+                    <button className="primary-button" disabled={deliveryActionLoading} onClick={syncLalamoveStatus}>
+                      {deliveryActionLoading ? "Refreshing..." : "Refresh Lalamove Status"}
+                    </button>
+                  </section>
+                )}
+
+                {String(deliveryDetail.courier_code || "").toUpperCase() !== "LALAMOVE" && deliveryDetail.delivery_status === "BOOKED" && deliveryDetail.fulfillment_method === "CLIENT_DROP_OFF" && (
                   <section className="action-card">
                     <div>
                       <h2>Confirm Parcel Drop-off</h2>
@@ -617,7 +737,7 @@ export default function DeliveriesPage({ client, detailRequest, goToDeliveries, 
                   </section>
                 )}
 
-                {deliveryDetail.delivery_status === "BOOKED" && deliveryDetail.fulfillment_method !== "CLIENT_DROP_OFF" && (
+                {String(deliveryDetail.courier_code || "").toUpperCase() !== "LALAMOVE" && deliveryDetail.delivery_status === "BOOKED" && deliveryDetail.fulfillment_method !== "CLIENT_DROP_OFF" && (
                   <section className="action-card">
                     <div>
                       <h2>Parcel Pickup</h2>
@@ -629,14 +749,14 @@ export default function DeliveriesPage({ client, detailRequest, goToDeliveries, 
                   </section>
                 )}
 
-                {["PICKED_UP", "DROPPED_OFF"].includes(deliveryDetail.delivery_status) && (
+                {String(deliveryDetail.courier_code || "").toUpperCase() !== "LALAMOVE" && ["PICKED_UP", "DROPPED_OFF"].includes(deliveryDetail.delivery_status) && (
                   <section className="action-card">
                     <div><h2>Shipment In Transit</h2><p>Use this when the parcel is moving through the courier network.</p></div>
                     <button className="primary-button" disabled={deliveryActionLoading} onClick={() => updateDeliveryStatus("IN_TRANSIT")}>Mark In Transit</button>
                   </section>
                 )}
 
-                {deliveryDetail.delivery_status === "IN_TRANSIT" && (
+                {String(deliveryDetail.courier_code || "").toUpperCase() !== "LALAMOVE" && deliveryDetail.delivery_status === "IN_TRANSIT" && (
                   <section className="action-card">
                     <div><h2>Delivery Completion</h2><p>Use this only after the parcel reaches the recipient.</p></div>
                     <button className="primary-button" disabled={deliveryActionLoading} onClick={() => updateDeliveryStatus("DELIVERED")}>Mark Delivered</button>
