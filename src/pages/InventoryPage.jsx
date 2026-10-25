@@ -10,6 +10,54 @@ import {
 } from "../supabase";
 import PhotoGalleryViewer from "../components/PhotoGalleryViewer";
 
+let inventoryHeicConverterPromise = null;
+
+function isHeicInventoryImage(file) {
+  return /\.hei[cf]$/i.test(String(file?.name || "")) ||
+    /^image\/hei[cf](?:-sequence)?$/i.test(String(file?.type || ""));
+}
+
+async function getInventoryHeicConverter() {
+  if (typeof window.heic2any === "function") return window.heic2any;
+  if (!inventoryHeicConverterPromise) {
+    inventoryHeicConverterPromise = new Promise((resolve, reject) => {
+      const existing = document.querySelector('script[data-eo2mate-heic-converter="true"]');
+      const script = existing || document.createElement("script");
+      const finish = () => {
+        if (typeof window.heic2any === "function") resolve(window.heic2any);
+        else reject(new Error("The HEIC converter did not load."));
+      };
+      script.addEventListener("load", finish, { once: true });
+      script.addEventListener("error", () => {
+        script.remove();
+        reject(new Error("Unable to load the HEIC converter."));
+      }, { once: true });
+      if (!existing) {
+        script.src = "https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js";
+        script.async = true;
+        script.dataset.eo2mateHeicConverter = "true";
+        document.head.appendChild(script);
+      } else if (script.dataset.loaded === "true") {
+        finish();
+      }
+      script.addEventListener("load", () => { script.dataset.loaded = "true"; }, { once: true });
+    }).catch((error) => {
+      inventoryHeicConverterPromise = null;
+      throw error;
+    });
+  }
+  return inventoryHeicConverterPromise;
+}
+
+async function convertInventoryHeicToJpeg(file) {
+  const convert = await getInventoryHeicConverter();
+  const converted = await convert({ blob: file, toType: "image/jpeg", quality: 0.92 });
+  const jpegBlob = Array.isArray(converted) ? converted[0] : converted;
+  if (!(jpegBlob instanceof Blob)) throw new Error(`${file.name}: HEIC conversion returned no image.`);
+  const baseName = String(file.name || "eo2mate-inventory-image").replace(/\.[^.]+$/, "");
+  return new File([jpegBlob], `${baseName}.jpg`, { type: "image/jpeg", lastModified: Date.now() });
+}
+
 
 const EMPTY_ITEM = {
   inventory_item_id: "",
@@ -1157,6 +1205,9 @@ export default function InventoryPage({
         files.length;
         index++
       ) {
+        const uploadFile = isHeicInventoryImage(files[index])
+          ? await convertInventoryHeicToJpeg(files[index])
+          : files[index];
         const form =
           new FormData();
 
@@ -1188,12 +1239,8 @@ export default function InventoryPage({
 
         form.append(
           "file",
-          files[
-            index
-          ],
-          files[
-            index
-          ].name,
+          uploadFile,
+          uploadFile.name,
         );
 
         const {
@@ -1308,7 +1355,10 @@ export default function InventoryPage({
       form.append("client_id", client.client_id);
 
       for (const file of files) {
-        form.append("files", file, file.name);
+        const uploadFile = isHeicInventoryImage(file)
+          ? await convertInventoryHeicToJpeg(file)
+          : file;
+        form.append("files", uploadFile, uploadFile.name);
       }
 
       const { data, error } =
@@ -2503,7 +2553,7 @@ export default function InventoryPage({
                 type="file"
                 hidden
                 multiple
-                accept="image/jpeg,image/png,image/webp"
+                accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/heic-sequence,image/heif-sequence,.heic,.heif"
                 onChange={(event) =>
                   uploadImageBatch(event.target.files)
                 }
@@ -4016,7 +4066,7 @@ export default function InventoryPage({
                 type="file"
                 hidden
                 multiple
-                accept="image/jpeg,image/png,image/webp"
+                accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/heic-sequence,image/heif-sequence,.heic,.heif"
                 onChange={
                   (
                     event,
