@@ -742,15 +742,8 @@ export default function InventoryPage({
       {
         ...EMPTY_ITEM,
 
-        page_scope_mode:
-          selectedFbPageId && pages.some((page) => String(page.fb_page_id) === String(selectedFbPageId))
-            ? "SELECTED"
-            : "ALL",
-
-        page_ids:
-          selectedFbPageId && pages.some((page) => String(page.fb_page_id) === String(selectedFbPageId))
-            ? [String(selectedFbPageId)]
-            : [],
+        page_scope_mode: "ALL",
+        page_ids: [],
 
         inventory_owner_id:
           defaultOwner
@@ -4021,6 +4014,7 @@ export default function InventoryPage({
 
       {
         imageModal &&
+        !photoViewer &&
         selectedItem &&
         (
           <div className="inventory-modal-backdrop">

@@ -3184,6 +3184,46 @@ export default function FacebookPostPage({
           white-space: nowrap;
         }
 
+        .fb-photo-grid.multiple {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          align-items: start;
+        }
+
+        .fb-photo-grid.multiple > .fb-photo-card {
+          min-width: 0;
+        }
+
+        .fb-photo-grid.multiple .fb-photo-positioner {
+          height: auto;
+          aspect-ratio: 1 / 1;
+        }
+
+        .fb-photo-grid.multiple .fb-item-editor {
+          grid-template-columns: minmax(0, 1fr);
+        }
+
+        .fb-photo-grid.multiple .fb-item-editor label,
+        .fb-photo-grid.multiple .fb-item-editor input,
+        .fb-photo-grid.multiple .fb-item-editor select {
+          min-width: 0;
+          max-width: 100%;
+          box-sizing: border-box;
+        }
+
+        .fb-photo-grid.multiple .fb-item-editor .fb-post-setup-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        }
+
+        .fb-photo-grid.multiple .fb-item-editor .eo2-mining-rules-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        }
+
+        @media (max-width: 900px) {
+          .fb-photo-grid.multiple {
+            grid-template-columns: 1fr;
+          }
+        }
+
         .primary-button,
         .secondary-button,
         .icon-button {
@@ -3819,7 +3859,7 @@ export default function FacebookPostPage({
           </>
           )
         ) : (
-          <div className="fb-photo-grid">
+          <div className={`fb-photo-grid ${isMultiple ? "multiple" : "single"}`}>
             {items.map((item, index) => (
               <article
                 key={item.id}
