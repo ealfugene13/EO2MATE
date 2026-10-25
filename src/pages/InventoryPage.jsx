@@ -185,6 +185,15 @@ function primaryImage(
 }
 
 
+function orderedInventoryImages(images) {
+  return [...(images || [])].sort((a, b) => {
+    const primaryDifference = Number(b?.is_primary === true) - Number(a?.is_primary === true);
+    if (primaryDifference) return primaryDifference;
+    return Number(a?.display_order || 0) - Number(b?.display_order || 0);
+  });
+}
+
+
 function statusClass(
   status,
 ) {
@@ -1128,7 +1137,7 @@ export default function InventoryPage({
   }
 
   function openPhotoGallery(item, startImage = null) {
-    const sourceImages = (item?.images || [])
+    const sourceImages = orderedInventoryImages(item?.images)
       .map((image) => ({
         src: image.signed_url || image.url || "",
         alt: image.original_file_name || item.item_name || "Inventory photo",
@@ -1143,6 +1152,39 @@ export default function InventoryPage({
       index: targetIndex >= 0 ? targetIndex : 0,
       title: `${item.item_code ? `${item.item_code} · ` : ""}${item.item_name || "Inventory photos"}`,
     });
+  }
+
+
+  async function setPrimaryImage(image) {
+    const inventoryItemId = selectedItem?.inventory_item_id;
+    const inventoryImageId = image?.inventory_image_id;
+    if (!inventoryItemId || !inventoryImageId || image?.is_primary === true) return;
+
+    setProcessing(true);
+    setMessage("");
+    setErrorMessage("");
+
+    try {
+      await invoke({
+        action: "SET_PRIMARY_IMAGE",
+        client_id: client.client_id,
+        inventory_item_id: inventoryItemId,
+        inventory_image_id: inventoryImageId,
+      });
+
+      const refreshed = await invoke({
+        action: "GET_ITEM",
+        client_id: client.client_id,
+        inventory_item_id: inventoryItemId,
+      });
+      setSelectedItem(refreshed.item);
+      await loadItems();
+      setMessage("Main cover image updated. It will be selected first when posting.");
+    } catch (error) {
+      setErrorMessage(error?.message || "Unable to update the main cover image.");
+    } finally {
+      setProcessing(false);
+    }
   }
 
 
@@ -4090,11 +4132,7 @@ export default function InventoryPage({
 
               <div className="inventory-image-grid">
                 {
-                  (
-                    selectedItem
-                      .images ||
-                    []
-                  ).map(
+                  orderedInventoryImages(selectedItem.images).map(
                     (
                       image,
                     ) => (
@@ -4128,13 +4166,19 @@ export default function InventoryPage({
                         }
 
                         <div className="inventory-image-meta">
-                          {
-                            image
-                              .is_primary
-                              ? "Primary image"
-                              : `Image ${image.display_order}`
-                          }
+                          {image.is_primary ? "Main cover image" : `Image ${image.display_order}`}
                         </div>
+
+                        <button
+                          type="button"
+                          className={image.is_primary ? "primary-button" : "secondary-button"}
+                          onClick={() => setPrimaryImage(image)}
+                          disabled={processing || image.is_primary === true}
+                          aria-pressed={image.is_primary === true}
+                          style={{ width: "100%", marginTop: 8 }}
+                        >
+                          {image.is_primary ? "✓ Main cover" : "Set as main cover"}
+                        </button>
                       </div>
                     ),
                   )
