@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../supabase";
+import PhotoGalleryViewer from "../components/PhotoGalleryViewer";
 import Eo2DatePicker from "../components/Eo2DatePicker";
 import { captionTemplateSettingKey, DEFAULT_POST_CAPTION_TEMPLATES, renderPostCaptionTemplate, decorateGeneratedCaption } from "../postCaptionTemplates";
 
@@ -898,6 +899,8 @@ export default function FacebookPostPage({
   const [environment, setEnvironment] = useState("");
   const [postType, setPostType] = useState("");
   const [sellerCaption, setSellerCaption] = useState("");
+  const [closingTrailerCaption, setClosingTrailerCaption] = useState("");
+  const [photoViewer, setPhotoViewer] = useState(null);
   const [captionHelperTab, setCaptionHelperTab] = useState("emoji");
   const [recentCaptionCharacters, setRecentCaptionCharacters] = useState(() => {
     try {
@@ -958,6 +961,21 @@ export default function FacebookPostPage({
   const [fileInputKey, setFileInputKey] = useState(0);
 
   itemsRef.current = items;
+
+  function openPostPhotoGallery(startIndex = 0) {
+    const photos = items
+      .map((item, index) => ({
+        src: item.previewUrl,
+        alt: `Post photo ${index + 1}`,
+      }))
+      .filter((photo) => photo.src);
+    if (!photos.length) return;
+    setPhotoViewer({
+      photos,
+      index: Math.max(0, Math.min(startIndex, photos.length - 1)),
+      title: "Post photos",
+    });
+  }
 
   useEffect(() => {
     loadPostingSetup();
@@ -2214,6 +2232,7 @@ export default function FacebookPostPage({
     setPostType(nextPostType || (resetTypes.length ? String(resetTypes[0].post_type_code).toUpperCase() : ""));
 
     setSellerCaption("");
+    setClosingTrailerCaption("");
     setSingleItem("");
     setSingleItemSource("MANUAL");
     setSingleInventoryItemId("");
@@ -2281,7 +2300,7 @@ export default function FacebookPostPage({
     if(!confirmed){setConfirmPopup({mode:"REGULAR_SALE",title:`Publish ${isMultiple?"Multiple":"Single"} Regular Sale?`,page:getPageLabel(selectedPage),type:isMultiple?"Multiple Regular Sale":"Single Regular Sale",images:items.length});return;}
     setPublishing(true); setErrorMessage(""); setFailurePopup(null);
     try {
-      const payload={client_id:client.client_id,fb_page_id:selectedPageId,ends_at:regularSaleEndDate ? new Date(regularSaleEndDate).toISOString() : null,discount_type:regularSaleDiscountType,discount_value:regularSaleDiscountType === "NONE" ? null : Number(regularSaleDiscountValue),post_type:isMultiple?"MULTIPLE":"SINGLE",main_caption:mainCaption,max_quantity_per_buyer:regularSaleMaxPerBuyer===""?null:Number(regularSaleMaxPerBuyer),...(isMultiple?{items:items.map((item)=>({item_label:item.item.trim(),item_source:item.itemSource||"MANUAL",inventory_item_id:(item.itemSource||"MANUAL")==="INVENTORY"?item.inventoryItemId:null,inventory_image_id:(item.itemSource||"MANUAL")==="INVENTORY"?item.inventoryImageId:null,original_unit_price:normalizeMoney(item.regularSalePrice!==""?item.regularSalePrice:regularSalePrice),unit_price:regularSaleEffectivePrice(item.regularSalePrice!==""?item.regularSalePrice:regularSalePrice),quantity_limit:Number(item.regularSaleQuantity!==""?item.regularSaleQuantity:regularSaleQuantity),max_quantity_per_buyer:item.regularSaleMaxPerBuyer===""?null:Number(item.regularSaleMaxPerBuyer)})),photo_captions:photoCaptions}:{item:{item_label:singleItem.trim(),item_source:singleItemSource,inventory_item_id:singleItemSource==="INVENTORY"?singleInventoryItemId:null,original_unit_price:normalizeMoney(regularSalePrice),unit_price:regularSaleEffectivePrice(regularSalePrice),quantity_limit:Number(regularSaleQuantity),max_quantity_per_buyer:regularSaleMaxPerBuyer===""?null:Number(regularSaleMaxPerBuyer)}})};
+      const payload={client_id:client.client_id,fb_page_id:selectedPageId,ends_at:regularSaleEndDate ? new Date(regularSaleEndDate).toISOString() : null,discount_type:regularSaleDiscountType,discount_value:regularSaleDiscountType === "NONE" ? null : Number(regularSaleDiscountValue),post_type:isMultiple?"MULTIPLE":"SINGLE",main_caption:mainCaption,closing_caption:closingTrailerCaption.trim(),max_quantity_per_buyer:regularSaleMaxPerBuyer===""?null:Number(regularSaleMaxPerBuyer),...(isMultiple?{items:items.map((item)=>({item_label:item.item.trim(),item_source:item.itemSource||"MANUAL",inventory_item_id:(item.itemSource||"MANUAL")==="INVENTORY"?item.inventoryItemId:null,inventory_image_id:(item.itemSource||"MANUAL")==="INVENTORY"?item.inventoryImageId:null,original_unit_price:normalizeMoney(item.regularSalePrice!==""?item.regularSalePrice:regularSalePrice),unit_price:regularSaleEffectivePrice(item.regularSalePrice!==""?item.regularSalePrice:regularSalePrice),quantity_limit:Number(item.regularSaleQuantity!==""?item.regularSaleQuantity:regularSaleQuantity),max_quantity_per_buyer:item.regularSaleMaxPerBuyer===""?null:Number(item.regularSaleMaxPerBuyer)})),photo_captions:photoCaptions}:{item:{item_label:singleItem.trim(),item_source:singleItemSource,inventory_item_id:singleItemSource==="INVENTORY"?singleInventoryItemId:null,original_unit_price:normalizeMoney(regularSalePrice),unit_price:regularSaleEffectivePrice(regularSalePrice),quantity_limit:Number(regularSaleQuantity),max_quantity_per_buyer:regularSaleMaxPerBuyer===""?null:Number(regularSaleMaxPerBuyer)}})};
       const formData=new FormData(); formData.append("payload",JSON.stringify(payload)); await appendRenderedPostImages(formData, items);
       const {data,error}=await supabase.functions.invoke("meta",{headers:{"x-eo2mate-meta-route":"regular-sale-publish"},body:formData}); if(error)throw error; if(!data?.success)throw new Error(data?.message||data?.error||"Regular Sale publishing failed.");
       const successData={...data,page_name:getPageLabel(selectedPage),environment,post_type_display_name:isMultiple?"Multiple Regular Sale":"Single Regular Sale",mode_display_name:"Regular Sale"}; resetFormForNewPost({keepSuccessPopup:true}); setSuccessPopup(successData);
@@ -2298,7 +2317,7 @@ export default function FacebookPostPage({
     }
     setPublishing(true);setErrorMessage("");setFailurePopup(null);
     try{
-      const payload={client_id:client.client_id,fb_page_id:selectedPageId,post_type:isMultiple?"MULTIPLE":"SINGLE",main_caption:mainCaption,mine_price:normalizeMoney(miningMinePrice),take_price:normalizeMoney(miningTakePrice),lock_price:normalizeMoney(miningLockPrice),ends_at:phDateFromLocalInput(miningEndDate)?.toISOString(),...(isMultiple?{items:items.map(item=>({item_label:item.item.trim(),item_source:item.itemSource||"MANUAL",inventory_item_id:item.itemSource==="INVENTORY"?item.inventoryItemId:null,inventory_image_id:item.itemSource==="INVENTORY"?item.inventoryImageId:null,mine_price:item.miningMinePrice===""?null:normalizeMoney(item.miningMinePrice),take_price:item.miningTakePrice===""?null:normalizeMoney(item.miningTakePrice),lock_price:item.miningLockPrice===""?null:normalizeMoney(item.miningLockPrice),ends_at:item.miningEndDate?phDateFromLocalInput(item.miningEndDate)?.toISOString():null})),photo_captions:photoCaptions}:{item:{item_label:singleItem.trim()}})};
+      const payload={client_id:client.client_id,fb_page_id:selectedPageId,post_type:isMultiple?"MULTIPLE":"SINGLE",main_caption:mainCaption,closing_caption:closingTrailerCaption.trim(),mine_price:normalizeMoney(miningMinePrice),take_price:normalizeMoney(miningTakePrice),lock_price:normalizeMoney(miningLockPrice),ends_at:phDateFromLocalInput(miningEndDate)?.toISOString(),...(isMultiple?{items:items.map(item=>({item_label:item.item.trim(),item_source:item.itemSource||"MANUAL",inventory_item_id:item.itemSource==="INVENTORY"?item.inventoryItemId:null,inventory_image_id:item.itemSource==="INVENTORY"?item.inventoryImageId:null,mine_price:item.miningMinePrice===""?null:normalizeMoney(item.miningMinePrice),take_price:item.miningTakePrice===""?null:normalizeMoney(item.miningTakePrice),lock_price:item.miningLockPrice===""?null:normalizeMoney(item.miningLockPrice),ends_at:item.miningEndDate?phDateFromLocalInput(item.miningEndDate)?.toISOString():null})),photo_captions:photoCaptions}:{item:{item_label:singleItem.trim()}})};
       const formData=new FormData();formData.append("payload",JSON.stringify(payload));await appendRenderedPostImages(formData, items);
       const {data,error}=await supabase.functions.invoke("meta",{headers:{"x-eo2mate-meta-route":"mining-publish"},body:formData});if(error)throw error;if(!data?.success)throw new Error(data?.message||data?.error||"Mining publishing failed.");
       const successData={...data,page_name:getPageLabel(selectedPage),environment,post_type_display_name:isMultiple?"Multiple Mining":"Single Mining",mode_display_name:"Mining"};resetFormForNewPost({keepSuccessPopup:true});setSuccessPopup(successData);
@@ -2326,6 +2345,7 @@ export default function FacebookPostPage({
         fb_page_id: selectedPageId,
         post_type: isMultiple ? "MULTIPLE" : "SINGLE",
         main_caption: mainCaption,
+        closing_caption: closingTrailerCaption.trim(),
         ends_at: phDateFromLocalInput(preorderDeadline)?.toISOString(),
         payment_deadline_at: phDateFromLocalInput(preorderPaymentDeadline)?.toISOString(),
         payment_requirement: preorderPaymentRequirement === "FULL_PAYMENT" ? "FULL" : (preorderDownPaymentType === "PERCENTAGE" ? "DEPOSIT_PERCENT" : "DEPOSIT_AMOUNT"),
@@ -2422,6 +2442,9 @@ export default function FacebookPostPage({
 
         main_caption:
           mainCaption,
+
+        closing_caption:
+          closingTrailerCaption.trim(),
 
         auction_item_label: isMultiple ? null : singleItem.trim(),
         auction_rules: { ...sharedRules },
@@ -2881,6 +2904,27 @@ export default function FacebookPostPage({
           line-height: 1.55;
         }
 
+        .fb-post-caption-fields {
+          display: grid;
+          gap: 12px;
+          align-content: start;
+          min-width: 0;
+        }
+
+        .fb-post-caption-fields .fb-seller-caption-field textarea {
+          min-height: 112px;
+        }
+
+        .fb-post-caption-fields .fb-seller-caption-field:first-child textarea {
+          min-height: 142px;
+        }
+
+        .eo2-optional-caption {
+          color: #718096;
+          font-size: .72rem;
+          font-weight: 600;
+        }
+
         .fb-posting-panel select {
           appearance: none;
           -webkit-appearance: none;
@@ -3106,23 +3150,22 @@ export default function FacebookPostPage({
         .fb-photo-positioner {
           position: relative;
           overflow: hidden;
-          aspect-ratio: 1 / 1;
-          cursor: grab;
-          touch-action: none;
+          display: block;
+          width: 100%;
+          height: 220px;
+          padding: 0;
+          border: 0;
+          cursor: zoom-in;
           user-select: none;
           background: #f4f6f8;
-        }
-
-        .fb-photo-positioner:active {
-          cursor: grabbing;
         }
 
         .fb-photo-positioner > img {
           display: block;
           width: 100%;
           height: 100%;
-          object-fit: cover;
-          pointer-events: none;
+          object-fit: contain;
+          pointer-events: auto;
           user-select: none;
         }
 
@@ -3428,20 +3471,29 @@ export default function FacebookPostPage({
         </div>
 
         <div className="fb-caption-tools-layout">
-          <label className="fb-seller-caption-field">
-            Seller Caption
-
-            <textarea
-              ref={sellerCaptionRef}
-              rows="5"
-              value={sellerCaption}
-              onChange={(e) =>
-                setSellerCaption(e.target.value)
-              }
-              disabled={publishing}
-              placeholder="Write an optional introduction for your post. Use the helpers to insert emojis, symbols, or quick text."
-            />
-          </label>
+          <div className="fb-post-caption-fields">
+            <label className="fb-seller-caption-field">
+              Existing Caption
+              <textarea
+                ref={sellerCaptionRef}
+                rows="5"
+                value={sellerCaption}
+                onChange={(e) => setSellerCaption(e.target.value)}
+                disabled={publishing}
+                placeholder="Write an optional introduction for your post. Use the helpers to insert emojis, symbols, or quick text."
+              />
+            </label>
+            <label className="fb-seller-caption-field">
+              Additional Trailer Caption for Closing <span className="eo2-optional-caption">Optional</span>
+              <textarea
+                rows="3"
+                value={closingTrailerCaption}
+                onChange={(e) => setClosingTrailerCaption(e.target.value)}
+                disabled={publishing}
+                placeholder="This text will be added to the system's closing comment when the post ends."
+              />
+            </label>
+          </div>
 
           <aside className="fb-caption-helpers" aria-label="Caption helpers">
             <div className="fb-caption-helpers-heading">
@@ -3773,15 +3825,20 @@ export default function FacebookPostPage({
                 key={item.id}
                 className="fb-photo-card"
               >
-                <div className="fb-photo-positioner" aria-label={`Post image ${index + 1}`}>
+                <button
+                  type="button"
+                  className="fb-photo-positioner"
+                  aria-label={`Open post image ${index + 1}`}
+                  onClick={() => openPostPhotoGallery(index)}
+                >
                   <img
                     src={item.previewUrl}
                     alt={`Post ${index + 1}`}
                     draggable="false"
-                    style={{ objectPosition: "50% 50%", background: "#f4f6f8" }}
+                    style={{ background: "#f4f6f8" }}
                   />
-                  <span className="fb-photo-position-hint">EO2MATE automatically prepares a centered 1080×1080 image for Meta</span>
-                </div>
+                  <span className="fb-photo-position-hint">Click to view · posts as 1080×1080</span>
+                </button>
 
                 <button type="button" onClick={() => removeItem(item.id)}>Remove</button>
                 {isMultiple && (
@@ -3947,6 +4004,11 @@ export default function FacebookPostPage({
                 {mainCaption ||
                   "Your generated Facebook caption will appear here."}
               </pre>
+            </div>
+
+            <div className="fb-facebook-preview fb-closing-caption-preview">
+              <strong>Closing comment preview</strong>
+              <pre>{closingTrailerCaption.trim() || "No additional trailer caption. The system's standard closing message will be used."}</pre>
             </div>
 
             {isMultiple && (
@@ -4147,6 +4209,14 @@ export default function FacebookPostPage({
           </div>
         </div>
       )}
+
+      {photoViewer && <PhotoGalleryViewer
+        photos={photoViewer.photos}
+        index={photoViewer.index}
+        title={photoViewer.title}
+        onIndexChange={(index) => setPhotoViewer((current) => current ? { ...current, index } : current)}
+        onClose={() => setPhotoViewer(null)}
+      />}
     </>
   );
 
