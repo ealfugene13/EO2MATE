@@ -1384,20 +1384,27 @@ export default function InventoryPage({
     setMessage("");
     setErrorMessage("");
 
-    try {
-      const form = new FormData();
-      form.append("action", "IMAGE_BATCH_UPLOAD");
-      form.append("client_id", client.client_id);
+    let currentBatch = null;
+    const uploadedImages = [];
 
-      for (const file of files) {
+    try {
+      for (let index = 0; index < files.length; index += 1) {
+        const file = files[index];
         const uploadFile = isHeicInventoryImage(file)
           ? await convertInventoryHeicToJpeg(file)
           : file;
+        const form = new FormData();
+        form.append("action", "IMAGE_BATCH_UPLOAD");
+        form.append("client_id", client.client_id);
+        if (currentBatch?.inventory_image_upload_batch_id) {
+          form.append(
+            "inventory_image_upload_batch_id",
+            currentBatch.inventory_image_upload_batch_id,
+          );
+        }
         form.append("files", uploadFile, uploadFile.name);
-      }
 
-      const { data, error } =
-        await supabase.functions.invoke(
+        const { data, error } = await supabase.functions.invoke(
           "eo2mate",
           {
             headers: { "x-eo2mate-route": "inventory-admin" },
@@ -1405,19 +1412,18 @@ export default function InventoryPage({
           },
         );
 
-      if (error) {
-        throw error;
-      }
+        if (error) throw error;
+        if (!data?.success) {
+          throw new Error(data?.message || "Unable to upload image batch.");
+        }
 
-      if (!data?.success) {
-        throw new Error(
-          data?.message ||
-          "Unable to upload image batch.",
-        );
+        currentBatch = data.batch;
+        uploadedImages.push(...(data.batch?.images || []));
+        setMessage(`Uploading images: ${index + 1} of ${files.length} complete.`);
       }
 
       const nextAssignments = {};
-      for (const image of data.batch?.images || []) {
+      for (const image of uploadedImages) {
         nextAssignments[image.inventory_image_upload_item_id] = {
           inventory_item_id: "",
           is_primary: false,
@@ -1425,16 +1431,27 @@ export default function InventoryPage({
         };
       }
 
-      setImageBatch(data.batch);
+      setImageBatch({ ...currentBatch, images: uploadedImages });
       setImageAssignments(nextAssignments);
       setImageBatchModal(true);
-      setMessage(
-        `${files.length} image(s) uploaded. Assign each image, review, then save.`,
-      );
+      setMessage(`${uploadedImages.length} image(s) uploaded. Assign each image, review, then save.`);
     } catch (error) {
+      if (uploadedImages.length && currentBatch) {
+        const nextAssignments = {};
+        for (const image of uploadedImages) {
+          nextAssignments[image.inventory_image_upload_item_id] = {
+            inventory_item_id: "",
+            is_primary: false,
+            display_order: 1,
+          };
+        }
+        setImageBatch({ ...currentBatch, images: uploadedImages });
+        setImageAssignments(nextAssignments);
+        setImageBatchModal(true);
+        setMessage(`${uploadedImages.length} of ${files.length} image(s) uploaded. You can assign these now.`);
+      }
       setErrorMessage(
-        error?.message ||
-        "Unable to upload image batch.",
+        `${error?.message || "Unable to upload image batch."}${uploadedImages.length ? ` ${uploadedImages.length} image(s) were uploaded successfully.` : ""}`,
       );
     } finally {
       if (imageBatchInputRef.current) {
@@ -1450,14 +1467,50 @@ export default function InventoryPage({
     changes,
   ) {
     setImageAssignments(
-      (current) => ({
-        ...current,
-        [imageId]: {
-          ...(current[imageId] || {}),
-          ...changes,
-        },
-      }),
+      (current) => {
+        const next = {
+          ...current,
+          [imageId]: {
+            ...(current[imageId] || {}),
+            ...changes,
+          },
+        };
+
+        if (changes.is_primary === true) {
+          const selectedItemId = next[imageId]?.inventory_item_id;
+          for (const [otherImageId, assignment] of Object.entries(next)) {
+            if (
+              otherImageId !== imageId &&
+              assignment.inventory_item_id === selectedItemId
+            ) {
+              next[otherImageId] = { ...assignment, is_primary: false };
+            }
+          }
+        }
+
+        return next;
+      },
     );
+  }
+
+
+  function getNextImageDisplayOrder(inventoryItemId, currentImageId) {
+    if (!inventoryItemId) return 1;
+
+    const existingOrders =
+      items
+        .find((item) => item.inventory_item_id === inventoryItemId)
+        ?.images
+        ?.map((image) => Number(image.display_order || 0)) || [];
+
+    const stagedOrders =
+      (imageBatch?.images || [])
+        .filter((image) => image.inventory_image_upload_item_id !== currentImageId)
+        .map((image) => imageAssignments[image.inventory_image_upload_item_id])
+        .filter((assignment) => assignment?.inventory_item_id === inventoryItemId)
+        .map((assignment) => Number(assignment.display_order || 0));
+
+    return Math.max(0, ...existingOrders, ...stagedOrders) + 1;
   }
 
 
@@ -3931,7 +3984,8 @@ export default function InventoryPage({
                 <div>
                   <h2>Assign Inventory Images</h2>
                   <p>
-                    Review uploaded images and assign each one to the correct product/SKU.
+                    Select the same product/SKU for multiple images to add them all to its gallery.
+                    Each image gets its own display order; choose one primary image per product/SKU.
                     Unassigned images will remain uncommitted.
                   </p>
                 </div>
@@ -3974,7 +4028,17 @@ export default function InventoryPage({
                           onChange={(event) =>
                             updateImageAssignment(
                               image.inventory_image_upload_item_id,
-                              { inventory_item_id: event.target.value },
+                              {
+                                inventory_item_id: event.target.value,
+                                is_primary:
+                                  event.target.value === assignment.inventory_item_id
+                                    ? assignment.is_primary === true
+                                    : false,
+                                display_order: getNextImageDisplayOrder(
+                                  event.target.value,
+                                  image.inventory_image_upload_item_id,
+                                ),
+                              },
                             )
                           }
                           disabled={processing}
