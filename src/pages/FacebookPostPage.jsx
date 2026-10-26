@@ -2752,6 +2752,20 @@ export default function FacebookPostPage({
           text-align: center;
         }
 
+        .eo2-publish-card {
+          background: transparent;
+          color: #e8f4ef;
+          box-shadow: none;
+          padding: 20px;
+        }
+
+        .eo2-publish-logo {
+          display: block;
+          width: min(300px, 78vw);
+          height: auto;
+          margin: 0 auto 18px;
+        }
+
         .eo2-spinner {
           width: 44px;
           height: 44px;
@@ -4062,7 +4076,7 @@ export default function FacebookPostPage({
         publishing) && (
         <div className="eo2-publish-overlay">
           <div className="eo2-publish-card">
-            <div className="eo2-spinner" />
+            <img className="eo2-publish-logo" src={`${import.meta.env.BASE_URL}eo2mate-loader.svg`} alt="EO2MATE loading" />
 
             <h2>
               {publishing

@@ -930,6 +930,7 @@ export default function PortalPage({ session }) {
     return (
       <div className="loading-screen">
         <div className="loading-card">
+          <img className="loading-logo" src={`${import.meta.env.BASE_URL}eo2mate-loader.svg`} alt="EO2MATE loading" />
           <h2>Loading client portal</h2>
           <p>Checking your account, Facebook connection and dashboard data...</p>
         </div>
