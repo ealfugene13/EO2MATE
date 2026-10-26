@@ -2286,6 +2286,13 @@ export default function InventoryPage({
           width: min(1100px, 96vw);
         }
 
+        .inventory-item-modal {
+          box-sizing: border-box;
+          width: min(900px, calc(100vw - 40px));
+          max-height: min(88vh, 900px);
+          padding: 26px;
+        }
+
         .inventory-modal-header {
           display: flex;
           justify-content: space-between;
@@ -2310,6 +2317,53 @@ export default function InventoryPage({
           gap: 13px;
         }
 
+        .inventory-item-modal .inventory-form-grid {
+          align-items: start;
+          gap: 18px 22px;
+        }
+
+        .inventory-item-modal .inventory-form-grid > label {
+          display: grid;
+          align-content: start;
+          gap: 7px;
+          min-width: 0;
+          color: #344256;
+          font-size: 12px;
+          font-weight: 700;
+          line-height: 1.35;
+        }
+
+        .inventory-item-modal .inventory-form-grid > label input,
+        .inventory-item-modal .inventory-form-grid > label select,
+        .inventory-item-modal .inventory-form-grid > label textarea,
+        .inventory-item-modal .inventory-owner-row select {
+          box-sizing: border-box;
+          width: 100%;
+          min-width: 0;
+          min-height: 42px;
+          margin: 0;
+          padding: 10px 12px;
+          border: 1px solid #d7deea;
+          border-radius: 10px;
+          background: #fff;
+          color: #172235;
+          font: inherit;
+          font-weight: 500;
+        }
+
+        .inventory-item-modal .inventory-form-grid > label textarea {
+          min-height: 104px;
+          resize: vertical;
+        }
+
+        .inventory-item-modal .inventory-form-grid > label input:focus,
+        .inventory-item-modal .inventory-form-grid > label select:focus,
+        .inventory-item-modal .inventory-form-grid > label textarea:focus,
+        .inventory-item-modal .inventory-owner-row select:focus {
+          outline: 3px solid rgba(37, 99, 235, .14);
+          border-color: #6d93e8;
+        }
+
         .inventory-form-wide {
           grid-column: 1 / -1;
         }
@@ -2327,6 +2381,46 @@ export default function InventoryPage({
           grid-template-columns: 1fr auto;
           gap: 8px;
           align-items: end;
+        }
+
+        .inventory-item-modal .inventory-owner-row label {
+          display: grid;
+          gap: 7px;
+          min-width: 0;
+          color: #344256;
+          font-size: 12px;
+          font-weight: 700;
+        }
+
+        .inventory-item-modal .inventory-owner-row > button {
+          min-height: 42px;
+          white-space: nowrap;
+        }
+
+        .inventory-item-modal .inventory-modal-header {
+          align-items: center;
+          margin-bottom: 22px;
+        }
+
+        .inventory-item-modal .inventory-modal-header h2 {
+          color: #16243a;
+          font-size: 21px;
+          letter-spacing: -.02em;
+        }
+
+        .inventory-item-modal .inventory-modal-header p {
+          color: #64748b;
+          font-size: 13px;
+          line-height: 1.5;
+        }
+
+        .inventory-item-modal .inventory-modal-actions {
+          position: sticky;
+          bottom: -26px;
+          margin: 22px -26px -26px;
+          padding: 16px 26px 26px;
+          border-top: 1px solid #e7ebf2;
+          background: var(--panel-bg, #fff);
         }
 
         .inventory-image-grid {
@@ -2454,6 +2548,26 @@ export default function InventoryPage({
 
           .inventory-owner-row {
             grid-template-columns: 1fr;
+          }
+
+          .inventory-item-modal {
+            width: min(96vw, 900px);
+            padding: 18px;
+          }
+
+          .inventory-item-modal .inventory-form-grid {
+            grid-template-columns: 1fr;
+            gap: 14px;
+          }
+
+          .inventory-item-modal .inventory-form-wide {
+            grid-column: auto;
+          }
+
+          .inventory-item-modal .inventory-modal-actions {
+            bottom: -18px;
+            margin: 18px -18px -18px;
+            padding: 14px 18px 18px;
           }
 
           .inventory-import-summary {
@@ -3073,7 +3187,7 @@ export default function InventoryPage({
         itemModal &&
         (
           <div className="inventory-modal-backdrop">
-            <section className="inventory-modal">
+            <section className="inventory-modal inventory-item-modal">
               <div className="inventory-modal-header">
                 <div>
                   <h2>
