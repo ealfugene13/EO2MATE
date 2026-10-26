@@ -8,7 +8,7 @@ const SETTING_LABELS = {
   ANNOUNCEMENT_INTERVAL_HOURS: "Auction announcement interval (hours)", INVALID_COMMAND_REPLY_ENABLED: "Reply to invalid Messenger commands",
 };
 const EDITABLE = new Set(Object.keys(SETTING_LABELS));
-const ALLOWED_ACTIONS = new Set(["START_PAYMENT","REFRESH_PAYMENT","HELP"]);
+const ALLOWED_ACTIONS = new Set(["START_PAYMENT","REFRESH_PAYMENT","REVIEW_ORDER","CONSOLIDATE_ORDERS","SALES_INVOICE","STORE_LINK","HELP"]);
 const norm = v => String(v || "").trim().replace(/\s+/g," ").toUpperCase();
 
 function RefreshIcon(){return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v5h-5"/><path d="M4 18v-5h5"/><path d="M6.1 9a7 7 0 0 1 11.3-2.1L20 9"/><path d="M4 15l2.6 2.1A7 7 0 0 0 17.9 15"/></svg>}
