@@ -11,7 +11,7 @@ function LoadingScreen() {
   return (
     <div className="loading-screen">
       <div className="loading-card">
-        <div className="brand-logo">A</div>
+        <img className="loading-logo" src={`${import.meta.env.BASE_URL}eo2mate-loader.svg`} alt="EO2MATE loading" />
         <h2>Loading portal</h2>
         <p>Checking your session...</p>
       </div>

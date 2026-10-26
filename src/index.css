@@ -15,9 +15,25 @@ button { cursor: pointer; }
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f5f7fb;
+  background: #050707;
   padding: 24px;
 }
+
+.loading-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  color: #e8f4ef;
+  text-align: center;
+}
+.loading-logo {
+  display: block;
+  width: min(360px, 82vw);
+  height: auto;
+}
+.loading-card h2 { margin: 8px 0 0; font-size: 18px; font-weight: 600; }
+.loading-card p { margin: 0; color: #9eb8ae; font-size: 14px; }
 
 .auth-card {
   width: 100%;
