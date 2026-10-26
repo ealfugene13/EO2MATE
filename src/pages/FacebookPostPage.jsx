@@ -2736,8 +2736,8 @@ export default function FacebookPostPage({
           z-index: 9999;
           display: grid;
           place-items: center;
-          background: rgba(15, 23, 42, .58);
-          backdrop-filter: blur(3px);
+          background: #050707;
+          backdrop-filter: none;
           padding: 20px;
         }
 
