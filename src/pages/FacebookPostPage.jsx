@@ -2948,6 +2948,11 @@ export default function FacebookPostPage({
           align-items: start;
         }
 
+        .fb-photo-grid.multiple {
+          grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+          align-items: start;
+        }
+
         .eo2-mining-rules-grid {
           grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
           align-items: start;
@@ -3289,7 +3294,8 @@ export default function FacebookPostPage({
             grid-template-columns: 1fr !important;
           }
 
-          .fb-photo-grid {
+          .fb-photo-grid.multiple,
+          .fb-photo-grid.single {
             grid-template-columns: 1fr !important;
           }
 
@@ -3820,7 +3826,7 @@ export default function FacebookPostPage({
           </>
           )
         ) : (
-          <div className="fb-photo-grid">
+          <div className={`fb-photo-grid ${isMultiple ? "multiple" : "single"}`}>
             {items.map((item, index) => (
               <article
                 key={item.id}
