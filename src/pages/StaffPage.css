@@ -76,7 +76,18 @@
 .staff-text-action.danger:hover { background: #fff1ef; }
 .staff-text-action:disabled { opacity: .55; cursor: not-allowed; }
 .staff-empty-state { color: #77849a; font-size: 12px; }
+.staff-role-guide { margin: 0 14px 14px; padding: 15px; border: 1px solid #e6edf4; border-radius: 12px; background: #f9fbfd; }
+.staff-role-guide-heading { display: flex; align-items: center; gap: 10px; }
+.staff-role-guide-heading > div { display: grid; gap: 3px; }
+.staff-role-guide-heading strong { color: #34435a; font-size: 12px; }
+.staff-role-guide-heading p, .staff-role-guide-footnote { margin: 0; color: #758298; font-size: 11px; line-height: 1.5; }
+.staff-role-guide-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 13px; }
+.staff-role-guide-grid article { padding: 11px 12px; border: 1px solid #e8edf3; border-radius: 9px; background: #fff; }
+.staff-role-guide-grid article strong { color: #2f5e8f; font-size: 11px; }
+.staff-role-guide-grid article p { margin: 5px 0 0; color: #68778d; font-size: 10px; line-height: 1.5; }
+.staff-role-guide-footnote { margin-top: 11px; }
 @media (max-width: 700px) { .staff-code-card { align-items: flex-start; flex-direction: column; } .staff-pending-list { padding: 16px 17px 7px; } .staff-pending-row { align-items: flex-start; } .staff-row-actions { min-width: 130px; flex-wrap: wrap; } }
+@media (max-width: 760px) { .staff-role-guide-grid { grid-template-columns: 1fr; } }
 @media (max-width: 1000px) { .staff-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 700px) { .staff-header { align-items: flex-start; } .staff-form-grid { grid-template-columns: 1fr; } .staff-invite-panel { padding: 17px; } .staff-users-heading { align-items: flex-start; flex-direction: column; padding: 17px; } .staff-search { width: 100%; } .staff-table { min-width: 720px; } }
 @media (max-width: 480px) { .staff-metrics { gap: 9px; } .staff-metric-card { min-height: 91px; gap: 9px; padding: 12px 10px; } .staff-metric-icon { width: 35px; height: 35px; } .staff-metric-title { font-size: 11px; } .staff-metric-copy small { font-size: 10px; } .staff-heading { align-items: flex-start; gap: 10px; } .staff-page-mark { width: 36px; height: 36px; } .staff-header h1 { font-size: 25px; } .staff-add-button { min-height: 40px; } .staff-form-actions { width: 100%; } .staff-form-actions button { flex: 1; } }

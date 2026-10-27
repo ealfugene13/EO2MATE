@@ -32,6 +32,17 @@ import "./SetupWorkspace.css";
 import "./FacebookPageSwitcher.css";
 import "./AccountSecurityWorkspace.css";
 
+const ROLE_PAGE_ACCESS = {
+  ADMIN: new Set(["dashboard", "notifications", "posts", "auctions", "auction-detail", "facebook-post", "mining-create", "post-mining", "pre-order", "pre-order-create", "regular-sale", "live-selling", "facebook-users", "payments", "payment-detail", "deliveries", "delivery-detail", "inventory", "sales", "orders", "order-detail", "purchases", "account-security"]),
+  STAFF: new Set(["dashboard", "notifications", "inventory", "reports", "account-security"]),
+};
+
+function roleCanAccessPage(role, page) {
+  const normalizedRole = String(role || "").toUpperCase();
+  if (normalizedRole === "OWNER" || normalizedRole === "SUPER_ADMIN") return true;
+  return ROLE_PAGE_ACCESS[normalizedRole]?.has(page) === true;
+}
+
 function PortalPageContent({ page, homePage = "dashboard", backLabel = "Back to dashboard", onBack, children }) {
   const contentRef = useRef(null);
   const [banner, setBanner] = useState(null);
@@ -649,6 +660,17 @@ export default function PortalPage({ session }) {
   const metaConnected = facebookStatus?.connected === true;
 
   useEffect(() => {
+    if (client?.role && !roleCanAccessPage(client.role, page)) {
+      setPage("dashboard");
+      setNavigationFilter(null);
+      setDetailRequest(null);
+    }
+    if (String(client?.role || "").toUpperCase() === "STAFF" && accountSecuritySection !== "security") {
+      setAccountSecuritySection("security");
+    }
+  }, [accountSecuritySection, client?.role, page]);
+
+  useEffect(() => {
     if (onboardingChecked && !metaConnected && isMetaOperationalPage(page)) {
       setPage("dashboard");
     }
@@ -1032,7 +1054,7 @@ export default function PortalPage({ session }) {
             Notifications
           </SidebarNavButton>
 
-          {metaConnected && (
+          {metaConnected && roleCanAccessPage(client?.role, "posts") && (
             <>
               <SidebarSectionLabel>Selling</SidebarSectionLabel>
 
@@ -1097,7 +1119,7 @@ export default function PortalPage({ session }) {
 
           <SidebarSectionLabel>Operations</SidebarSectionLabel>
 
-          <SidebarNavButton
+          {roleCanAccessPage(client?.role, "payments") && <SidebarNavButton
             icon="payments"
             className={`nav-item ${page.includes("payment") ? "active" : ""}`}
             onClick={() => paymentAccountStatus?.payment_enabled && goToPayments("ALL")}
@@ -1105,73 +1127,73 @@ export default function PortalPage({ session }) {
             title={paymentAccountStatus?.payment_enabled ? "Payments" : "Set up and activate Online Payments to enable online payments"}
           >
             Payments
-          </SidebarNavButton>
+          </SidebarNavButton>}
 
-          <SidebarNavButton
+          {roleCanAccessPage(client?.role, "deliveries") && <SidebarNavButton
             icon="delivery"
             className={`nav-item ${page.includes("deliver") ? "active" : ""}`}
             onClick={() => goToDeliveries("ALL")}
           >
             Delivery
-          </SidebarNavButton>
+          </SidebarNavButton>}
 
-          <SidebarNavButton
+          {roleCanAccessPage(client?.role, "inventory") && <SidebarNavButton
             icon="inventory"
             className={`nav-item ${page === "inventory" ? "active" : ""}`}
             onClick={() => setPage("inventory")}
           >
             Inventory
-          </SidebarNavButton>
+          </SidebarNavButton>}
 
-          <SidebarNavButton
+          {roleCanAccessPage(client?.role, "sales") && <SidebarNavButton
             icon="sales"
             className={`nav-item ${["sales", "orders", "order-detail"].includes(page) ? "active" : ""}`}
             onClick={() => setPage("sales")}
           >
             Sales &amp; Orders
-          </SidebarNavButton>
+          </SidebarNavButton>}
 
-          <SidebarNavButton
+          {roleCanAccessPage(client?.role, "purchases") && <SidebarNavButton
             icon="purchases"
             className={`nav-item ${page === "purchases" ? "active" : ""}`}
             onClick={() => setPage("purchases")}
           >
             Purchases
-          </SidebarNavButton>
+          </SidebarNavButton>}
 
-          <SidebarSectionLabel>Maintenance</SidebarSectionLabel>
+          {(roleCanAccessPage(client?.role, "users-staff") || roleCanAccessPage(client?.role, "reports") || roleCanAccessPage(client?.role, "setup")) && <SidebarSectionLabel>Maintenance</SidebarSectionLabel>}
 
-          <SidebarNavButton
+          {roleCanAccessPage(client?.role, "users-staff") && <SidebarNavButton
             icon="users"
             className={`nav-item ${page === "users-staff" ? "active" : ""}`}
             onClick={() => setPage("users-staff")}
           >
             Users &amp; Staff
-          </SidebarNavButton>
+          </SidebarNavButton>}
 
-          <SidebarNavButton
+          {roleCanAccessPage(client?.role, "account-security") && <SidebarNavButton
             icon="users"
             className={`nav-item ${page === "account-security" ? "active" : ""}`}
             onClick={() => { setAccountSecuritySection("security"); navigateTo("account-security"); }}
           >
             Account &amp; Security
-          </SidebarNavButton>
+          </SidebarNavButton>}
 
-          <SidebarNavButton
+          {roleCanAccessPage(client?.role, "reports") && <SidebarNavButton
             icon="reports"
             className={`nav-item ${page === "reports" ? "active" : ""}`}
             onClick={() => setPage("reports")}
           >
             Reports
-          </SidebarNavButton>
+          </SidebarNavButton>}
 
-          <SidebarNavButton
+          {roleCanAccessPage(client?.role, "setup") && <SidebarNavButton
             icon="setup"
             className={`nav-item ${page === "setup" ? "active" : ""}`}
             onClick={() => setPage("setup")}
           >
             Setup
-          </SidebarNavButton>
+          </SidebarNavButton>}
         </nav>
 
         <div className="sidebar-footer" style={{ flexShrink: 0 }}>
@@ -1210,7 +1232,7 @@ export default function PortalPage({ session }) {
           </div>
         )}
 
-        <PortalPageContent page={page} onBack={() => navigateTo("dashboard")}>
+        {roleCanAccessPage(client?.role, page) && <PortalPageContent page={page} onBack={() => navigateTo("dashboard")}>
         {page === "admin-clients" && platformAdmin && (
           <AdminClientsPage />
         )}
@@ -1270,12 +1292,12 @@ export default function PortalPage({ session }) {
               <button type="button" role="tab" aria-selected={accountSecuritySection === "security"} className={accountSecuritySection === "security" ? "active" : ""} onClick={() => setAccountSecuritySection("security")}>
                 <span className="account-security-tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M5 21v-2a7 7 0 0 1 14 0v2"/></svg></span><span>Account Security</span>
               </button>
-              <button type="button" role="tab" aria-selected={accountSecuritySection === "facebook"} className={accountSecuritySection === "facebook" ? "active" : ""} onClick={() => setAccountSecuritySection("facebook")}>
+              {String(client?.role || "").toUpperCase() !== "STAFF" && <button type="button" role="tab" aria-selected={accountSecuritySection === "facebook"} className={accountSecuritySection === "facebook" ? "active" : ""} onClick={() => setAccountSecuritySection("facebook")}>
                 <span className="account-security-tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M14 8h3V4h-3a5 5 0 0 0-5 5v3H6v4h3v4h4v-4h3l1-4h-4V9a1 1 0 0 1 1-1Z"/></svg></span><span>Facebook Setup</span>
-              </button>
-              <button type="button" role="tab" aria-selected={accountSecuritySection === "payments"} className={accountSecuritySection === "payments" ? "active" : ""} onClick={() => setAccountSecuritySection("payments")}>
+              </button>}
+              {String(client?.role || "").toUpperCase() !== "STAFF" && <button type="button" role="tab" aria-selected={accountSecuritySection === "payments"} className={accountSecuritySection === "payments" ? "active" : ""} onClick={() => setAccountSecuritySection("payments")}>
                 <span className="account-security-tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h3"/></svg></span><span>Payment Settings</span>
-              </button>
+              </button>}
             </nav>
             <div className="account-security-workspace-content" role="tabpanel">
               {accountSecuritySection === "security" && <AccountSecurityPage session={session} />}
@@ -1311,7 +1333,7 @@ export default function PortalPage({ session }) {
         )}
 
         {(page === "deliveries" || page === "delivery-detail") && <DeliveriesPage selectedFbPageId={effectivePageId} navigationFilter={navigationFilter} client={client} detailRequest={detailRequest} goToDeliveries={goToDeliveries} page={page} setErrorMessage={setErrorMessage} setPage={setPage} />}
-        </PortalPageContent>
+        </PortalPageContent>}
 
       </main>
       {floatingWidgetSettings.notifications && <FloatingLiveNotifications clientId={client?.client_id} fbPageId={effectivePageId} pageName={availablePages.find((entry) => String(entry.fb_page_id) === String(effectivePageId))?.page_name || ""} onOpenNotification={openNotification} onHide={() => setFloatingWidgetVisible("notifications", false)} />}
