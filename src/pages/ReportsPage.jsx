@@ -221,7 +221,8 @@ export default function ReportsPage({ client, page, setErrorMessage , selectedFb
     } else start.setDate(start.getDate() - 30);
     start.setHours(0,0,0,0);
     const inRange = (row) => {
-      const raw = row?.created_at || row?.post_created_at || row?.paid_at || row?.updated_at;
+      const isCancelledOrder = String(row?.order_status || row?.status || "").toUpperCase() === "CANCELLED";
+      const raw = (isCancelledOrder && row?.cancelled_at) || row?.created_at || row?.post_created_at || row?.paid_at || row?.updated_at;
       if (!raw) return true;
       const d = new Date(raw);
       return !Number.isNaN(d.getTime()) && d >= start && d <= end;
@@ -249,7 +250,10 @@ export default function ReportsPage({ client, page, setErrorMessage , selectedFb
     const money = (r) => Number(r?.total_amount ?? r?.amount ?? r?.grand_total ?? r?.order_total ?? r?.value ?? r?.winning_amount ?? r?.claim_price ?? 0) || 0;
     const paid = filteredPayments.filter((r) => ["PAID","SUCCESS","COMPLETED","SETTLED"].includes(statusOf(r)));
     const pending = filteredPayments.filter((r) => ["PENDING","AWAITING_PAYMENT","READY_FOR_PAYMENT","UNPAID"].includes(statusOf(r)));
-    const gross = filteredOrders.reduce((a,r)=>a+money(r),0);
+    const cancelledOrders = filteredOrders.filter((r)=>String(r?.order_status||r?.status||"").toUpperCase()==="CANCELLED");
+    const activeOrders = filteredOrders.filter((r)=>String(r?.order_status||r?.status||"").toUpperCase()!=="CANCELLED");
+    const gross = activeOrders.reduce((a,r)=>a+money(r),0);
+    const cancelledOrderValue = cancelledOrders.reduce((a,r)=>a+money(r),0);
     const paidValue = paid.reduce((a,r)=>a+money(r),0);
     const buyers = new Set(filteredOrders.map(r=>r.fb_user_id || r.buyer_id || r.customer_id || r.psid).filter(Boolean));
 
@@ -260,7 +264,7 @@ export default function ReportsPage({ client, page, setErrorMessage , selectedFb
     else if (selectedReport === "order-fulfillment") sourceRows = filteredDeliveries;
 
     let rows = sourceRows.map((r) => ({
-      Date: r.created_at || r.post_created_at || r.paid_at || r.updated_at || "",
+      Date: (String(r?.order_status||r?.status||"").toUpperCase()==="CANCELLED"&&r.cancelled_at)||r.created_at || r.post_created_at || r.paid_at || r.updated_at || "",
       Reference: r.order_group_no || r.order_no || r.reference_no || r.fb_post_id || r.order_group_id || r.order_id || r.auction_id || r.post_id || r.payment_id || r.delivery_id || r.id || "—",
       Channel: channelOf(r) || (selectedReport === "auction-performance" ? "AUCTION" : selectedReport === "post-mining-performance" ? "MINING" : "—"),
       Buyer: r.buyer_name || r.fb_user_name || r.customer_name || r.fb_user_id || r.psid || "—",
@@ -274,7 +278,7 @@ export default function ReportsPage({ client, page, setErrorMessage , selectedFb
       return reportSortBy === "DATE_ASC" ? ad-bd : bd-ad;
     });
     rows = rows.slice(0,500);
-    return { filteredOrders, filteredPayments, filteredAuctions, filteredDeliveries, mining, regular, paid, pending, gross, paidValue, buyers: buyers.size, rows, start, end };
+    return { filteredOrders, filteredPayments, filteredAuctions, filteredDeliveries, mining, regular, paid, pending, gross, cancelledOrders, cancelledOrderValue, paidValue, buyers: buyers.size, rows, start, end };
   }, [orders, payments, auctions, deliveries, sellingPostRows, reportDateRange, reportCustomFrom, reportCustomTo, reportPageFilter, reportChannelFilter, reportStatusFilter, reportSortBy, selectedReport]);
   const reportTableRows = generatedReport?.data?.rows || reportData.rows;
   const reportPagination = useRecordPagination(reportTableRows, `${selectedReport}|${reportDateRange}|${reportPageFilter}|${reportChannelFilter}|${reportStatusFilter}|${reportSortBy}`);
@@ -590,7 +594,8 @@ export default function ReportsPage({ client, page, setErrorMessage , selectedFb
                   )}
 
                   <div className="metrics-grid" style={{ marginTop: 18 }}>
-                    <MetricCard title="Gross Sales" value={formatCurrency(displayData.gross)} subtitle={`${displayData.filteredOrders.length} matching orders`} />
+                    <MetricCard title="Net Sales" value={formatCurrency(displayData.gross)} subtitle={`${displayData.filteredOrders.length-displayData.cancelledOrders.length} active orders; cancellations excluded`} />
+                    <MetricCard title="Cancelled Orders" value={displayData.cancelledOrders.length} subtitle={`${formatCurrency(displayData.cancelledOrderValue)} cancelled order value`} />
                     <MetricCard title="Paid" value={displayData.paid.length} subtitle={formatCurrency(displayData.paidValue)} />
                     <MetricCard title="Pending" value={displayData.pending.length} subtitle="Payments awaiting completion" />
                     <MetricCard title="Buyers" value={displayData.buyers} subtitle="Unique matching buyers" />

@@ -214,12 +214,18 @@ export default function OrdersPage({ client, detailRequest, page, setErrorMessag
     if(!orderDetail?.order_id || manualBusy) return;
     setManualBusy(true); setManualNotice("");
     try {
-      const {data,error}=await supabase.functions.invoke("eo2mate",{method:"POST",headers:{"x-eo2mate-route":"manual-order-admin"},body:{action,client_id:client.client_id,order_id:orderDetail.order_id,...extra}});
-      if(error) throw error;
-      if(!data?.success) throw new Error(data?.message || "Manual order action failed.");
-      setManualNotice(action==="RECORD_PAYMENT"?"Payment recorded. The order is marked paid and ready for delivery when shipping details are complete.":"Manual order cancelled. Reserved stock has been released.");
+      if(action==="CANCEL"){
+        const {data,error}=await supabase.rpc("cancel_sales_order",{p_client_id:client.client_id,p_order_id:orderDetail.order_id,p_order_group_id:null,p_reason:extra.reason||null});
+        if(error) throw error;
+        setManualNotice(data?.result==="ALREADY_CANCELLED"?"This order was already cancelled.":`${Number(data?.cancelled_orders||0)} order cancelled. ${Number(data?.restocked_movements||0)} inventory deduction(s) reversed. Any buyer refund must be handled separately.`);
+      }else{
+        const {data,error}=await supabase.functions.invoke("eo2mate",{method:"POST",headers:{"x-eo2mate-route":"manual-order-admin"},body:{action,client_id:client.client_id,order_id:orderDetail.order_id,...extra}});
+        if(error) throw error;
+        if(!data?.success) throw new Error(data?.message || "Manual order action failed.");
+        setManualNotice("Payment recorded. The order is marked paid and ready for delivery when shipping details are complete.");
+      }
       setManualPaymentOpen(false); await openOrder(orderDetail.order_id); await loadPortal();
-    } catch(error) { setManualNotice(error.message || "Manual order action failed."); }
+    } catch(error) { const raw=String(error.message||"");setManualNotice(raw.includes("ORDER_CANCELLATION_TOO_LATE")?"This order cannot be cancelled after it has shipped, been delivered, or completed.":raw.includes("ORDER_CANCELLATION_FORBIDDEN")?"You do not have permission to cancel orders for this workspace.":raw || "Manual order action failed."); }
     finally { setManualBusy(false); }
   }
   const [detailLoading, setDetailLoading] = useState(false);
@@ -500,8 +506,8 @@ export default function OrdersPage({ client, detailRequest, page, setErrorMessag
                   <div className="orders-header-actions">
                     <StatusBadge status={orderDetail.order_status} />
                     {canUseManualActions && !orderDetail.order_group_id && orderDetail.order_status==="PAYMENT_PENDING" && normalized(orderDetail.payment_status||orderDetail.latest_payment_status)!=="PAID" && <button type="button" className="secondary-button" onClick={()=>{setManualNotice("");setManualPaymentReference("");setManualPaymentOpen(true);}}>Record payment</button>}
-                    {canUseManualActions && orderDetail.source_type==="MANUAL" && orderDetail.order_status==="PAYMENT_PENDING" && <>
-                      <button type="button" className="secondary-button" onClick={()=>{const reason=window.prompt("Reason for cancelling this manual order:");if(reason===null)return;if(!window.confirm("Cancel this order and release its reserved inventory?"))return;runManualOrderAction("CANCEL",{reason});}}>Cancel order</button>
+                    {canUseManualActions && !["CANCELLED","SHIPPED","DELIVERED","COMPLETED"].includes(normalized(orderDetail.order_status)) && <>
+                      <button type="button" className="secondary-button danger-action" onClick={()=>{const reason=window.prompt("Reason for cancelling this order:");if(reason===null)return;if(!window.confirm("Cancel this order? Any recorded payment will not be refunded automatically."))return;runManualOrderAction("CANCEL",{reason});}}>Cancel order</button>
                     </>}
                   </div>
                 </header>
