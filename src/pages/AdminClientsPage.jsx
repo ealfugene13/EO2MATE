@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../supabase";
 import Eo2DatePicker from "../components/Eo2DatePicker";
 import RecordPagination, { useRecordPagination } from "../components/RecordPagination";
+import KycReviewPanel from "../components/KycReviewPanel";
 
 function dt(value) {
   if (!value) return "-";
@@ -150,6 +151,8 @@ export default function AdminClientsPage() {
           </form>
         </section>
       )}
+
+      <KycReviewPanel />
 
       <section className="dashboard-panel">
         <div className="panel-header">

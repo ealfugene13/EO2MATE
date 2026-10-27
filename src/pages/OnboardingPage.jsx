@@ -11,6 +11,13 @@ export default function OnboardingPage({ session, initialStatus = null, onComple
   const [skipCode, setSkipCode] = useState("");
   const [message, setMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const [kyc, setKyc] = useState({ legal_business_name: "", business_type: "SOLE_PROPRIETORSHIP", government_id_type: "", government_id_name: "" });
+  const [kycStatus, setKycStatus] = useState(null);
+  const [kycDocuments, setKycDocuments] = useState([]);
+  const [kycBusy, setKycBusy] = useState(false);
+  const [kycNotice, setKycNotice] = useState("");
+  const [kycError, setKycError] = useState("");
+  const [kycConsent, setKycConsent] = useState(false);
 
   useEffect(() => {
     if (!status) loadStatus();
@@ -100,6 +107,75 @@ export default function OnboardingPage({ session, initialStatus = null, onComple
   const pages = status?.pages || [];
   const subscription = status?.subscription;
 
+  useEffect(() => {
+    if (!client?.client_id || !session?.user?.id) return;
+    let cancelled = false;
+    async function loadKyc() {
+      const [submissionResult, documentResult] = await Promise.all([
+        supabase.from("eo2mate_kyc_submissions").select("*").eq("client_id", client.client_id).maybeSingle(),
+        supabase.from("eo2mate_kyc_documents").select("document_id,document_type,object_path,content_type,file_size_bytes").eq("client_id", client.client_id),
+      ]);
+      if (cancelled) return;
+      if (submissionResult.error) { setKycError(submissionResult.error.message || "Unable to load verification status. Apply the KYC migration first."); return; }
+      if (documentResult.error) { setKycError(documentResult.error.message || "Unable to load uploaded documents."); return; }
+      const submission = submissionResult.data;
+      if (submission) {
+        setKycStatus(submission);
+        setKyc({ legal_business_name: submission.legal_business_name || "", business_type: submission.business_type || "SOLE_PROPRIETORSHIP", government_id_type: submission.government_id_type || "", government_id_name: submission.government_id_name || "" });
+      }
+      setKycDocuments(documentResult.data || []);
+    }
+    loadKyc().catch(error => { if (!cancelled) setKycError(error.message || "Unable to load verification status."); });
+    return () => { cancelled = true; };
+  }, [client?.client_id, session?.user?.id]);
+
+  async function uploadKycDocument(documentType, file) {
+    if (!client?.client_id || !session?.user?.id || kycBusy) return;
+    const isBusinessDoc = documentType === "BUSINESS_REGISTRATION";
+    const acceptedMime = isBusinessDoc ? ["image/jpeg", "image/png", "image/webp", "application/pdf"] : ["image/jpeg", "image/png", "image/webp"];
+    if (!acceptedMime.includes(file.type)) { setKycError(isBusinessDoc ? "Use a JPG, PNG, WebP, or PDF file." : "Government ID images must be JPG, PNG, or WebP."); return; }
+    if (file.size <= 0 || file.size > 10 * 1024 * 1024) { setKycError("Each verification document must be 10 MB or smaller."); return; }
+    setKycBusy(true); setKycError(""); setKycNotice("");
+    const extension = ({ "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "application/pdf": "pdf" })[file.type];
+    const objectPath = `${client.client_id}/${session.user.id}/${documentType}/${crypto.randomUUID()}.${extension}`;
+    try {
+      const { error: uploadError } = await supabase.storage.from("eo2mate-kyc-private").upload(objectPath, file, { contentType: file.type, upsert: false });
+      if (uploadError) throw uploadError;
+      const prior = kycDocuments.find(row => row.document_type === documentType);
+      const { data, error: saveError } = await supabase.from("eo2mate_kyc_documents").upsert({
+        client_id: client.client_id, document_type: documentType, object_path: objectPath,
+        content_type: file.type, file_size_bytes: file.size, uploaded_by: session.user.id, updated_at: new Date().toISOString(),
+      }, { onConflict: "client_id,document_type" }).select("document_id,document_type,object_path,content_type,file_size_bytes").single();
+      if (saveError) { await supabase.storage.from("eo2mate-kyc-private").remove([objectPath]); throw saveError; }
+      if (prior?.object_path) await supabase.storage.from("eo2mate-kyc-private").remove([prior.object_path]);
+      setKycDocuments(current => [...current.filter(row => row.document_type !== documentType), data]);
+      setKycNotice(`${documentType.replaceAll("_", " ")} uploaded to private storage.`);
+    } catch (error) { setKycError(error.message || "Document upload failed."); }
+    finally { setKycBusy(false); }
+  }
+
+  async function submitKyc(event) {
+    event.preventDefault();
+    if (!client?.client_id || !kycConsent || kycBusy) return;
+    const required = ["GOVERNMENT_ID_FRONT", "GOVERNMENT_ID_BACK", "BUSINESS_REGISTRATION"];
+    if (required.some(type => !kycDocuments.some(row => row.document_type === type))) { setKycError("Upload the front and back of your government ID, plus your business registration document."); return; }
+    setKycBusy(true); setKycError(""); setKycNotice("");
+    try {
+      const { data, error } = await supabase.rpc("submit_eo2mate_kyc", {
+        p_client_id: client.client_id,
+        p_legal_business_name: kyc.legal_business_name.trim(),
+        p_business_type: kyc.business_type,
+        p_government_id_type: kyc.government_id_type,
+        p_government_id_name: kyc.government_id_name.trim(),
+      });
+      if (error) throw error;
+      setKycStatus(data);
+      setKycNotice("Documents submitted for EO2MATE manual review.");
+      setKycConsent(false);
+    } catch (error) { setKycError(error.message || "KYC/KYB submission failed."); }
+    finally { setKycBusy(false); }
+  }
+
   return (
     <div className="onboarding-shell">
       <main className="onboarding-wizard-card onboarding-v2">
@@ -111,14 +187,15 @@ export default function OnboardingPage({ session, initialStatus = null, onComple
         <div className="wizard-heading">
           <p className="eyebrow">GET STARTED</p>
           <h1>Set up your EO2MATE workspace</h1>
-          <p>Your account is secured with MFA. Add your client or brand details and activate your workspace. Your client/brand name identifies the EO2MATE workspace and may differ from the Facebook Page names you connect.</p>
+          <p>Your account is secured with MFA. Add your client or brand details, submit private business verification documents, and activate your workspace. Your client/brand name may differ from the Facebook Page names you connect.</p>
         </div>
 
-        <div className="wizard-stepper wizard-stepper-four">
+        <div className="wizard-stepper wizard-stepper-five">
           <div className="wizard-step done"><span>✓</span><div><strong>Security</strong><small>MFA enabled</small></div></div>
           <div className={`wizard-step ${client ? "done" : "current"}`}><span>2</span><div><strong>Client / brand</strong><small>{client ? "Complete" : "Required"}</small></div></div>
           <div className={`wizard-step ${pages.length ? "done" : client ? "optional" : ""}`}><span>3</span><div><strong>Facebook Pages</strong><small>{pages.length ? `${pages.length} connected` : "Optional / later"}</small></div></div>
-          <div className={`wizard-step ${status?.onboarding_complete ? "done" : client ? "current" : ""}`}><span>4</span><div><strong>Workspace</strong><small>{status?.onboarding_complete ? "Ready" : "Activate"}</small></div></div>
+          <div className={`wizard-step ${["SUBMITTED", "IN_REVIEW", "APPROVED"].includes(kycStatus?.status) ? "done" : client ? "current" : ""}`}><span>4</span><div><strong>KYC / KYB</strong><small>{kycStatus?.status ? kycStatus.status.replaceAll("_", " ") : "Submit documents"}</small></div></div>
+          <div className={`wizard-step ${status?.onboarding_complete ? "done" : client ? "current" : ""}`}><span>5</span><div><strong>Workspace</strong><small>{status?.onboarding_complete ? "Ready" : "Activate"}</small></div></div>
         </div>
 
         {showSkipDialog && <div role="dialog" aria-modal="true" aria-label="Authorize simulated test Page" style={{position:"fixed",inset:0,background:"rgba(15,23,42,.65)",zIndex:9999,display:"grid",placeItems:"center",padding:16}}>
@@ -204,8 +281,28 @@ export default function OnboardingPage({ session, initialStatus = null, onComple
                 </>
               )}
             </section>
+            <section className="onboarding-stage-card" aria-label="KYC and KYB verification">
+              <div className="onboarding-stage-heading"><span>Step 4</span><div><strong>KYC / KYB verification</strong><small>Submit your legal business name, government ID images, and business registration document.</small></div></div>
+              <div className="onboarding-permission-note">Files are stored in a private EO2MATE bucket. We do not store your ID number in the database. This first release supports secure intake and manual review; automated OCR and image-fraud analysis are not active yet.</div>
+              {kycStatus && <div className="wizard-summary-row" style={{ marginBottom: 12, border: "1px solid #e7ebf1", borderRadius: 10 }}><span>Review status</span><strong>{kycStatus.status.replaceAll("_", " ")}</strong></div>}
+              {kycStatus?.reviewer_notes && <div className="onboarding-permission-note"><strong>Reviewer note:</strong> {kycStatus.reviewer_notes}</div>}
+              {kycError && <div className="form-error" role="alert">{kycError}</div>}
+              {kycNotice && <div className="success-message" role="status">{kycNotice}</div>}
+              {client && !["SUBMITTED", "IN_REVIEW", "APPROVED"].includes(kycStatus?.status) && <form className="wizard-form onboarding-clean-form" onSubmit={submitKyc}>
+                <label>Legal business name<input value={kyc.legal_business_name} onChange={e => setKyc(current => ({ ...current, legal_business_name: e.target.value }))} required maxLength="180" placeholder="Name shown on your registration documents" /></label>
+                <label>Business type<select value={kyc.business_type} onChange={e => setKyc(current => ({ ...current, business_type: e.target.value }))}><option value="SOLE_PROPRIETORSHIP">Sole proprietorship</option><option value="PARTNERSHIP">Partnership</option><option value="CORPORATION">Corporation</option><option value="OTHER">Other</option></select></label>
+                <label>Government ID type<select value={kyc.government_id_type} onChange={e => setKyc(current => ({ ...current, government_id_type: e.target.value }))} required><option value="">Select ID type</option><option>Philippine National ID</option><option>Passport</option><option>Driver's license</option><option>UMID</option><option>PRC ID</option><option>Other government ID</option></select></label>
+                <label>Name exactly as printed on ID<input value={kyc.government_id_name} onChange={e => setKyc(current => ({ ...current, government_id_name: e.target.value }))} required maxLength="180" autoComplete="name" /></label>
+                {[{type:"GOVERNMENT_ID_FRONT",title:"Government ID · front",accept:"image/jpeg,image/png,image/webp"},{type:"GOVERNMENT_ID_BACK",title:"Government ID · back",accept:"image/jpeg,image/png,image/webp"},{type:"BUSINESS_REGISTRATION",title:"Business registration · DTI / SEC / other",accept:"image/jpeg,image/png,image/webp,application/pdf"}].map(doc => {
+                  const existing = kycDocuments.find(row => row.document_type === doc.type);
+                  return <label key={doc.type} className="onboarding-kyc-file"><span>{doc.title}</span><input type="file" accept={doc.accept} capture={doc.type === "BUSINESS_REGISTRATION" ? undefined : "environment"} disabled={kycBusy} onChange={event => { const file = event.target.files?.[0]; event.target.value = ""; if (file) uploadKycDocument(doc.type, file); }} /><small>{existing ? `Uploaded · ${Math.ceil(existing.file_size_bytes / 1024)} KB` : "Required · maximum 10 MB"}</small></label>;
+                })}
+                <label className="onboarding-kyc-consent"><input type="checkbox" checked={kycConsent} onChange={e => setKycConsent(e.target.checked)} />I authorize EO2MATE platform administrators to review these documents for business verification.</label>
+                <button className="primary-button onboarding-primary-action" type="submit" disabled={kycBusy || !kycConsent}>{kycBusy ? "Submitting…" : kycStatus ? "Resubmit for review" : "Submit for review"}</button>
+              </form>}
+            </section>
             <section className="onboarding-stage-card active-stage ready">
-              <div className="onboarding-stage-heading"><span>Step 4</span><div><strong>Activate workspace</strong><small>Facebook can be connected now or later.</small></div></div>
+              <div className="onboarding-stage-heading"><span>Step 5</span><div><strong>Activate workspace</strong><small>Facebook can be connected now or later. KYC review is tracked separately during rollout.</small></div></div>
               <div className="wizard-action-buttons">
                 <button className="secondary-button danger-outline-button" type="button" onClick={cancelOnboarding} disabled={loading}>Cancel onboarding</button>
                 <button className="primary-button onboarding-primary-action" type="button" onClick={finishOnboarding} disabled={loading}>{loading ? "Activating..." : "Activate EO2MATE Workspace"}</button>
