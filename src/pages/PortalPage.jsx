@@ -1236,7 +1236,7 @@ export default function PortalPage({ session }) {
 
         {(page === "live-selling") && <LiveSellingPage selectedFbPageId={effectivePageId} client={client} liveSellingWorkspaceTab={liveSellingWorkspaceTab} metaConnected={metaConnected} page={page} setLiveSellingWorkspaceTab={setLiveSellingWorkspaceTab} />}
 
-        {(page === "users-staff") && <StaffPage page={page} />}
+        {(page === "users-staff") && <StaffPage page={page} client={client} session={session} />}
 
         {(page === "facebook-users") && <FacebookUsersPage key={`facebook-users-${effectivePageId}`} client={client} selectedFbPageId={effectivePageId} selectedFbPageName={availablePages.find((p) => String(p.fb_page_id) === String(effectivePageId))?.page_name || ""} />}
 

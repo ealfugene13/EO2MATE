@@ -4156,3 +4156,13 @@ button.post-type-card:hover { transform: translateY(-2px); border-color: #bcdcc3
 .fb-inventory-photo-options>button.selected{border-color:#21885a;box-shadow:0 0 0 2px #21885a24}
 .fb-inventory-photo-options img{display:block;width:76px;height:64px;border-radius:5px;object-fit:cover}
 .fb-inventory-photo-options span{display:block;margin-top:4px;color:#526357;font-size:9px;font-weight:700;line-height:1.2}
+
+.staff-accept-invite-card{margin-bottom:18px;border-color:#d8e8dd;background:#f7fbf8}
+.staff-accept-invite-form{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:12px}
+.staff-accept-invite-form label{display:grid;gap:6px;color:#39465b;font-size:11px;font-weight:700}
+.staff-accept-invite-form input{width:100%;min-height:40px;padding:9px 11px;border:1px solid #d8e0eb;border-radius:9px;color:#27354b;background:#fff}
+.staff-accept-invite-form button{min-height:40px;padding:0 13px}
+.staff-permission-panel{display:flex;align-items:flex-start;gap:12px;padding:18px}
+.staff-permission-panel strong{color:#34435a;font-size:13px}
+.staff-permission-panel p{margin:4px 0 0;color:#6d7b90;font-size:12px;line-height:1.5}
+@media(max-width:600px){.staff-accept-invite-form{grid-template-columns:1fr}.staff-accept-invite-form button{width:100%}}

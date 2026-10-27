@@ -18,6 +18,10 @@ export default function OnboardingPage({ session, initialStatus = null, onComple
   const [kycNotice, setKycNotice] = useState("");
   const [kycError, setKycError] = useState("");
   const [kycConsent, setKycConsent] = useState(false);
+  const [staffInviteCode, setStaffInviteCode] = useState("");
+  const [staffInviteBusy, setStaffInviteBusy] = useState(false);
+  const [staffInviteMessage, setStaffInviteMessage] = useState("");
+  const [staffInviteError, setStaffInviteError] = useState("");
 
   useEffect(() => {
     if (!status) loadStatus();
@@ -101,6 +105,19 @@ export default function OnboardingPage({ session, initialStatus = null, onComple
       window.setTimeout(() => onComplete?.(), 400);
     } catch (error) { setErrorMessage(error.message || "Unable to complete onboarding."); }
     finally { setLoading(false); }
+  }
+
+  async function acceptStaffInvite(event) {
+    event.preventDefault();
+    setStaffInviteBusy(true); setStaffInviteError(""); setStaffInviteMessage("");
+    try {
+      const { data, error } = await supabase.rpc("accept_eo2mate_staff_invite", { p_invite_code: staffInviteCode.trim() });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.message || "Unable to accept this invitation.");
+      setStaffInviteMessage("Invitation accepted. Opening your client workspace…");
+      window.setTimeout(() => onComplete?.(), 500);
+    } catch (error) { setStaffInviteError(error.message || "Unable to accept this invitation."); }
+    finally { setStaffInviteBusy(false); }
   }
 
   const client = status?.client;
@@ -189,6 +206,16 @@ export default function OnboardingPage({ session, initialStatus = null, onComple
           <h1>Set up your EO2MATE workspace</h1>
           <p>Your account is secured with MFA. Add your client or brand details, submit private business verification documents, and activate your workspace. Your client/brand name may differ from the Facebook Page names you connect.</p>
         </div>
+
+        <section className="onboarding-stage-card staff-accept-invite-card">
+          <div className="onboarding-stage-heading"><span>Team invite</span><div><strong>Joining an existing client?</strong><small>Enter the one-time invitation code shared by the client owner or admin. Sign in with the invited email address.</small></div></div>
+          <form className="staff-accept-invite-form" onSubmit={acceptStaffInvite}>
+            <label>Invitation code<input value={staffInviteCode} onChange={event => setStaffInviteCode(event.target.value)} placeholder="Paste invitation code" autoComplete="off" required /></label>
+            <button className="secondary-button" type="submit" disabled={staffInviteBusy || !staffInviteCode.trim()}>{staffInviteBusy ? "Accepting…" : "Accept invitation"}</button>
+          </form>
+          {staffInviteMessage && <div className="success-message" role="status">{staffInviteMessage}</div>}
+          {staffInviteError && <div className="form-error" role="alert">{staffInviteError}</div>}
+        </section>
 
         <div className="wizard-stepper wizard-stepper-five">
           <div className="wizard-step done"><span>✓</span><div><strong>Security</strong><small>MFA enabled</small></div></div>

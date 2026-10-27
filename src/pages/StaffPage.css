@@ -49,6 +49,34 @@
 .staff-access-icon { width: 31px; height: 31px; border-radius: 9px; color: #5479a5; background: #eaf1fa; }
 .staff-access-note strong { color: #34435a; font-size: 12px; }
 .staff-access-note p { margin: 3px 0 0; color: #6d7b90; font-size: 11px; line-height: 1.5; }
+.staff-alert { margin: 0 0 14px; padding: 11px 14px; border-radius: 10px; font-size: 12px; line-height: 1.5; }
+.staff-alert.error { color: #8e332c; border: 1px solid #f2d0cc; background: #fff4f2; }
+.staff-alert.success { color: #246343; border: 1px solid #cce8d8; background: #f1fbf5; }
+.staff-form-grid small, .staff-code-card small, .staff-pending-row small { color: #77849a; font-size: 11px; font-weight: 400; line-height: 1.45; }
+.staff-code-card { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 15px; padding: 13px 15px; border: 1px solid #cce8d8; border-radius: 10px; background: #f4fbf6; }
+.staff-code-card > div { display: grid; gap: 5px; min-width: 0; }
+.staff-code-card strong { color: #246343; font-size: 12px; }
+.staff-code-card code { color: #193b2c; font-size: 14px; font-weight: 700; overflow-wrap: anywhere; user-select: all; }
+.staff-pending-list { padding: 17px 22px 7px; border-top: 1px solid #edf1f6; }
+.staff-pending-table { margin-top: 10px; }
+.staff-pending-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 0; border-bottom: 1px solid #f0f3f7; }
+.staff-pending-row > span { display: grid; gap: 3px; min-width: 0; }
+.staff-pending-row strong { color: #34435b; font-size: 12px; overflow-wrap: anywhere; }
+.staff-role-badge, .staff-status-badge, .staff-self-tag { display: inline-flex; align-items: center; margin-right: 5px; padding: 4px 8px; border-radius: 999px; font-size: 10px; font-weight: 750; letter-spacing: .02em; }
+.staff-role-badge { color: #4b5e78; background: #edf2f8; }
+.staff-role-badge.role-owner, .staff-role-badge.role-admin { color: #286647; background: #e9f7ef; }
+.staff-status-badge.status-active { color: #236b45; background: #e8f6ed; }
+.staff-status-badge.status-inactive { color: #6c7482; background: #eef0f4; }
+.staff-self-tag { padding: 3px 6px; color: #41678f; background: #edf5fd; }
+.staff-row-actions { display: flex; align-items: center; gap: 8px; }
+.staff-row-actions select { min-height: 30px; padding: 4px 7px; border: 1px solid #dce3ed; border-radius: 7px; color: #39465b; background: #fff; font-size: 11px; }
+.staff-text-action { padding: 5px 7px; border: 0; border-radius: 6px; color: #28699e; background: transparent; font-size: 11px; font-weight: 700; cursor: pointer; }
+.staff-text-action:hover { background: #f0f6fc; }
+.staff-text-action.danger { color: #b44740; }
+.staff-text-action.danger:hover { background: #fff1ef; }
+.staff-text-action:disabled { opacity: .55; cursor: not-allowed; }
+.staff-empty-state { color: #77849a; font-size: 12px; }
+@media (max-width: 700px) { .staff-code-card { align-items: flex-start; flex-direction: column; } .staff-pending-list { padding: 16px 17px 7px; } .staff-pending-row { align-items: flex-start; } .staff-row-actions { min-width: 130px; flex-wrap: wrap; } }
 @media (max-width: 1000px) { .staff-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 700px) { .staff-header { align-items: flex-start; } .staff-form-grid { grid-template-columns: 1fr; } .staff-invite-panel { padding: 17px; } .staff-users-heading { align-items: flex-start; flex-direction: column; padding: 17px; } .staff-search { width: 100%; } .staff-table { min-width: 720px; } }
 @media (max-width: 480px) { .staff-metrics { gap: 9px; } .staff-metric-card { min-height: 91px; gap: 9px; padding: 12px 10px; } .staff-metric-icon { width: 35px; height: 35px; } .staff-metric-title { font-size: 11px; } .staff-metric-copy small { font-size: 10px; } .staff-heading { align-items: flex-start; gap: 10px; } .staff-page-mark { width: 36px; height: 36px; } .staff-header h1 { font-size: 25px; } .staff-add-button { min-height: 40px; } .staff-form-actions { width: 100%; } .staff-form-actions button { flex: 1; } }
