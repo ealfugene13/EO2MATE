@@ -1337,7 +1337,7 @@ export default function PortalPage({ session }) {
 
       </main>
       {floatingWidgetSettings.notifications && <FloatingLiveNotifications clientId={client?.client_id} fbPageId={effectivePageId} pageName={availablePages.find((entry) => String(entry.fb_page_id) === String(effectivePageId))?.page_name || ""} onOpenNotification={openNotification} onHide={() => setFloatingWidgetVisible("notifications", false)} />}
-      {floatingWidgetSettings.messenger && <FloatingMetaMessenger clientId={client?.client_id} onHide={() => setFloatingWidgetVisible("messenger", false)} />}
+      {floatingWidgetSettings.messenger && roleCanAccessPage(client?.role, "posts") && <FloatingMetaMessenger clientId={client?.client_id} onHide={() => setFloatingWidgetVisible("messenger", false)} />}
     </div>
   );
 }
